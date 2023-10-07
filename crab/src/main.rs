@@ -48,10 +48,12 @@ fn handle_input_line(line: &String) {
                  * - movetime: search for exactly x ms
                  * - infinite: search until "stop" command
                  *   received. Do not exit search otherwise.
+                 * - perft [unofficial]: run perft to x plies
                  */
             }
             "isready" => {
                 /* Immediately print "readyok" */
+                println!("readyok");
             }
             "ponderhit" => {
                 /* The user has played the expected move. */
@@ -77,16 +79,18 @@ fn handle_input_line(line: &String) {
                 /* Stop calculating immediately. */
             }
             "uci" => {
-                /* Print ID and all options. */
+                /* Print ID, all options and "uciok" */
+                println!("uciok");
             }
             "ucinewgame" => {
                 /* What it sounds like. Set pos to start pos, etc. */
             }
             "quit" => {
                 /* Quit as soon as possible */
+                exit(0);
             }
-            _ => {
-                /* Unrecognised command. */
+            other => {
+                println!("Unrecognised option \"{other}\".");
             }
         }
     } else {
