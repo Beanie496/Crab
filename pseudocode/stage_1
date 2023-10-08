@@ -20,3 +20,23 @@ FUNC handle_uci_commands(line):
             return QUIT
     ENDSWITCH
 ENDFUNC
+
+ENUM:
+    FILE_1 = 0, FILE_2 = 1, /* ... */ FILE_8 = 7
+ENDENUM
+
+ENUM
+    RANK_1 = 0, RANK_2 = 1, /* ... */ RANK_8 = 7
+ENDENUM
+
+FUNC pretty_print(bitboard):
+    FOR i = RANK_8 TO i = RANK_1:
+        FOR j = FILE_1 TO j = FILE_8:
+            IF bitboard & (1 << (i * 8 + j)) != 0:
+                OUTPUT("1 ")
+            ELSE
+                OUTPUT("0 ")
+            ENDIF
+        NEXT j
+    NEXT i
+ENDFUNC
