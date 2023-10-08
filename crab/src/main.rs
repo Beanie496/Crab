@@ -3,6 +3,9 @@ use std::{
     process::exit,
 };
 
+mod defs;
+mod util;
+
 fn main() {
     uci_main_loop();
 }
