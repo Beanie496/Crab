@@ -5,3 +5,62 @@ bishop_magic[64][???]
 rook_magic[64][???]
 
 // algorithms
+FUNC generate_pawn_moves(pawns, occupancy, us):
+    IF us == WHITE:
+        direction = UP
+    ELSE
+        direction = DOWN
+    ENDIF
+
+    WHILE (pawns != 0):
+        next = pawns.pop_bit()
+
+        // pushes
+        one_step = shift<direction, NONE>(next) & !occupancy
+        two_step = shift<direction, NONE>(one_step) & !occupancy & Rank4_bb
+        both_step = one_step | two_step
+
+        // captures
+        cap_left = shift<direction, LEFT>(next) & occupancy & !us & !File8_bb
+        cap_right = shift<direction, RIGHT>(next) & occupancy & !us & !File1_bb
+
+        attacks = both_step | cap_left | cap_right
+
+        add_moves<PAWN>(next, attacks)
+    ENDWHILE
+ENDFUNC
+
+FUNC shift<UP_DOWN, RIGHT_LEFT>(board):
+    IF UP_DOWN == UP:
+        IF RIGHT_LEFT == RIGHT:
+            return board << 9
+        ELSE IF RIGHT_LEFT == NONE:
+            return board << 8
+        ELSE
+            return board << 7
+        ENDIF
+    ELSE IF UP_DOWN == NONE
+        IF RIGHT_LEFT == RIGHT:
+            return board << 1
+        ELSE IF RIGHT_LEFT == NONE:
+            return board << 0
+        ELSE
+            return board >> 1
+        ENDIF
+    ELSE:
+        IF RIGHT_LEFT == RIGHT:
+            return board >> 7
+        ELSE IF RIGHT_LEFT == NONE:
+            return board >> 8
+        ELSE
+            return board >> 9
+        ENDIF
+    ENDIF
+ENDFUNC
+
+FUNC add_moves<PIECE>(start, end_bb):
+    WHILE (end_bb != 0):
+        end = end_bb.pop_bit()
+        movelist.push(start, end, PIECE)
+    ENDWHILE
+ENDFUNC
