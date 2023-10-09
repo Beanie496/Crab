@@ -1,42 +1,7 @@
-FUNC main():
-    uci_main_loop()
-ENDFUNC
+// data structures (lookup tables)
+king_attacks[64]
+knight_attacks[64]
+bishop_magic[64][???]
+rook_magic[64][???]
 
-FUNC uci_main_loop():
-    DO:
-        line = readline()
-        line.split_on(" ")
-    WHILE handle_uci_commands(line) != QUIT
-ENDFUNC
-
-FUNC handle_uci_commands(line):
-    SWITCH line[0]:
-        "uci":
-            // do nothing
-        "setoption":
-            handle_setoption(line)
-        // ...
-        "quit":
-            return QUIT
-    ENDSWITCH
-ENDFUNC
-
-ENUM:
-    FILE_1 = 0, FILE_2 = 1, /* ... */ FILE_8 = 7
-ENDENUM
-
-ENUM
-    RANK_1 = 0, RANK_2 = 1, /* ... */ RANK_8 = 7
-ENDENUM
-
-FUNC pretty_print(bitboard):
-    FOR i = RANK_8 TO i = RANK_1:
-        FOR j = FILE_1 TO j = FILE_8:
-            IF bitboard & (1 << (i * 8 + j)) != 0:
-                OUTPUT("1 ")
-            ELSE
-                OUTPUT("0 ")
-            ENDIF
-        NEXT j
-    NEXT i
-ENDFUNC
+// algorithms
