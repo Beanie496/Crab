@@ -1,10 +1,89 @@
-// data structures (lookup tables)
+/* data structures (lookup tables) */
 king_attacks[64]
 knight_attacks[64]
 bishop_magic[64][???]
 rook_magic[64][???]
 
-// algorithms
+
+/* constants - not technically important but needed to understand the
+   algorithms */
+FILE1 = 0
+FILE8 = 7
+RANK1 = 0
+RANK8 = 7
+SQ_A1 = 0
+SQ_A2 = 1
+// ...
+SQ_A8 = 7
+// ...
+SQ_B8 = 15
+// ..
+SQ_H8 = 63
+/* 1 0 0 0 0 0 0 0
+ * 1 0 0 0 0 0 0 0
+ * ...
+ * 1 0 0 0 0 0 0 0
+ */
+FILE1_BB = 0x0101010101010101
+/* 0 0 0 0 0 0 0 1
+ * 0 0 0 0 0 0 0 1
+ * ...
+ * 0 0 0 0 0 0 0 1
+ */
+FILE8_BB = 0x8080808080808080
+/* 0 0 0 0 0 0 0 0
+ * 0 0 0 0 0 0 0 0
+ * ...
+ * 1 1 1 1 1 1 1 1
+ */
+RANK1_BB = 0x00000000000000ff
+RANK4_BB = 0x00000000ff000000
+/* 1 1 1 1 1 1 1 1
+ * 0 0 0 0 0 0 0 0
+ * ...
+ * 0 0 0 0 0 0 0 0
+ */
+RANK8_BB = 0xff00000000000000
+
+
+/* algorithms */
+FUNC init_knight_attacks()
+    FOR i = SQ_A1 TO i = SQ_H8:
+        e = east_one(i)
+        w = west_one(i)
+        attacks = (e | w) << 16
+        attacks |= (e | w) >> 16
+        ee = east_one(e)
+        ww = west_one(w)
+        attacks |= (ee | ww) << 8
+        attacks |= (ee | ww) >> 8
+        knight_attacks[i] = attacks
+    NEXT i
+ENDFUNC
+
+FUNC init_king_attacks()
+    FOR i = SQ_A1 TO i = SQ_H8:
+        all = east_one(i) | i | west_one(i)
+        king_attacks[i] = (north_one(all) | south_one(all) | all) ^ i
+    NEXT i
+ENDFUNC
+
+FUNC north_one(board):
+    return board << 8
+ENDFUNC
+
+FUNC east_one(board):
+    return (board << 1) & !FILE1_BB
+ENDFUNC
+
+FUNC south_one(board):
+    return board >> 8
+ENDFUNC
+
+FUNC west_one(board):
+    return (board >> 1) & !FILE8_BB
+ENDFUNC
+
 FUNC generate_pawn_moves(pawns, occupancy, us):
     IF us == WHITE:
         direction = UP
@@ -17,16 +96,30 @@ FUNC generate_pawn_moves(pawns, occupancy, us):
 
         // pushes
         one_step = shift<direction, NONE>(next) & !occupancy
-        two_step = shift<direction, NONE>(one_step) & !occupancy & Rank4_bb
+        two_step = shift<direction, NONE>(one_step) & !occupancy & RANK4_BB
         both_step = one_step | two_step
 
         // captures
-        cap_left = shift<direction, LEFT>(next) & occupancy & !us & !File8_bb
-        cap_right = shift<direction, RIGHT>(next) & occupancy & !us & !File1_bb
+        cap_left = shift<direction, LEFT>(next) & occupancy & !us & !FILE8_BB
+        cap_right = shift<direction, RIGHT>(next) & occupancy & !us & !FILE1_BB
 
         attacks = both_step | cap_left | cap_right
 
         add_moves<PAWN>(next, attacks)
+    ENDWHILE
+ENDFUNC
+
+FUNC generate_knight_moves(knights, occupancy, us):
+    WHILE (knights != 0):
+        next = knights.pop_bit()
+        add_moves<KNIGHT>(next, knight_attacks[next])
+    ENDWHILE
+ENDFUNC
+
+FUNC generate_knight_moves(knights, occupancy, us):
+    WHILE (kings != 0):
+        next = kings.pop_bit()
+        add_moves<KNIGHT>(next, king_attacks[next])
     ENDWHILE
 ENDFUNC
 
