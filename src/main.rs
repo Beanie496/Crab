@@ -3,29 +3,30 @@ use std::{
     process::exit,
 };
 
-use crate::board::*;
+use crate::engine::*;
 
 mod board;
 mod defs;
+mod engine;
 mod util;
 
 fn main() {
-    let board = Board::new();
-    uci_main_loop();
+    let engine = Engine::new();
+    uci_main_loop(engine);
 }
 
-fn uci_main_loop() {
+fn uci_main_loop(engine: Engine) {
     let mut input = String::new();
     loop {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read from stdin");
-        handle_input_line(&input);
+        handle_input_line(&input, &engine);
         input.clear();
     }
 }
 
-fn handle_input_line(line: &String) {
+fn handle_input_line(line: &String, engine: &Engine) {
     let mut line = line.trim().split(' ');
 
     // handle each UCI option
@@ -98,7 +99,7 @@ fn handle_input_line(line: &String) {
             }
             /* non-standard commands */
             "p" => {
-                // pretty print
+                engine.pretty_print_board();
             }
             other => {
                 println!("Unrecognised option \"{other}\".");
