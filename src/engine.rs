@@ -15,4 +15,3 @@ impl Engine {
         self.board.pretty_print();
     }
 }
-

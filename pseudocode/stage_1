@@ -43,3 +43,56 @@ RANK8_BB = 0xff00000000000000
 
 
 /* algorithms */
+FUNC generate_moves(board, movelist):
+    generate_pawn_moves(board, movelist)
+    generate_non_sliding_moves<KNIGHT>(board, movelist)
+    generate_non_sliding_moves<KING>(board, movelist)
+    generate_sliding_moves<BISHOP>(board, movelist)
+    generate_sliding_moves<ROOK>(board, movelist)
+    generate_sliding_moves<QUEEN>(board, movelist)
+ENDFUNC
+
+FUNC generate_pawn_moves(board, movelist):
+    WHILE board.pawns != 0:
+        src = pop_next_square(&board.pawns)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move<PAWN>(lsb, dest)
+    ENDWHILE
+ENDFUNC
+
+// NON_SLIDING_PIECE == {KNIGHT,KING} - not pawn
+FUNC generate_non_sliding_moves<NON_SLIDING_PIECE>(board, movelist):
+    IF PIECE == KNIGHT:
+        src = pop_next_square(&board.knights)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move<PAWN>(lsb, dest)
+    ELSE
+        src = pop_next_square(&board.kings)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move<PAWN>(lsb, dest)
+    ENDIF
+ENDFUNC
+
+// SLIDING_PIECE == {BISHOP,ROOK,QUEEN}
+FUNC generate_sliding_moves<SLIDING_PIECE>(board, movelist):
+    IF PIECE == KNIGHT:
+        src = pop_next_square(&board.knights)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move<PAWN>(lsb, dest)
+    ELSE
+        src = pop_next_square(&board.kings)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move<PAWN>(lsb, dest)
+    ENDIF
+ENDFUNC
+
+FUNC pop_next_square(&bb):
+    shift = *bb.trailing_zeros
+    *bb ^= 1 << shift
+    return shift
+ENDFUNC
