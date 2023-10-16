@@ -3,10 +3,14 @@ use std::{
     process::exit,
 };
 
+use crate::board::*;
+
+mod board;
 mod defs;
 mod util;
 
 fn main() {
+    let board = Board::new();
     uci_main_loop();
 }
 
@@ -91,6 +95,10 @@ fn handle_input_line(line: &String) {
             "quit" => {
                 /* Quit as soon as possible */
                 exit(0);
+            }
+            /* non-standard commands */
+            "p" => {
+                // pretty print
             }
             other => {
                 println!("Unrecognised option \"{other}\".");
