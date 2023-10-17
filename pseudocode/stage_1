@@ -78,17 +78,25 @@ ENDFUNC
 
 // SLIDING_PIECE == {BISHOP,ROOK,QUEEN}
 FUNC generate_sliding_moves<SLIDING_PIECE>(board, movelist):
-    IF PIECE == KNIGHT:
-        src = pop_next_square(&board.knights)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move<PAWN>(lsb, dest)
-    ELSE
-        src = pop_next_square(&board.kings)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move<PAWN>(lsb, dest)
-    ENDIF
+    // this is more Rust than pseudocode, but the distiction
+    // between a switch and match statement is important
+    MATCH SLIDING_PIECE:
+        BISHOP:
+            src = pop_next_square(&board.bishops)
+            // random number from 0 to 63
+            dest = random(0, 63)
+            movelist.push_move<PAWN>(lsb, dest)
+        ROOK:
+            src = pop_next_square(&board.rooks)
+            // random number from 0 to 63
+            dest = random(0, 63)
+            movelist.push_move<PAWN>(lsb, dest)
+        QUEEN:
+            src = pop_next_square(&board.queens)
+            // random number from 0 to 63
+            dest = random(0, 63)
+            movelist.push_move<PAWN>(lsb, dest)
+    ENDMATCH
 ENDFUNC
 
 FUNC pop_next_square(&bb):
