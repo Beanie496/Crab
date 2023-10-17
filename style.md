@@ -10,10 +10,10 @@ The order for each file should be as shown:
 - `use`s
 - `mod`s
 - Types
+- Global variables
 - Enums/unions/structs in that order, unless needed otherwise
 - Traits
 - Impls
-- Global variables
 - Functions definitions, in descending order of abstraction (so main() first)
 
 Don't use the old file path style. This means you should never make a file called `mod.rs`.
