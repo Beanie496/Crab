@@ -1,4 +1,7 @@
-use crate::defs::*;
+use crate::{
+    defs::*,
+    movelist::*,
+};
 
 pub struct Board {
     white:   Bitboard,
@@ -9,6 +12,7 @@ pub struct Board {
     rooks:   Bitboard,
     queens:  Bitboard,
     kings:   Bitboard,
+    ml:      Movelist,
 }
 
 impl Board {
@@ -22,6 +26,7 @@ impl Board {
             rooks:   0x8100000000000081,
             queens:  0x0800000000000008,
             kings:   0x1000000000000010,
+            ml:      Movelist::new(),
         }
     }
 
@@ -73,6 +78,29 @@ impl Board {
             }
         } else {
             '0'
+        }
+    }
+}
+
+impl Board {
+    pub fn generate_moves(&self) {
+        // pawn moves
+        {
+        }
+        // knight moves
+        {
+        }
+        // king moves
+        {
+        }
+        // bishop moves
+        {
+        }
+        // rook moves
+        {
+        }
+        // queen moves
+        {
         }
     }
 }
