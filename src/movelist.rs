@@ -24,4 +24,20 @@ impl Movelist {
         self.moves[self.first_empty] = (start & (end << 6)) as Move;
         self.first_empty += 1;
     }
+
+    fn pop_move(&mut self) -> Option<Move> {
+        if self.first_empty > 0 {
+            self.first_empty -= 1;
+            Some(self.moves[self.first_empty])
+        } else {
+            None
+        }
+    }
+}
+
+impl Iterator for Movelist {
+    type Item = Move;
+    fn next (&mut self) -> Option<Self::Item> {
+        self.pop_move()
+    }
 }
