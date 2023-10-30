@@ -43,6 +43,18 @@ RANK8_BB = 0xff00000000000000
 
 
 /* algorithms */
+FUNC perft(depth):
+    IF depth == 0:
+        RETURN 1
+    ENDIF
+    generate_moves()
+    total = 0
+    FOR move IN movelist:
+        total += perft(depth - 1)
+    NEXT move
+    RETURN total
+ENDFUNC
+
 FUNC generate_moves(board, movelist):
     generate_pawn_moves(board, movelist)
     generate_non_sliding_moves<KNIGHT>(board, movelist)
