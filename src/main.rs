@@ -16,18 +16,18 @@ fn main() {
     uci_main_loop(engine);
 }
 
-fn uci_main_loop(engine: Engine) {
+fn uci_main_loop(mut engine: Engine) {
     let mut input = String::new();
     loop {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read from stdin");
-        handle_input_line(&input, &engine);
+        handle_input_line(&input, &mut engine);
         input.clear();
     }
 }
 
-fn handle_input_line(line: &String, engine: &Engine) {
+fn handle_input_line(line: &String, engine: &mut Engine) {
     let mut line = line.trim().split(' ');
 
     // handle each UCI option
@@ -98,10 +98,21 @@ fn handle_input_line(line: &String, engine: &Engine) {
                 /* Quit as soon as possible */
                 exit(0);
             }
+
             /* non-standard commands */
+            /* "p" - prints current position */
             "p" => {
                 engine.pretty_print_board();
             }
+            /* "perft n", where n is a number - run perft to depth n */
+            "perft" => {
+                if let Some(num) = line.next() {
+                    if let Ok(result) = num.parse::<i32>() {
+                        engine.perft(result as u8);
+                    }
+                }
+            }
+
             other => {
                 println!("Unrecognised option \"{other}\".");
             }

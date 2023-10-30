@@ -15,6 +15,22 @@ pub fn pretty_print(board: Bitboard) {
     println!("");
 }
 
+pub fn pretty_move(mv: Move) -> String {
+    let start = (mv as u8) & 0x3f;
+    let end  = ((mv >> 6) as u8) & 0x3f;
+    let mut ret = String::with_capacity(4);
+    ret += &square_as_str(start);
+    ret += &square_as_str(end);
+    ret
+}
+
+pub fn square_as_str(sq: u8) -> String {
+    let mut ret = String::with_capacity(2);
+    ret.push(('a' as u8 + (sq & 7)) as char);
+    ret.push(('1' as u8 + (sq >> 3)) as char);
+    ret
+}
+
 pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
     let shift: u8 = bb.trailing_zeros() as u8;
     *bb ^= 1u64 << shift;

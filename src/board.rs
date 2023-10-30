@@ -85,59 +85,87 @@ impl Board {
 }
 
 impl Board {
+    pub fn perft(&mut self, depth: u8) -> u8 {
+        if depth == 0 {
+            return 1;
+        }
+
+        self.generate_moves();
+
+        let mut total = 0;
+        while let Some(result) = self.ml.next() {
+            //make_move();
+            total += self.perft(depth - 1);
+            //unmake_move();
+        }
+        total
+    }
+
+    pub fn next_move(&mut self) -> Option<Move> {
+        self.ml.next()
+    }
+}
+
+impl Board {
     pub fn generate_moves(&mut self) {
         // pawn moves
         {
-            while self.pawns != 0 {
-                let src = pop_next_square(&mut self.pawns);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut pawns = self.pawns;
+            while pawns != 0 {
+                let src = pop_next_square(&mut pawns);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
         // knight moves
         {
-            while self.knights != 0 {
-                let src = pop_next_square(&mut self.knights);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut knights = self.knights;
+            while knights != 0 {
+                let src = pop_next_square(&mut knights);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
         // king moves
         {
-            while self.kings != 0 {
-                let src = pop_next_square(&mut self.kings);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut kings = self.kings;
+            while kings != 0 {
+                let src = pop_next_square(&mut kings);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
         // bishop moves
         {
-            while self.bishops != 0 {
-                let src = pop_next_square(&mut self.bishops);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut bishops = self.bishops;
+            while bishops != 0 {
+                let src = pop_next_square(&mut bishops);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
         // rook moves
         {
-            while self.rooks != 0 {
-                let src = pop_next_square(&mut self.rooks);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut rooks = self.rooks;
+            while rooks != 0 {
+                let src = pop_next_square(&mut rooks);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
         // queen moves
         {
-            while self.queens != 0 {
-                let src = pop_next_square(&mut self.queens);
-                let dest = 0;
-                unsafe { _rdrand16_step(&mut (dest as u16)); }
-                self.ml.push_move(src, dest);
+            let mut queens = self.queens;
+            while queens != 0 {
+                let src = pop_next_square(&mut queens);
+                let mut dest: u16 = 0;
+                unsafe { _rdrand16_step(&mut dest); }
+                self.ml.push_move(src, dest as u8);
             }
         }
     }
