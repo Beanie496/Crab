@@ -14,3 +14,9 @@ pub fn pretty_print(board: Bitboard) {
     }
     println!("");
 }
+
+pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
+    let shift: u8 = bb.trailing_zeros() as u8;
+    *bb ^= 1u64 << shift;
+    return shift;
+}

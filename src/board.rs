@@ -1,6 +1,8 @@
+use std::arch::x86_64::_rdrand16_step;
 use crate::{
     defs::*,
     movelist::*,
+    util::pop_next_square,
 };
 
 pub struct Board {
@@ -83,24 +85,60 @@ impl Board {
 }
 
 impl Board {
-    pub fn generate_moves(&self) {
+    pub fn generate_moves(&mut self) {
         // pawn moves
         {
+            while self.pawns != 0 {
+                let src = pop_next_square(&mut self.pawns);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
         // knight moves
         {
+            while self.knights != 0 {
+                let src = pop_next_square(&mut self.knights);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
         // king moves
         {
+            while self.kings != 0 {
+                let src = pop_next_square(&mut self.kings);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
         // bishop moves
         {
+            while self.bishops != 0 {
+                let src = pop_next_square(&mut self.bishops);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
         // rook moves
         {
+            while self.rooks != 0 {
+                let src = pop_next_square(&mut self.rooks);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
         // queen moves
         {
+            while self.queens != 0 {
+                let src = pop_next_square(&mut self.queens);
+                let dest = 0;
+                unsafe { _rdrand16_step(&mut (dest as u16)); }
+                self.ml.push_move(src, dest);
+            }
         }
     }
 }
