@@ -1,9 +1,4 @@
-// Move = 0b0000000000000000
-//          |--||----||----|
-// First 6 bits for start pos (0-63)
-// Next 6 bits for end pos (0-63)
-// Last 4 bits for flags (unused)
-type Move = u16;
+use crate::defs::*;
 
 const MAX_MOVES: usize = 250;
 
@@ -21,7 +16,7 @@ impl Movelist {
     }
 
     pub fn push_move(&mut self, start: u8, end: u8) {
-        self.moves[self.first_empty] = (start & (end << 6)) as Move;
+        self.moves[self.first_empty] = start as Move| ((end as Move) << 6);
         self.first_empty += 1;
     }
 
