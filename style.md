@@ -10,8 +10,8 @@ The order for each file should be as shown:
 - `use`s
 - `mod`s
 - Types
-- Global variables
 - Enums/unions/structs in that order, unless needed otherwise
+- Global variables
 - Traits
 - Impls
 - Functions definitions, in descending order of abstraction (so main() first)
