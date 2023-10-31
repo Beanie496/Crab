@@ -6,29 +6,27 @@ use crate::{
 };
 
 pub struct Board {
-    white:   Bitboard,
-    black:   Bitboard,
-    pawns:   Bitboard,
-    knights: Bitboard,
-    bishops: Bitboard,
-    rooks:   Bitboard,
-    queens:  Bitboard,
-    kings:   Bitboard,
+    sides:  [Bitboard; Nums::SIDES],
+    pieces: [Bitboard; Nums::PIECES],
     ml:      Movelist,
 }
 
 impl Board {
     pub fn new() -> Board {
         Board {
-            white:   0x000000000000ffff,
-            black:   0xffff000000000000,
-            pawns:   0x00ff00000000ff00,
-            knights: 0x4200000000000042,
-            bishops: 0x2400000000000024,
-            rooks:   0x8100000000000081,
-            queens:  0x0800000000000008,
-            kings:   0x1000000000000010,
-            ml:      Movelist::new(),
+            sides: [
+                0x000000000000ffff, // White
+                0xffff000000000000, // Black
+            ],
+            pieces: [
+                0x00ff00000000ff00, // Pawns
+                0x4200000000000042, // Knights
+                0x2400000000000024, // Bishops
+                0x8100000000000081, // Rooks
+                0x0800000000000008, // Queens
+                0x1000000000000010, // Kings
+            ],
+            ml: Movelist::new(),
         }
     }
 
@@ -46,41 +44,14 @@ impl Board {
 
     fn char_piece_from_pos(&self, rank: u8, file: u8) -> char {
         let sq_bb = bitboard_from_pos(rank, file);
-        if sq_bb & self.white != 0 {
-            if sq_bb & self.pawns != 0 {
-                'P'
-            } else if sq_bb & self.knights != 0 {
-                'N'
-            } else if sq_bb & self.bishops != 0 {
-                'B'
-            } else if sq_bb & self.rooks != 0 {
-                'R'
-            } else if sq_bb & self.queens != 0 {
-                'Q'
-            } else if sq_bb & self.kings != 0 {
-                'K'
-            } else {
-                panic!("White bb does not match up with the piece bbs");
+        for i in 0..Nums::SIDES {
+            for j in 0..Nums::PIECES {
+                if sq_bb & self.sides[i] & self.pieces[j] != 0 {
+                    return PIECE_CHARS[i][j];
+                }
             }
-        } else if sq_bb & self.black != 0 {
-            if sq_bb & self.pawns != 0 {
-                'p'
-            } else if sq_bb & self.knights != 0 {
-                'n'
-            } else if sq_bb & self.bishops != 0 {
-                'b'
-            } else if sq_bb & self.rooks != 0 {
-                'r'
-            } else if sq_bb & self.queens != 0 {
-                'q'
-            } else if sq_bb & self.kings != 0 {
-                'k'
-            } else {
-                panic!("Black bb does not match up with the piece bbs");
-            }
-        } else {
-            '0'
         }
+        '0'
     }
 }
 
@@ -110,7 +81,7 @@ impl Board {
     pub fn generate_moves(&mut self) {
         // pawn moves
         {
-            let mut pawns = self.pawns;
+            let mut pawns = self.pieces[Pieces::PAWN];
             while pawns != 0 {
                 let src = pop_next_square(&mut pawns);
                 let mut dest: u16 = 0;
@@ -120,7 +91,7 @@ impl Board {
         }
         // knight moves
         {
-            let mut knights = self.knights;
+            let mut knights = self.pieces[Pieces::KNIGHT];
             while knights != 0 {
                 let src = pop_next_square(&mut knights);
                 let mut dest: u16 = 0;
@@ -130,7 +101,7 @@ impl Board {
         }
         // king moves
         {
-            let mut kings = self.kings;
+            let mut kings = self.pieces[Pieces::KING];
             while kings != 0 {
                 let src = pop_next_square(&mut kings);
                 let mut dest: u16 = 0;
@@ -140,7 +111,7 @@ impl Board {
         }
         // bishop moves
         {
-            let mut bishops = self.bishops;
+            let mut bishops = self.pieces[Pieces::BISHOP];
             while bishops != 0 {
                 let src = pop_next_square(&mut bishops);
                 let mut dest: u16 = 0;
@@ -150,7 +121,7 @@ impl Board {
         }
         // rook moves
         {
-            let mut rooks = self.rooks;
+            let mut rooks = self.pieces[Pieces::ROOK];
             while rooks != 0 {
                 let src = pop_next_square(&mut rooks);
                 let mut dest: u16 = 0;
@@ -160,7 +131,7 @@ impl Board {
         }
         // queen moves
         {
-            let mut queens = self.queens;
+            let mut queens = self.pieces[Pieces::QUEEN];
             while queens != 0 {
                 let src = pop_next_square(&mut queens);
                 let mut dest: u16 = 0;
