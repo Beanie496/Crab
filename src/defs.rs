@@ -26,6 +26,8 @@ pub struct Pieces;
 pub struct Ranks;
 /// Enumerates sides. White = 0, Black = 1.
 pub struct Sides;
+/// Enumerates squares, from a1 = 0 to a8 = 7 to h8 = 63.
+pub struct Squares;
 
 /** An array of character constants associated with each piece on both sides.
  * ```
@@ -66,4 +68,11 @@ impl Ranks {
 impl Sides {
     pub const WHITE: u8 = 0;
     pub const BLACK: u8 = 1;
+}
+
+impl Squares {
+    pub const A1: u8 = 0;
+    pub const A8: u8 = 7;
+    pub const H1: u8 = 56;
+    pub const H8: u8 = 63;
 }

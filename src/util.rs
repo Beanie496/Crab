@@ -40,3 +40,21 @@ pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
     *bb ^= 1u64 << shift;
     return shift;
 }
+
+pub fn create_move(start: u8, end: u8) -> Move {
+    start as Move
+        | ((end as Move) << 6)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::defs::Squares;
+    use super::create_move;
+
+    #[test]
+    fn push_twice_then_pop_twice() {
+        // these asserts will use magic values known to be correct
+        assert_eq!(create_move(Squares::A1, Squares::H8), 63 << 6);
+        assert_eq!(create_move(Squares::A8, Squares::H1), (56 << 6) | 7);
+    }
+}

@@ -1,4 +1,7 @@
-use crate::defs::Move;
+use crate::{
+    defs::Move,
+    util::create_move,
+};
 
 const MAX_MOVES: usize = 250;
 
@@ -22,7 +25,7 @@ impl Movelist {
     /// full.
     pub fn push_move(&mut self, start: u8, end: u8) {
         if self.first_empty < MAX_MOVES {
-            self.moves[self.first_empty] = start as Move | ((end as Move) << 6);
+            self.moves[self.first_empty] = create_move(start, end);
             self.first_empty += 1;
         } else {
             panic!("Pushing a move onto an already-full move list.");
