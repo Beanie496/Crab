@@ -29,15 +29,6 @@ impl Engine {
             println!("1");
             return;
         }
-
-        self.board.generate_moves();
-
-        while let Some(result) = self.board.next_move() {
-            //make_move();
-            println!("{}: {}",
-                stringify_move(result),
-                self.board.perft(depth - 1));
-            //unmake_move();
-        }
+        self.board.perft(depth - 1);
     }
 }

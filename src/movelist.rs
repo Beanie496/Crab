@@ -40,10 +40,3 @@ impl Movelist {
         }
     }
 }
-
-impl Iterator for Movelist {
-    type Item = Move;
-    fn next (&mut self) -> Option<Self::Item> {
-        self.pop_move()
-    }
-}

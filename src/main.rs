@@ -8,6 +8,7 @@ use crate::engine::*;
 mod board;
 mod defs;
 mod engine;
+mod movegen;
 mod movelist;
 mod util;
 

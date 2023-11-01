@@ -1,8 +1,6 @@
-use std::arch::x86_64::_rdrand16_step;
 use crate::{
     defs::*,
     movelist::*,
-    util::pop_next_square,
 };
 
 pub struct Board {
@@ -63,41 +61,7 @@ impl Board {
 impl Board {
     /// Runs perft on the given depth.
     pub fn perft(&mut self, depth: u8) -> u8 {
-        if depth == 0 {
-            return 1;
-        }
-
-        self.generate_moves();
-
-        let mut total = 0;
-        while let Some(result) = self.ml.next() {
-            //make_move();
-            total += self.perft(depth - 1);
-            //unmake_move();
-        }
-        total
-    }
-
-    /// REWORK
-    pub fn next_move(&mut self) -> Option<Move> {
-        self.ml.next()
-    }
-}
-
-impl Board {
-    /// REWORK, but supposed to generate all the legal moves from the current
-    /// state of the board.
-    pub fn generate_moves(&mut self) {
-        // pawn moves
-        {
-            let mut pawns = self.pieces[Pieces::PAWN as usize];
-            while pawns != 0 {
-                let src = pop_next_square(&mut pawns);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
+        depth
     }
 }
 
