@@ -1,18 +1,40 @@
 pub type Bitboard = u64;
-// Move = 0b0000000000000000
-//          |--||----||----|
-// First 6 bits for start pos (0-63)
-// Next 6 bits for end pos (0-63)
-// Last 4 bits for flags (unused)
+/**
+ * Start pos == 6 bits, 0-63
+ *
+ * End pos == 6 bits, 0-63
+ *
+ * Flags == 4 bits
+ * ```
+ * Move ==
+ *     ((start & 0x3f) << 0)
+ *     | ((end & 0x3f) << 6)
+ *     | ((flags & 0xf) << 12);
+ *
+ * ```
+ */
 pub type Move = u16;
 pub type Piece = u8;
 
+/// Enumerates files, from file 1 = 0 to file 8 = 7.
 pub struct Files;
-pub struct Pieces;
-pub struct Ranks;
+/// Constants associated with Chess (sides = 2, etc.).
 pub struct Nums;
+/// Enumerates pieces, from pawn = 0 to king = 5.
+pub struct Pieces;
+/// Enumerates ranks, from rank 1 = 0 to rank 8 = 7.
+pub struct Ranks;
+/// Enumerates sides. White = 0, Black = 1.
+pub struct Sides;
 
-pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
+/** An array of character constants associated with each piece on both sides.
+ * ```
+ * assert_eq!(PIECE_CHARS[Sides::WHITE][Pieces::PAWN], 'P');
+ * assert_eq!(PIECE_CHARS[Sides::BLACK][Pieces::PAWN], 'p');
+ * // etc.
+ * ```
+ */
+pub const PIECE_CHARS: [[char; Nums::PIECES as usize]; Nums::SIDES as usize] = [
     ['P', 'N', 'B', 'R', 'Q', 'K'],
     ['p', 'n', 'b', 'r', 'q', 'k'],
 ];
@@ -20,6 +42,11 @@ pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
 impl Files {
     pub const FILE1: u8 = 0;
     pub const FILE8: u8 = 7;
+}
+
+impl Nums {
+    pub const SIDES:  u8 = 2;
+    pub const PIECES: u8 = 6;
 }
 
 impl Pieces {
@@ -36,7 +63,7 @@ impl Ranks {
     pub const RANK8: u8 = 7;
 }
 
-impl Nums {
-    pub const SIDES:  usize = 2;
-    pub const PIECES: usize = 6;
+impl Sides {
+    pub const WHITE: u8 = 0;
+    pub const BLACK: u8 = 1;
 }
