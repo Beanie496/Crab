@@ -5,6 +5,7 @@ pub type Bitboard = u64;
 // Next 6 bits for end pos (0-63)
 // Last 4 bits for flags (unused)
 pub type Move = u16;
+pub type Piece = u8;
 
 pub struct Files;
 pub struct Pieces;
@@ -22,12 +23,12 @@ impl Files {
 }
 
 impl Pieces {
-    pub const PAWN:   usize = 0;
-    pub const KNIGHT: usize = 1;
-    pub const BISHOP: usize = 2;
-    pub const ROOK:   usize = 3;
-    pub const QUEEN:  usize = 4;
-    pub const KING:   usize = 5;
+    pub const PAWN:   Piece = 0;
+    pub const KNIGHT: Piece = 1;
+    pub const BISHOP: Piece = 2;
+    pub const ROOK:   Piece = 3;
+    pub const QUEEN:  Piece = 4;
+    pub const KING:   Piece = 5;
 }
 
 impl Ranks {

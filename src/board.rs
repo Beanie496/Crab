@@ -81,7 +81,7 @@ impl Board {
     pub fn generate_moves(&mut self) {
         // pawn moves
         {
-            let mut pawns = self.pieces[Pieces::PAWN];
+            let mut pawns = self.pieces[Pieces::PAWN as usize];
             while pawns != 0 {
                 let src = pop_next_square(&mut pawns);
                 let mut dest: u16 = 0;
