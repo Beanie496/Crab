@@ -1,12 +1,11 @@
 use crate::{
     defs::{ Bitboard, Files, Nums, PIECE_CHARS, Ranks },
-    movelist::Movelist,
 };
 
+/// Stores information about the current state of the board.
 pub struct Board {
     sides:  [Bitboard; Nums::SIDES as usize],
     pieces: [Bitboard; Nums::PIECES as usize],
-    ml:      Movelist,
 }
 
 impl Board {
@@ -26,7 +25,6 @@ impl Board {
                 0x0800000000000008, // Queens
                 0x1000000000000010, // Kings
             ],
-            ml: Movelist::new(),
         }
     }
 
@@ -55,13 +53,6 @@ impl Board {
             }
         }
         '0'
-    }
-}
-
-impl Board {
-    /// Runs perft on the given depth.
-    pub fn perft(&mut self, depth: u8) -> u8 {
-        depth
     }
 }
 

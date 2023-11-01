@@ -3,12 +3,12 @@ use crate::{
     util::create_move,
 };
 
-const MAX_MOVES: usize = 250;
+const MAX_GAME_MOVES: usize = 250;
 
 /// A wrapper struct for the current move list, from the starting position
 /// (set by the user or the default start pos) to the current position.
 pub struct Movelist {
-    moves: [Move; MAX_MOVES],
+    moves: [Move; MAX_GAME_MOVES],
     first_empty: usize,
 }
 
@@ -16,7 +16,7 @@ impl Movelist {
     /// Returns a Movelist object with an empty move list.
     pub fn new() -> Movelist {
         Movelist {
-            moves: [0; MAX_MOVES],
+            moves: [0; MAX_GAME_MOVES],
             first_empty: 0,
         }
     }
@@ -24,7 +24,7 @@ impl Movelist {
     /// Pushes a move onto the move list. Panics if the move list is already
     /// full.
     pub fn push_move(&mut self, start: u8, end: u8) {
-        if self.first_empty < MAX_MOVES {
+        if self.first_empty < MAX_GAME_MOVES {
             self.moves[self.first_empty] = create_move(start, end);
             self.first_empty += 1;
         } else {
