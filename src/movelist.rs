@@ -22,7 +22,7 @@ impl Movelist {
     /// full.
     pub fn push_move(&mut self, start: u8, end: u8) {
         if self.first_empty < MAX_MOVES {
-            self.moves[self.first_empty] = start as Move| ((end as Move) << 6);
+            self.moves[self.first_empty] = start as Move | ((end as Move) << 6);
             self.first_empty += 1;
         } else {
             panic!("Pushing a move onto an already-full move list.");

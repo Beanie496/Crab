@@ -17,7 +17,7 @@ The order for each file should be as shown:
 - Functions definitions, in descending order of abstraction (so main() first)
 
 Don't use the old file path style. This means you should never make a file called `mod.rs`.
-Don't make inline modules. Always put the code in an external file.
+Unit tests should usually be inline modules. All other modules should be in external files.
 
 ### 2. Imports
 
