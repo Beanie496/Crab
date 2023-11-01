@@ -1,5 +1,5 @@
 use crate::{
-    board::*,
+    board::Board,
     util::stringify_move,
 };
 

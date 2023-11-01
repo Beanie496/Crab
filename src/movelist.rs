@@ -1,4 +1,4 @@
-use crate::defs::*;
+use crate::defs::Move;
 
 const MAX_MOVES: usize = 250;
 

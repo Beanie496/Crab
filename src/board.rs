@@ -1,6 +1,6 @@
 use crate::{
-    defs::*,
-    movelist::*,
+    defs::{ Bitboard, Files, Nums, PIECE_CHARS, Ranks },
+    movelist::Movelist,
 };
 
 pub struct Board {

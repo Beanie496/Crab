@@ -21,32 +21,24 @@ Don't make inline modules. Always put the code in an external file.
 
 ### 2. Imports
 
-Do not nest imports on one line, and do not nest imports more than one level deep.
-```
-// ok
-use a::b::{c, d};
-use a::e::f;
-```
+If you import multiple items from one module, do so on one line. If you import multiple items that are themselves importing multiple items, put each item on a new line.
+Sort the imports alphabetically.
+Only import what is used.
 ```
 // ok
 use a::{
-    b::{c, d},
-    e::f,
+    b::{
+        c::{
+            d::e,
+            f::g,
+        },
+    },
+    h::i,
 };
 ```
 ```
 // not ok
 use a::{b::{c, d}, f};
-```
-```
-// not ok
-use a::{
-    b::{c::{
-        d::e,
-        f::g,
-    },
-    f::g,
-};
 ```
 
 When two items in different crates have the same name, bring the parent modules into scope instead. Don't use `as` to rename an item.

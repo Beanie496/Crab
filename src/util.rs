@@ -1,4 +1,4 @@
-use crate::defs::*;
+use crate::defs::{ Bitboard, Files, Move, Ranks };
 
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
