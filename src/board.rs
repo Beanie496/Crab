@@ -89,56 +89,6 @@ impl Board {
                 self.ml.push_move(src, dest as u8);
             }
         }
-        // knight moves
-        {
-            let mut knights = self.pieces[Pieces::KNIGHT];
-            while knights != 0 {
-                let src = pop_next_square(&mut knights);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
-        // king moves
-        {
-            let mut kings = self.pieces[Pieces::KING];
-            while kings != 0 {
-                let src = pop_next_square(&mut kings);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
-        // bishop moves
-        {
-            let mut bishops = self.pieces[Pieces::BISHOP];
-            while bishops != 0 {
-                let src = pop_next_square(&mut bishops);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
-        // rook moves
-        {
-            let mut rooks = self.pieces[Pieces::ROOK];
-            while rooks != 0 {
-                let src = pop_next_square(&mut rooks);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
-        // queen moves
-        {
-            let mut queens = self.pieces[Pieces::QUEEN];
-            while queens != 0 {
-                let src = pop_next_square(&mut queens);
-                let mut dest: u16 = 0;
-                unsafe { _rdrand16_step(&mut dest); }
-                self.ml.push_move(src, dest as u8);
-            }
-        }
     }
 }
 
