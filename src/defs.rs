@@ -6,6 +6,7 @@ pub type File = u8;
  * * End pos == 6 bits, 0-63
  * * Piece == 3 bits, 0-5
  * * Side == 1 bit
+ *
  * The start and end are obvious. The piece and side are for fast access into
  * the board's arrays instead of requiring a match statement.
  * ```
