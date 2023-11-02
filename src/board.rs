@@ -1,11 +1,13 @@
 use crate::{
-    defs::{ Bitboard, Files, Nums, PIECE_CHARS, Ranks },
+    defs::{ Bitboard, Files, Move, Nums, PIECE_CHARS, Ranks, Side, Sides },
+    util::{ decompose_move },
 };
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    sides:  [Bitboard; Nums::SIDES as usize],
-    pieces: [Bitboard; Nums::PIECES as usize],
+    sides:        [Bitboard; Nums::SIDES as usize],
+    pieces:       [Bitboard; Nums::PIECES as usize],
+    side_to_move:  Side,
 }
 
 impl Board {
@@ -25,9 +27,28 @@ impl Board {
                 0x0800000000000008, // Queens
                 0x1000000000000010, // Kings
             ],
+            side_to_move: Sides::WHITE,
         }
     }
+}
 
+impl Board {
+    pub fn make_move(&mut self, mv: Move) {
+        let (start, end, piece, side) = decompose_move(mv);
+        self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
+        self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);
+        self.side_to_move ^= 1;
+    }
+
+    pub fn unmake_move(&mut self, mv: Move) {
+        let (start, end, piece, side) = decompose_move(mv);
+        self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
+        self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);
+        self.side_to_move ^= 1;
+    }
+}
+
+impl Board {
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {

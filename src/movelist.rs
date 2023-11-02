@@ -1,5 +1,5 @@
 use crate::{
-    defs::Move,
+    defs::{ Move, Piece, Side },
     util::create_move,
 };
 
@@ -22,9 +22,9 @@ impl Movelist {
 
     /// Pushes a move onto the move list. Panics if the move list is already
     /// full.
-    pub fn push_move(&mut self, start: u8, end: u8) {
+    pub fn push_move(&mut self, start: u8, end: u8, piece: Piece, side: Side) {
         if self.first_empty < MAX_GAME_MOVES {
-            self.moves[self.first_empty] = create_move(start, end);
+            self.moves[self.first_empty] = create_move(start, end, piece, side);
             self.first_empty += 1;
         } else {
             panic!("Pushing a move onto an already-full move list.");

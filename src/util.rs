@@ -1,4 +1,4 @@
-use crate::defs::{ Bitboard, Files, Move, Ranks };
+use crate::defs::{ Bitboard, Files, Move, Piece, Ranks, Side };
 
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
@@ -41,9 +41,21 @@ pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
     return shift;
 }
 
-pub fn create_move(start: u8, end: u8) -> Move {
+/// Returns a Move given a start square, end square, piece and side.
+pub fn create_move(start: u8, end: u8, piece: Piece, side: Side) -> Move {
     start as Move
         | ((end as Move) << 6)
+        | ((piece as Move) << 12)
+        | ((side as Move) << 15)
+}
+
+/// Returns a tuple of a start square, end square, piece and side given a Move.
+pub fn decompose_move(mv: Move) -> (u8, u8, Piece, Side) {
+    let start = (mv & 0x3f) as u8;
+    let end = ((mv >> 6) & 0x3f) as u8;
+    let piece = ((mv >> 12) & 0x7) as u8;
+    let side = ((mv >> 15) & 0x1) as u8;
+    (start, end, piece, side)
 }
 
 #[cfg(test)]

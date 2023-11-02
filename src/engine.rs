@@ -43,11 +43,11 @@ impl Engine {
         self.mg.generate_moves(&self.board, &mut ml);
 
         for mv in ml {
-            //make_move();
+            self.board.make_move(mv);
             println!("{}: {}",
                 stringify_move(mv),
                 self.perft(depth - 1));
-            //unmake_move();
+            self.board.unmake_move(mv);
         }
     }
 

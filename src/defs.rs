@@ -1,20 +1,24 @@
 pub type Bitboard = u64;
 /**
- * Start pos == 6 bits, 0-63
- *
- * End pos == 6 bits, 0-63
- *
- * Flags == 4 bits
+ * From LSB onwards, a Move is as follows:
+ * * Start pos == 6 bits, 0-63
+ * * End pos == 6 bits, 0-63
+ * * Piece == 3 bits, 0-5
+ * * Side == 1 bit
+ * The start and end are obvious. The piece and side are for fast access into
+ * the board's arrays instead of requiring a match statement.
  * ```
  * Move ==
  *     ((start & 0x3f) << 0)
  *     | ((end & 0x3f) << 6)
- *     | ((flags & 0xf) << 12);
+ *     | ((piece & 0x7) << 12)
+ *     | ((side & 0x1) << 15);
  *
  * ```
  */
 pub type Move = u16;
 pub type Piece = u8;
+pub type Side = u8;
 
 /// Enumerates files, from file 1 = 0 to file 8 = 7.
 pub struct Files;
@@ -66,8 +70,8 @@ impl Ranks {
 }
 
 impl Sides {
-    pub const WHITE: u8 = 0;
-    pub const BLACK: u8 = 1;
+    pub const WHITE: Side = 0;
+    pub const BLACK: Side = 1;
 }
 
 impl Squares {
