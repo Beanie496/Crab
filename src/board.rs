@@ -1,5 +1,5 @@
 use crate::{
-    defs::{ Bitboard, Files, Move, Nums, PIECE_CHARS, Ranks, Side, Sides },
+    defs::{ Bitboard, File, Files, Move, Nums, PIECE_CHARS, Rank, Ranks, Side, Sides },
     util::{ decompose_move },
 };
 
@@ -64,7 +64,7 @@ impl Board {
 
     /// Returns the piece on the square given by the rank and file, otherwise
     /// returns '0'.
-    fn char_piece_from_pos(&self, rank: u8, file: u8) -> char {
+    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let sq_bb = bitboard_from_pos(rank, file);
         for i in 0..Nums::SIDES as usize {
             for j in 0..Nums::PIECES as usize {
@@ -78,11 +78,11 @@ impl Board {
 }
 
 /// Returns the character representation of the given rank.
-fn rank_to_char(rank: u8) -> char {
+fn rank_to_char(rank: Rank) -> char {
     char::from_u32('A' as u32 + rank as u32).unwrap()
 }
 
 /// Returns a 0-initialised bitboard with the bit in the given position set.
-fn bitboard_from_pos(rank: u8, file: u8) -> Bitboard {
+fn bitboard_from_pos(rank: Rank, file: File) -> Bitboard {
     1u64 << (rank * 8 + file)
 }

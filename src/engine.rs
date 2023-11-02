@@ -63,9 +63,9 @@ impl Engine {
 
         let mut total = 0;
         for mv in ml {
-            //make_move();
+            self.board.make_move(mv);
             total += self.perft(depth - 1);
-            //unmake_move();
+            self.board.unmake_move(mv);
         }
         total
     }

@@ -1,4 +1,5 @@
 pub type Bitboard = u64;
+pub type File = u8;
 /**
  * From LSB onwards, a Move is as follows:
  * * Start pos == 6 bits, 0-63
@@ -18,7 +19,9 @@ pub type Bitboard = u64;
  */
 pub type Move = u16;
 pub type Piece = u8;
+pub type Rank = u8;
 pub type Side = u8;
+pub type Square = u8;
 
 /// Enumerates files, from file 1 = 0 to file 8 = 7.
 pub struct Files;
@@ -46,8 +49,8 @@ pub const PIECE_CHARS: [[char; Nums::PIECES as usize]; Nums::SIDES as usize] = [
 ];
 
 impl Files {
-    pub const FILE1: u8 = 0;
-    pub const FILE8: u8 = 7;
+    pub const FILE1: File = 0;
+    pub const FILE8: File = 7;
 }
 
 impl Nums {
@@ -65,8 +68,8 @@ impl Pieces {
 }
 
 impl Ranks {
-    pub const RANK1: u8 = 0;
-    pub const RANK8: u8 = 7;
+    pub const RANK1: Rank = 0;
+    pub const RANK8: Rank = 7;
 }
 
 impl Sides {
@@ -75,8 +78,8 @@ impl Sides {
 }
 
 impl Squares {
-    pub const A1: u8 = 0;
-    pub const A8: u8 = 7;
-    pub const H1: u8 = 56;
-    pub const H8: u8 = 63;
+    pub const A1: Square = 0;
+    pub const A8: Square = 7;
+    pub const H1: Square = 56;
+    pub const H8: Square = 63;
 }

@@ -1,4 +1,4 @@
-use crate::defs::{ Bitboard, Files, Move, Piece, Ranks, Side };
+use crate::defs::{ Bitboard, Files, Move, Piece, Ranks, Side, Square };
 
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
@@ -27,7 +27,7 @@ pub fn stringify_move(mv: Move) -> String {
 }
 
 /// Returns a string representation of a square.
-pub fn stringify_square(sq: u8) -> String {
+pub fn stringify_square(sq: Square) -> String {
     let mut ret = String::with_capacity(2);
     ret.push(('a' as u8 + (sq & 7)) as char);
     ret.push(('1' as u8 + (sq >> 3)) as char);
@@ -42,7 +42,7 @@ pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
 }
 
 /// Returns a Move given a start square, end square, piece and side.
-pub fn create_move(start: u8, end: u8, piece: Piece, side: Side) -> Move {
+pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
     start as Move
         | ((end as Move) << 6)
         | ((piece as Move) << 12)
@@ -50,7 +50,7 @@ pub fn create_move(start: u8, end: u8, piece: Piece, side: Side) -> Move {
 }
 
 /// Returns a tuple of a start square, end square, piece and side given a Move.
-pub fn decompose_move(mv: Move) -> (u8, u8, Piece, Side) {
+pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
     let start = (mv & 0x3f) as u8;
     let end = ((mv >> 6) & 0x3f) as u8;
     let piece = ((mv >> 12) & 0x7) as u8;
