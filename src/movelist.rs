@@ -5,8 +5,7 @@ use crate::{
 
 const MAX_GAME_MOVES: usize = 250;
 
-/// A wrapper struct for the current move list, from the starting position
-/// (set by the user or the default start pos) to the current position.
+/// A wrapper around an array of moves.
 pub struct Movelist {
     moves: [Move; MAX_GAME_MOVES],
     first_empty: usize,
@@ -41,5 +40,13 @@ impl Movelist {
         } else {
             None
         }
+    }
+}
+
+impl Iterator for Movelist {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pop_move()
     }
 }

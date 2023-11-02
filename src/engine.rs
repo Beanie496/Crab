@@ -2,12 +2,15 @@ use crate::{
     board::Board,
     movegen::Movegen,
     movelist::Movelist,
+    util::stringify_move,
 };
 
 /// Master object that contains all the other major objects.
 pub struct Engine {
     board: Board,
     mg:    Movegen,
+    /// The current move list, from the starting position (set by the user or
+    /// the default start pos) to the current position.
     ml:    Movelist,
 }
 
@@ -35,11 +38,35 @@ impl Engine {
             println!("1");
             return;
         }
-        self.perft(depth - 1);
+
+        let mut ml = Movelist::new();
+        self.mg.generate_moves(&self.board, &mut ml);
+
+        for mv in ml {
+            //make_move();
+            println!("{}: {}",
+                stringify_move(mv),
+                self.perft(depth - 1));
+            //unmake_move();
+        }
     }
 
     /// Runs perft on the current position and returns the number of legal
     /// moves.
-    pub fn perft(&mut self, depth: u8) {
+    pub fn perft(&mut self, depth: u8) -> u8 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut ml = Movelist::new();
+        self.mg.generate_moves(&self.board, &mut ml);
+
+        let mut total = 0;
+        for mv in ml {
+            //make_move();
+            total += self.perft(depth - 1);
+            //unmake_move();
+        }
+        total
     }
 }

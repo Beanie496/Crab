@@ -109,7 +109,7 @@ fn handle_input_line(line: &String, engine: &mut Engine) {
             "perft" => {
                 if let Some(num) = line.next() {
                     if let Ok(result) = num.parse::<i32>() {
-                        engine.perft(result as u8);
+                        engine.perft_root(result as u8);
                     }
                 }
             }
