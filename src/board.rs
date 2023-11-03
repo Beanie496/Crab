@@ -1,5 +1,6 @@
 use crate::{
     defs::{ Bitboard, File, Files, Move, Nums, PIECE_CHARS, Rank, Ranks, Side, Sides },
+    movelist::Movelist,
     util::{ decompose_move },
 };
 
@@ -33,14 +34,19 @@ impl Board {
 }
 
 impl Board {
-    pub fn make_move(&mut self, mv: Move) {
+    /// Given a Move and a Movelist, update the board state to play the move
+    /// and push the Move onto the Movelist.
+    pub fn make_move(&mut self, mv: Move, ml: &mut Movelist) {
+        ml.push_move(mv);
         let (start, end, piece, side) = decompose_move(mv);
         self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
         self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);
         self.side_to_move ^= 1;
     }
 
-    pub fn unmake_move(&mut self, mv: Move) {
+    /// Given a a Movelist, pop the move off the Movelist and play it.
+    pub fn unmake_move(&mut self, ml: &mut Movelist) {
+        let mv = ml.pop_move().unwrap();
         let (start, end, piece, side) = decompose_move(mv);
         self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
         self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);

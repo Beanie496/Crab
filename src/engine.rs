@@ -43,11 +43,11 @@ impl Engine {
         self.mg.generate_moves(&self.board, &mut ml);
 
         for mv in ml {
-            self.board.make_move(mv);
+            self.board.make_move(mv, &mut self.ml);
             println!("{}: {}",
                 stringify_move(mv),
                 self.perft(depth - 1));
-            self.board.unmake_move(mv);
+            self.board.unmake_move(&mut self.ml);
         }
     }
 
@@ -63,9 +63,9 @@ impl Engine {
 
         let mut total = 0;
         for mv in ml {
-            self.board.make_move(mv);
+            self.board.make_move(mv, &mut self.ml);
             total += self.perft(depth - 1);
-            self.board.unmake_move(mv);
+            self.board.unmake_move(&mut self.ml);
         }
         total
     }
