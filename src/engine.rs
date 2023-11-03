@@ -53,7 +53,7 @@ impl Engine {
 
     /// Runs perft on the current position and returns the number of legal
     /// moves.
-    pub fn perft(&mut self, depth: u8) -> u8 {
+    pub fn perft(&mut self, depth: u8) -> u64 {
         if depth == 0 {
             return 1;
         }

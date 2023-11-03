@@ -1,8 +1,45 @@
 use crate::defs::{ Bitboard, Files, Move, Piece, Ranks, Side, Square };
 
+/// Returns a Move given a start square, end square, piece and side.
+pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
+    start as Move
+        | ((end as Move) << 6)
+        | ((piece as Move) << 12)
+        | ((side as Move) << 15)
+}
+
+/// Returns a tuple of a start square, end square, piece and side given a Move.
+pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
+    let start = (mv & 0x3f) as u8;
+    let end = ((mv >> 6) & 0x3f) as u8;
+    let piece = ((mv >> 12) & 0x7) as u8;
+    let side = ((mv >> 15) & 0x1) as u8;
+    (start, end, piece, side)
+}
+
+/// Returns `bb << 8`.
+pub fn north_one(bb: Bitboard) -> Bitboard {
+    bb << 8
+}
+
+/// Clears the LSB and returns it.
+pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
+    let popped_bit = *bb & bb.wrapping_neg();
+    *bb ^= popped_bit;
+    popped_bit
+}
+
+/// Clears the LSB and returns the 0-indexed position of that bit.
+pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
+    let shift: u8 = bb.trailing_zeros() as u8;
+    *bb ^= 1u64 << shift;
+    return shift;
+}
+
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
 pub fn pretty_print(board: Bitboard) {
+
     for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
         for f in Files::FILE1..=Files::FILE8 {
             if board & (1 << (r * 8 + f)) != 0 {
@@ -14,6 +51,11 @@ pub fn pretty_print(board: Bitboard) {
         println!("");
     }
     println!("");
+}
+
+/// Returns `bb >> 8`.
+pub fn south_one(bb: Bitboard) -> Bitboard {
+    bb >> 8
 }
 
 /// Returns a string representation of a move.
@@ -34,34 +76,16 @@ pub fn stringify_square(sq: Square) -> String {
     ret
 }
 
-/// Clears the LSB and returns the 0-indexed position of that bit.
-pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
-    let shift: u8 = bb.trailing_zeros() as u8;
-    *bb ^= 1u64 << shift;
-    return shift;
-}
-
-/// Returns a Move given a start square, end square, piece and side.
-pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
-    start as Move
-        | ((end as Move) << 6)
-        | ((piece as Move) << 12)
-        | ((side as Move) << 15)
-}
-
-/// Returns a tuple of a start square, end square, piece and side given a Move.
-pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
-    let start = (mv & 0x3f) as u8;
-    let end = ((mv >> 6) & 0x3f) as u8;
-    let piece = ((mv >> 12) & 0x7) as u8;
-    let side = ((mv >> 15) & 0x1) as u8;
-    (start, end, piece, side)
+/// Converts a Bitboard into a Square. This should only be done on Bitboards
+/// that have a single bit set.
+pub fn to_square(bb: Bitboard) -> Square {
+    bb.trailing_zeros() as Square
 }
 
 #[cfg(test)]
 mod tests {
     use crate::defs::{ Pieces, Sides, Squares };
-    use super::create_move;
+    use super::{ create_move, pop_lsb };
 
     #[test]
     fn create_move_works() {

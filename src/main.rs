@@ -95,6 +95,10 @@ fn handle_input_line(line: &String, engine: &mut Engine) {
             "ucinewgame" => {
                 /* What it sounds like. Set pos to start pos, etc. */
             }
+            "q" => {
+                /* Alias for "quit". */
+                exit(0);
+            }
             "quit" => {
                 /* Quit as soon as possible */
                 exit(0);
@@ -108,8 +112,10 @@ fn handle_input_line(line: &String, engine: &mut Engine) {
             /* "perft n", where n is a number - run perft to depth n */
             "perft" => {
                 if let Some(num) = line.next() {
-                    if let Ok(result) = num.parse::<i32>() {
-                        engine.perft_root(result as u8);
+                    if let Ok(result) = num.parse::<u8>() {
+                        engine.perft_root(result);
+                    } else {
+                        println!("Must give a number between 0 and 255.");
                     }
                 }
             }

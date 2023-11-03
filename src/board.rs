@@ -6,9 +6,9 @@ use crate::{
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    sides:        [Bitboard; Nums::SIDES as usize],
-    pieces:       [Bitboard; Nums::PIECES as usize],
-    side_to_move:  Side,
+    pub sides:        [Bitboard; Nums::SIDES as usize],
+    pub pieces:       [Bitboard; Nums::PIECES as usize],
+    pub side_to_move:  Side,
 }
 
 impl Board {
