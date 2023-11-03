@@ -55,7 +55,7 @@ impl Files {
 }
 
 impl Nums {
-    pub const SIDES:  u8 = 2;
+    pub const SIDES: u8 = 2;
     pub const PIECES: u8 = 6;
 }
 

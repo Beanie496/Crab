@@ -17,11 +17,6 @@ pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
     (start, end, piece, side)
 }
 
-/// Returns `bb << 8`.
-pub fn north_one(bb: Bitboard) -> Bitboard {
-    bb << 8
-}
-
 /// Clears the LSB and returns it.
 pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
     let popped_bit = *bb & bb.wrapping_neg();
@@ -33,13 +28,12 @@ pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
 pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
     let shift: u8 = bb.trailing_zeros() as u8;
     *bb ^= 1u64 << shift;
-    return shift;
+    shift
 }
 
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
 pub fn pretty_print(board: Bitboard) {
-
     for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
         for f in Files::FILE1..=Files::FILE8 {
             if board & (1 << (r * 8 + f)) != 0 {
@@ -48,20 +42,15 @@ pub fn pretty_print(board: Bitboard) {
                 print!("0 ");
             }
         }
-        println!("");
+        println!();
     }
-    println!("");
-}
-
-/// Returns `bb >> 8`.
-pub fn south_one(bb: Bitboard) -> Bitboard {
-    bb >> 8
+    println!();
 }
 
 /// Returns a string representation of a move.
 pub fn stringify_move(mv: Move) -> String {
     let start = (mv as u8) & 0x3f;
-    let end  = ((mv >> 6) as u8) & 0x3f;
+    let end = ((mv >> 6) as u8) & 0x3f;
     let mut ret = String::with_capacity(4);
     ret += &stringify_square(start);
     ret += &stringify_square(end);
@@ -71,8 +60,8 @@ pub fn stringify_move(mv: Move) -> String {
 /// Returns a string representation of a square.
 pub fn stringify_square(sq: Square) -> String {
     let mut ret = String::with_capacity(2);
-    ret.push(('a' as u8 + (sq & 7)) as char);
-    ret.push(('1' as u8 + (sq >> 3)) as char);
+    ret.push((b'a' + (sq & 7)) as char);
+    ret.push((b'1' + (sq >> 3)) as char);
     ret
 }
 
@@ -84,8 +73,8 @@ pub fn to_square(bb: Bitboard) -> Square {
 
 #[cfg(test)]
 mod tests {
-    use crate::defs::{ Pieces, Sides, Squares };
     use super::{ create_move, pop_lsb };
+    use crate::defs::{ Pieces, Sides, Squares };
 
     #[test]
     fn create_move_works() {

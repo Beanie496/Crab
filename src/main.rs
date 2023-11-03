@@ -28,15 +28,15 @@ fn uci_main_loop(mut engine: Engine) {
     }
 }
 
-fn handle_input_line(line: &String, engine: &mut Engine) {
+fn handle_input_line(line: &str, engine: &mut Engine) {
     let mut line = line.trim().split(' ');
 
     // handle each UCI option
     if let Some(command) = line.next() {
         match command {
             "debug" => {
-                 /* Sets debug to "on" or "off". Default "off". */
-                 /* This can be ignored. */
+                /* Sets debug to "on" or "off". Default "off". */
+                /* This can be ignored. */
             }
             "go" => {
                 /* Start calculating from the current position,

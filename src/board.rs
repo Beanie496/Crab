@@ -1,14 +1,14 @@
 use crate::{
-    defs::{ Bitboard, File, Files, Move, Nums, PIECE_CHARS, Rank, Ranks, Side, Sides },
+    defs::{ Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS },
     movelist::Movelist,
-    util::{ decompose_move },
+    util::decompose_move,
 };
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    pub sides:        [Bitboard; Nums::SIDES as usize],
-    pub pieces:       [Bitboard; Nums::PIECES as usize],
-    pub side_to_move:  Side,
+    pub sides: [Bitboard; Nums::SIDES as usize],
+    pub pieces: [Bitboard; Nums::PIECES as usize],
+    pub side_to_move: Side,
 }
 
 impl Board {
@@ -62,7 +62,7 @@ impl Board {
             for f in Files::FILE1..=Files::FILE8 {
                 print!("{} ", self.char_piece_from_pos(r, f));
             }
-            println!("")
+            println!();
         }
         println!("    ---------------");
         println!("    1 2 3 4 5 6 7 8");
@@ -72,10 +72,10 @@ impl Board {
     /// returns '0'.
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let sq_bb = bitboard_from_pos(rank, file);
-        for i in 0..Nums::SIDES as usize {
-            for j in 0..Nums::PIECES as usize {
+        for (i, side_pieces) in PIECE_CHARS.iter().enumerate() {
+            for (j, piece) in side_pieces.iter().enumerate() {
                 if sq_bb & self.sides[i] & self.pieces[j] != 0 {
-                    return PIECE_CHARS[i][j];
+                    return *piece;
                 }
             }
         }

@@ -8,10 +8,10 @@ use crate::{
 /// Master object that contains all the other major objects.
 pub struct Engine {
     board: Board,
-    mg:    Movegen,
+    mg: Movegen,
     /// The current move list, from the starting position (set by the user or
     /// the default start pos) to the current position.
-    ml:    Movelist,
+    ml: Movelist,
 }
 
 impl Engine {
@@ -20,8 +20,8 @@ impl Engine {
     pub fn new() -> Engine {
         Engine {
             board: Board::new(),
-            mg:    Movegen::new(),
-            ml:    Movelist::new(),
+            mg: Movegen::new(),
+            ml: Movelist::new(),
         }
     }
 
@@ -44,9 +44,7 @@ impl Engine {
 
         for mv in ml {
             self.board.make_move(mv, &mut self.ml);
-            println!("{}: {}",
-                stringify_move(mv),
-                self.perft(depth - 1));
+            println!("{}: {}", stringify_move(mv), self.perft(depth - 1));
             self.board.unmake_move(&mut self.ml);
         }
     }

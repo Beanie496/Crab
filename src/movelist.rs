@@ -1,6 +1,4 @@
-use crate::{
-    defs::Move,
-};
+use crate::defs::Move;
 
 const MAX_GAME_MOVES: usize = 250;
 

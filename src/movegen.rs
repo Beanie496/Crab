@@ -2,18 +2,16 @@ use crate::{
     board::Board,
     defs::{ Pieces, Sides },
     movelist::Movelist,
-    util::{ create_move, north_one, pop_lsb, pop_next_square, south_one, to_square },
+    util::{ create_move, pop_lsb, pop_next_square, to_square },
 };
 
 /// Generates and stores all legal moves on the current board state.
-pub struct Movegen {
-}
+pub struct Movegen {}
 
 impl Movegen {
     /// Returns a new Movegen object with an empty list.
     pub fn new() -> Movegen {
-        Movegen {
-        }
+        Movegen {}
     }
 }
 
@@ -43,14 +41,7 @@ impl Movegen {
             let mut targets = single_push; // more targets to come
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(
-                    create_move(
-                        to_square(pawn),
-                        target,
-                        Pieces::PAWN,
-                        us,
-                    )
-                );
+                ml.push_move(create_move(to_square(pawn), target, Pieces::PAWN, us));
             }
         }
     }
