@@ -26,11 +26,12 @@ pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
 
 /// Clears the LSB and returns the 0-indexed position of that bit.
 pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
-    let shift: u8 = bb.trailing_zeros() as u8;
+    let shift = bb.trailing_zeros() as u8;
     *bb ^= 1u64 << shift;
     shift
 }
 
+// Allowed dead code because this is occasionally useful for debugging.
 #[allow(dead_code)]
 /// Pretty prints a given bitboard.
 pub fn pretty_print(board: Bitboard) {
@@ -73,7 +74,7 @@ pub fn to_square(bb: Bitboard) -> Square {
 
 #[cfg(test)]
 mod tests {
-    use super::{ create_move, pop_lsb };
+    use super::create_move;
     use crate::defs::{ Pieces, Sides, Squares };
 
     #[test]

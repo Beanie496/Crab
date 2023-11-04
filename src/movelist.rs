@@ -31,12 +31,10 @@ impl Movelist {
     /// Pops a move from the move list. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     pub fn pop_move(&mut self) -> Option<Move> {
-        if self.first_empty > 0 {
+        (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
-            Some(self.moves[self.first_empty])
-        } else {
-            None
-        }
+            self.moves[self.first_empty]
+        })
     }
 }
 

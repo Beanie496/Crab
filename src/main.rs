@@ -3,7 +3,7 @@ use std::{
     process::exit,
 };
 
-use crate::engine::*;
+use crate::engine::Engine;
 
 mod board;
 mod defs;
@@ -95,11 +95,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             "ucinewgame" => {
                 /* What it sounds like. Set pos to start pos, etc. */
             }
-            "q" => {
-                /* Alias for "quit". */
-                exit(0);
-            }
-            "quit" => {
+            "q" | "quit" => {
                 /* Quit as soon as possible */
                 exit(0);
             }

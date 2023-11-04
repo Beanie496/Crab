@@ -78,6 +78,8 @@ impl Sides {
     pub const BLACK: Side = 1;
 }
 
+// Allowed dead code because a unit test uses these.
+#[allow(dead_code)]
 impl Squares {
     pub const A1: Square = 0;
     pub const A8: Square = 7;
