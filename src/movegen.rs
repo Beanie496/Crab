@@ -1,9 +1,12 @@
 use crate::{
+    bits::util::{ east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
     board::Board,
     defs::{ Bitboard, Bitboards, Nums, Pieces },
     movelist::Movelist,
-    util::{ create_move, east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
 };
+use util::create_move;
+
+pub mod util;
 
 /// Generates and stores all legal moves on the current board state.
 pub struct Movegen {

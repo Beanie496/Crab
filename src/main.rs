@@ -5,6 +5,7 @@ use std::{
 
 use crate::engine::Engine;
 
+mod bits;
 mod board;
 mod defs;
 mod engine;

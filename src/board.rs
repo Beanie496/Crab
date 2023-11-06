@@ -1,7 +1,7 @@
 use crate::{
     defs::{ Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS },
+    movegen::util::decompose_move,
     movelist::Movelist,
-    util::decompose_move,
 };
 
 /// Stores information about the current state of the board.
