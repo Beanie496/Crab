@@ -6,8 +6,8 @@ use crate::{
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    pub sides: [Bitboard; Nums::SIDES as usize],
-    pub pieces: [Bitboard; Nums::PIECES as usize],
+    pub sides: [Bitboard; Nums::SIDES],
+    pub pieces: [Bitboard; Nums::PIECES],
     pub side_to_move: Side,
 }
 
@@ -39,8 +39,8 @@ impl Board {
     pub fn make_move(&mut self, mv: Move, ml: &mut Movelist) {
         ml.push_move(mv);
         let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
-        self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);
+        self.pieces[piece] ^= (1u64 << start) | (1u64 << end);
+        self.sides[side] ^= (1u64 << start) | (1u64 << end);
         self.side_to_move ^= 1;
     }
 
@@ -48,8 +48,8 @@ impl Board {
     pub fn unmake_move(&mut self, ml: &mut Movelist) {
         let mv = ml.pop_move().unwrap();
         let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece as usize] ^= (1u64 << start) | (1u64 << end);
-        self.sides[side as usize] ^= (1u64 << start) | (1u64 << end);
+        self.pieces[piece] ^= (1u64 << start) | (1u64 << end);
+        self.sides[side] ^= (1u64 << start) | (1u64 << end);
         self.side_to_move ^= 1;
     }
 }
@@ -85,7 +85,7 @@ impl Board {
 
 /// Returns the character representation of the given rank.
 fn rank_to_char(rank: Rank) -> char {
-    char::from_u32('A' as u32 + rank as u32).unwrap()
+    unsafe { char::from_u32_unchecked((b'A' + rank) as u32) }
 }
 
 /// Returns a 0-initialised bitboard with the bit in the given position set.

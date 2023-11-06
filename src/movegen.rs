@@ -7,14 +7,14 @@ use crate::{
 
 /// Generates and stores all legal moves on the current board state.
 pub struct Movegen {
-    pawn_attacks: [[Bitboard; Nums::SQUARES as usize]; Nums::SIDES as usize],
+    pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
 }
 
 impl Movegen {
     /// Returns a new Movegen object with an empty list.
     pub fn new() -> Movegen {
         let mut mg = Movegen {
-            pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES as usize]; Nums::SIDES as usize],
+            pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
         };
         mg.init_pawn_attacks();
         mg
@@ -33,9 +33,9 @@ impl Movegen {
             // and so on.
             for (square, bb) in table
                     .iter_mut()
-                    .take((Nums::SQUARES - Nums::FILES) as usize)
+                    .take(Nums::SQUARES - Nums::FILES)
                     .enumerate()
-                    .skip(Nums::FILES as usize) {
+                    .skip(Nums::FILES) {
                 // adds 8 if the side is White (0) or subtracts 8 if Black (1)
                 let push = 1u64 << (square + 8 - side * 16);
                 *bb = east(push) | west(push);
@@ -53,9 +53,9 @@ impl Movegen {
 
     fn generate_pawn_moves(&self, board: &Board, ml: &mut Movelist) {
         let us = board.side_to_move;
-        let them_bb = board.sides[(1 - us) as usize];
-        let empty = !(board.sides[Sides::WHITE as usize] | board.sides[Sides::BLACK as usize]);
-        let mut pawns = board.pieces[Pieces::PAWN as usize] & board.sides[us as usize];
+        let them_bb = board.sides[1 - us];
+        let empty = !(board.sides[Sides::WHITE] | board.sides[Sides::BLACK]);
+        let mut pawns = board.pieces[Pieces::PAWN] & board.sides[us];
         while pawns != 0 {
             let pawn = pop_lsb(&mut pawns);
             /* Learned this rotate left trick from Rustic -
@@ -67,8 +67,8 @@ impl Movegen {
              * compared to C++-style generics, but performance is not an issue
              * yet.
              */
-            let single_push = pawn.rotate_left((72 - us * 16) as u32) & empty;
-            let captures = self.pawn_attacks[us as usize][square_of(pawn) as usize] & them_bb;
+            let single_push = pawn.rotate_left(72 - (us as u32) * 16) & empty;
+            let captures = self.pawn_attacks[us as usize][square_of(pawn)] & them_bb;
             let mut targets = single_push | captures;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);

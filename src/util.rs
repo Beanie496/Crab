@@ -10,11 +10,11 @@ pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move
 
 /// Returns a tuple of a start square, end square, piece and side given a Move.
 pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
-    let start = (mv & 0x3f) as u8;
-    let end = ((mv >> 6) & 0x3f) as u8;
-    let piece = ((mv >> 12) & 0x7) as u8;
-    let side = ((mv >> 15) & 0x1) as u8;
-    (start, end, piece, side)
+    let start = mv & 0x3f;
+    let end = (mv >> 6) & 0x3f;
+    let piece = (mv >> 12) & 0x7;
+    let side = (mv >> 15) & 0x1;
+    (start as Square, end as Square, piece as Piece, side as Side)
 }
 
 /// Returns a given bitboard shifted one square east without wrapping.
@@ -30,10 +30,10 @@ pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
 }
 
 /// Clears the LSB and returns the 0-indexed position of that bit.
-pub fn pop_next_square(bb: &mut Bitboard) -> u8 {
-    let shift = bb.trailing_zeros() as u8;
+pub fn pop_next_square(bb: &mut Bitboard) -> Square {
+    let shift = bb.trailing_zeros();
     *bb ^= 1u64 << shift;
-    shift
+    shift as Square
 }
 
 // Allowed dead code because this is occasionally useful for debugging.
@@ -61,19 +61,19 @@ pub fn square_of(bb: Bitboard) -> Square {
 
 /// Returns a string representation of a move.
 pub fn stringify_move(mv: Move) -> String {
-    let start = (mv as u8) & 0x3f;
-    let end = ((mv >> 6) as u8) & 0x3f;
+    let start = mv & 0x3f;
+    let end = (mv >> 6) & 0x3f;
     let mut ret = String::with_capacity(4);
-    ret += &stringify_square(start);
-    ret += &stringify_square(end);
+    ret += &stringify_square(start as Square);
+    ret += &stringify_square(end as Square);
     ret
 }
 
 /// Returns a string representation of a square.
 pub fn stringify_square(sq: Square) -> String {
     let mut ret = String::with_capacity(2);
-    ret.push((b'a' + (sq & 7)) as char);
-    ret.push((b'1' + (sq >> 3)) as char);
+    ret.push((b'a' + (sq as u8 & 7)) as char);
+    ret.push((b'1' + (sq as u8 >> 3)) as char);
     ret
 }
 

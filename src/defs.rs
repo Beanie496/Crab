@@ -19,10 +19,14 @@ pub type File = u8;
  * ```
  */
 pub type Move = u16;
-pub type Piece = u8;
+/// This is mainly for indexing so it's a usize
+pub type Piece = usize;
+/// This is a regular constant so it's the smallest possible value.
 pub type Rank = u8;
-pub type Side = u8;
-pub type Square = u8;
+/// This is mainly for indexing so it's a usize.
+pub type Side = usize;
+/// This is mainly for indexing so it's a usize.
+pub type Square = usize;
 
 /// Some pre-constructed bitboards.
 pub struct Bitboards;
@@ -46,7 +50,7 @@ pub struct Squares;
  * // etc.
  * ```
  */
-pub const PIECE_CHARS: [[char; Nums::PIECES as usize]; Nums::SIDES as usize] = [
+pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
     ['P', 'N', 'B', 'R', 'Q', 'K'],
     ['p', 'n', 'b', 'r', 'q', 'k'],
 ];
@@ -63,10 +67,10 @@ impl Files {
 }
 
 impl Nums {
-    pub const FILES: u8 = 8;
-    pub const SIDES: u8 = 2;
-    pub const SQUARES: u8 = 64;
-    pub const PIECES: u8 = 6;
+    pub const FILES: usize = 8;
+    pub const SIDES: usize = 2;
+    pub const SQUARES: usize = 64;
+    pub const PIECES: usize = 6;
 }
 
 impl Pieces {
