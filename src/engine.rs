@@ -42,11 +42,15 @@ impl Engine {
         let mut ml = Movelist::new();
         self.mg.generate_moves(&self.board, &mut ml);
 
+        let mut total = 0;
         for mv in ml {
             self.board.make_move(mv, &mut self.ml);
-            println!("{}: {}", stringify_move(mv), self.perft(depth - 1));
+            let moves = self.perft(depth - 1);
+            total += moves;
+            println!("{}: {moves}", stringify_move(mv));
             self.board.unmake_move(&mut self.ml);
         }
+        println!("Total: {total}");
     }
 
     /// Runs perft on the current position and returns the number of legal
