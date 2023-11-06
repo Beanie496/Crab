@@ -9,6 +9,7 @@ use crate::{
 pub struct Movegen {
     pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
     knight_attacks: [Bitboard; Nums::SQUARES],
+    king_attacks: [Bitboard; Nums::SQUARES],
 }
 
 impl Movegen {
@@ -17,9 +18,11 @@ impl Movegen {
         let mut mg = Movegen {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
+            king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
         };
         mg.init_pawn_attacks();
         mg.init_knight_attacks();
+        mg.init_king_attacks();
         mg
     }
 }
@@ -62,6 +65,17 @@ impl Movegen {
             *bb = attacks
         }
     }
+
+    /// Initialises king attack lookup table.
+    fn init_king_attacks(&mut self) {
+        for (square, bb) in self.king_attacks.iter_mut().enumerate() {
+            let king = 1 << square;
+            let mut attacks = east(king) | west(king) | king;
+            attacks |= north(attacks) | south(attacks);
+            attacks ^= king;
+            *bb = attacks;
+        }
+    }
 }
 
 impl Movegen {
@@ -74,9 +88,10 @@ impl Movegen {
 
     fn generate_pawn_moves(&self, board: &Board, ml: &mut Movelist) {
         let us = board.side_to_move;
+        let us_bb = board.sides[us];
         let them_bb = board.sides[1 - us];
-        let empty = !(board.sides[Sides::WHITE] | board.sides[Sides::BLACK]);
-        let mut pawns = board.pieces[Pieces::PAWN] & board.sides[us];
+        let empty = !(us_bb | them_bb);
+        let mut pawns = board.pieces[Pieces::PAWN] & us_bb;
         while pawns != 0 {
             let pawn = pop_lsb(&mut pawns);
             /* Learned this rotate left trick from Rustic -
@@ -101,13 +116,24 @@ impl Movegen {
     fn generate_non_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
         let us = board.side_to_move;
         let us_bb = board.sides[us];
-        let mut knights = board.pieces[Pieces::KNIGHT] & board.sides[us];
+
+        let mut knights = board.pieces[Pieces::KNIGHT] & us_bb;
         while knights != 0 {
             let knight = pop_lsb(&mut knights);
             let mut targets = self.knight_attacks[square_of(knight)] & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(to_square(knight), target, Pieces::KNIGHT, us));
+            }
+        }
+
+        let mut kings = board.pieces[Pieces::KING] & us_bb;
+        while kings != 0 {
+            let king = pop_lsb(&mut kings);
+            let mut targets = self.king_attacks[square_of(king)] & !us_bb;
+            while targets != 0 {
+                let target = pop_next_square(&mut targets);
+                ml.push_move(create_move(to_square(king), target, Pieces::KING, us));
             }
         }
     }
