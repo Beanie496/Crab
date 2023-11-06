@@ -2,12 +2,13 @@ use crate::{
     board::Board,
     defs::{ Bitboard, Bitboards, Nums, Pieces, Sides },
     movelist::Movelist,
-    util::{ create_move, east, pop_lsb, pop_next_square, square_of, to_square, west },
+    util::{ create_move, east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
 };
 
 /// Generates and stores all legal moves on the current board state.
 pub struct Movegen {
     pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
+    knight_attacks: [Bitboard; Nums::SQUARES],
 }
 
 impl Movegen {
@@ -15,8 +16,10 @@ impl Movegen {
     pub fn new() -> Movegen {
         let mut mg = Movegen {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
+            knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
         };
         mg.init_pawn_attacks();
+        mg.init_knight_attacks();
         mg
     }
 }
@@ -42,6 +45,23 @@ impl Movegen {
             }
         }
     }
+
+    /// Initialises knight attack lookup table.
+    fn init_knight_attacks(&mut self) {
+        for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
+            let knight = 1 << square;
+            // shortened name to avoid collisions with the function
+            let mut e = east(knight);
+            let mut w = west(knight);
+            let mut attacks = north(north(e | w));
+            attacks |= south(south(e | w));
+            e = east(e);
+            w = west(w);
+            attacks |= north(e | w);
+            attacks |= south(e | w);
+            *bb = attacks
+        }
+    }
 }
 
 impl Movegen {
@@ -49,6 +69,7 @@ impl Movegen {
     /// moves and put them in the given movelist.
     pub fn generate_moves(&self, board: &Board, ml: &mut Movelist) {
         self.generate_pawn_moves(board, ml);
+        self.generate_non_sliding_moves(board, ml);
     }
 
     fn generate_pawn_moves(&self, board: &Board, ml: &mut Movelist) {
@@ -73,6 +94,20 @@ impl Movegen {
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(to_square(pawn), target, Pieces::PAWN, us));
+            }
+        }
+    }
+
+    fn generate_non_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
+        let us = board.side_to_move;
+        let us_bb = board.sides[us];
+        let mut knights = board.pieces[Pieces::KNIGHT] & board.sides[us];
+        while knights != 0 {
+            let knight = pop_lsb(&mut knights);
+            let mut targets = self.knight_attacks[square_of(knight)] & !us_bb;
+            while targets != 0 {
+                let target = pop_next_square(&mut targets);
+                ml.push_move(create_move(to_square(knight), target, Pieces::KNIGHT, us));
             }
         }
     }

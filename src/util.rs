@@ -22,6 +22,11 @@ pub fn east(bb: Bitboard) -> Bitboard {
     (bb << 1) & !Bitboards::FILE1_BB
 }
 
+/// Returns a given bitboard shifted one square north without wrapping.
+pub fn north(bb: Bitboard) -> Bitboard {
+    bb << 8
+}
+
 /// Clears the LSB and returns it.
 pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
     let popped_bit = *bb & bb.wrapping_neg();
@@ -51,6 +56,11 @@ pub fn pretty_print(board: Bitboard) {
         println!();
     }
     println!();
+}
+
+/// Returns a given bitboard shifted one square south without wrapping.
+pub fn south(bb: Bitboard) -> Bitboard {
+    bb >> 8
 }
 
 /// Returns the square of the LSB of a bitboard: 0x0000000000000001 -> 0,
