@@ -76,9 +76,6 @@ impl Nums {
 impl Pieces {
     pub const PAWN:   Piece = 0;
     pub const KNIGHT: Piece = 1;
-    pub const BISHOP: Piece = 2;
-    pub const ROOK:   Piece = 3;
-    pub const QUEEN:  Piece = 4;
     pub const KING:   Piece = 5;
 }
 
@@ -89,7 +86,6 @@ impl Ranks {
 
 impl Sides {
     pub const WHITE: Side = 0;
-    pub const BLACK: Side = 1;
 }
 
 // Allowed dead code because a unit test uses these.

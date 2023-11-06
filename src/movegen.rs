@@ -1,6 +1,6 @@
 use crate::{
     board::Board,
-    defs::{ Bitboard, Bitboards, Nums, Pieces, Sides },
+    defs::{ Bitboard, Bitboards, Nums, Pieces },
     movelist::Movelist,
     util::{ create_move, east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
 };
@@ -104,7 +104,7 @@ impl Movegen {
              * yet.
              */
             let single_push = pawn.rotate_left(72 - (us as u32) * 16) & empty;
-            let captures = self.pawn_attacks[us as usize][square_of(pawn)] & them_bb;
+            let captures = self.pawn_attacks[us][square_of(pawn)] & them_bb;
             let mut targets = single_push | captures;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
