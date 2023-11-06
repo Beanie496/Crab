@@ -1,4 +1,4 @@
-use crate::defs::{ Bitboard, Files, Move, Piece, Ranks, Side, Square };
+use crate::defs::{ Bitboard, Bitboards, Files, Move, Piece, Ranks, Side, Square };
 
 /// Returns a Move given a start square, end square, piece and side.
 pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
@@ -15,6 +15,11 @@ pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
     let piece = ((mv >> 12) & 0x7) as u8;
     let side = ((mv >> 15) & 0x1) as u8;
     (start, end, piece, side)
+}
+
+/// Returns a given bitboard shifted one square east without wrapping.
+pub fn east(bb: Bitboard) -> Bitboard {
+    (bb << 1) & !Bitboards::FILE1_BB
 }
 
 /// Clears the LSB and returns it.
@@ -48,6 +53,12 @@ pub fn pretty_print(board: Bitboard) {
     println!();
 }
 
+/// Returns the square of the LSB of a bitboard: 0x0000000000000001 -> 0,
+/// 0x0000000000000010 = 4, etc.
+pub fn square_of(bb: Bitboard) -> Square {
+    bb.trailing_zeros() as Square
+}
+
 /// Returns a string representation of a move.
 pub fn stringify_move(mv: Move) -> String {
     let start = (mv as u8) & 0x3f;
@@ -70,6 +81,11 @@ pub fn stringify_square(sq: Square) -> String {
 /// that have a single bit set.
 pub fn to_square(bb: Bitboard) -> Square {
     bb.trailing_zeros() as Square
+}
+
+/// Returns a given bitboard shifted one square west without wrapping.
+pub fn west(bb: Bitboard) -> Bitboard {
+    (bb >> 1) & !Bitboards::FILE8_BB
 }
 
 #[cfg(test)]

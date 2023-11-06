@@ -24,6 +24,8 @@ pub type Rank = u8;
 pub type Side = u8;
 pub type Square = u8;
 
+/// Some pre-constructed bitboards.
+pub struct Bitboards;
 /// Enumerates files, from file 1 = 0 to file 8 = 7.
 pub struct Files;
 /// Constants associated with Chess (sides = 2, etc.).
@@ -49,13 +51,21 @@ pub const PIECE_CHARS: [[char; Nums::PIECES as usize]; Nums::SIDES as usize] = [
     ['p', 'n', 'b', 'r', 'q', 'k'],
 ];
 
+impl Bitboards {
+    pub const EMPTY: Bitboard = 0;
+    pub const FILE1_BB: Bitboard = 0x0101010101010101;
+    pub const FILE8_BB: Bitboard = 0x8080808080808080;
+}
+
 impl Files {
     pub const FILE1: File = 0;
     pub const FILE8: File = 7;
 }
 
 impl Nums {
+    pub const FILES: u8 = 8;
     pub const SIDES: u8 = 2;
+    pub const SQUARES: u8 = 64;
     pub const PIECES: u8 = 6;
 }
 
