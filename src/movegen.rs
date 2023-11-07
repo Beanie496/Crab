@@ -1,5 +1,5 @@
 use crate::{
-    bits::util::{ east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
+    bits::{ east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
     board::Board,
     defs::{ Bitboard, Bitboards, Nums, Pieces },
     movelist::Movelist,
