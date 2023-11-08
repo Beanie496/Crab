@@ -4,8 +4,10 @@ use crate::{
     defs::{ Bitboard, Bitboards, Nums, Pieces },
     movelist::Movelist,
 };
+use magic::Magic;
 use util::create_move;
 
+mod magic;
 pub mod util;
 
 /// Generates and stores all legal moves on the current board state.
@@ -13,7 +15,18 @@ pub struct Movegen {
     pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
     knight_attacks: [Bitboard; Nums::SQUARES],
     king_attacks: [Bitboard; Nums::SQUARES],
+    bishop_magic_lookup: [Bitboard; BISHOP_SIZE],
+    rook_magic_lookup: [Bitboard; ROOK_SIZE],
+    bishop_magics: [Magic; Nums::SQUARES],
+    rook_magics: [Magic; Nums::SQUARES],
 }
+
+/// 12 bits for each corner, 11 for each non-corner edge, 10 for all others.
+const ROOK_SIZE: usize = 102_400;
+/// Repeated once per quadrant: 6 bits for corner, 5 bits for each non-corner
+/// edge and each square adjacent to an edge, 7 bits for the squares adjacent
+/// or diagonal to a corner, 9 bits for the corners themselves.
+const BISHOP_SIZE: usize = 5_248;
 
 impl Movegen {
     /// Returns a new Movegen object with an empty list.
@@ -22,10 +35,15 @@ impl Movegen {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
             king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
+            bishop_magic_lookup: [Bitboards::EMPTY; BISHOP_SIZE],
+            rook_magic_lookup: [Bitboards::EMPTY; ROOK_SIZE],
+            bishop_magics: [Magic::default(); Nums::SQUARES],
+            rook_magics: [Magic::default(); Nums::SQUARES],
         };
         mg.init_pawn_attacks();
         mg.init_knight_attacks();
         mg.init_king_attacks();
+        mg.init_magics();
         mg
     }
 }
@@ -80,6 +98,10 @@ impl Movegen {
             *bb = attacks;
         }
     }
+
+    fn init_magics(&mut self) {
+
+    }
 }
 
 impl Movegen {
@@ -88,6 +110,7 @@ impl Movegen {
     pub fn generate_moves(&self, board: &Board, ml: &mut Movelist) {
         self.generate_pawn_moves(board, ml);
         self.generate_non_sliding_moves(board, ml);
+        self.generate_sliding_moves(board, ml);
     }
 
     fn generate_pawn_moves(&self, board: &Board, ml: &mut Movelist) {
@@ -138,6 +161,62 @@ impl Movegen {
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(to_square(king), target, Pieces::KING, us));
+            }
+        }
+    }
+
+    fn generate_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
+        let us = board.side_to_move;
+        let us_bb = board.sides[us];
+        let them_bb = board.sides[1 - us];
+        let occupancies = us_bb | them_bb;
+
+        let mut bishops = board.pieces[Pieces::BISHOP] & us_bb;
+        while bishops != 0 {
+            let bishop = pop_lsb(&mut bishops);
+            let bishop_sq = to_square(bishop);
+            let mut targets = self.bishop_magic_lookup[
+                self.bishop_magics[
+                    bishop_sq
+                ].get_table_index(occupancies)
+            ] & !us_bb;
+            while targets != 0 {
+                let target = pop_next_square(&mut targets);
+                ml.push_move(create_move(bishop_sq, target, Pieces::BISHOP, us));
+            }
+        }
+
+        let mut rooks = board.pieces[Pieces::ROOK] & us_bb;
+        while bishops != 0 {
+            let rook = pop_lsb(&mut rooks);
+            let rook_sq = to_square(rook);
+            let mut targets = self.rook_magic_lookup[
+                self.rook_magics[
+                    rook_sq
+                ].get_table_index(occupancies)
+            ] & !us_bb;
+            while targets != 0 {
+                let target = pop_next_square(&mut targets);
+                ml.push_move(create_move(rook_sq, target, Pieces::ROOK, us));
+            }
+        }
+
+        let mut queens = board.pieces[Pieces::ROOK] & us_bb;
+        while bishops != 0 {
+            let queen = pop_lsb(&mut queens);
+            let queen_sq = to_square(queen);
+            let mut targets = self.rook_magic_lookup[
+                self.rook_magics[
+                    queen_sq
+                ].get_table_index(occupancies)
+            ] | self.bishop_magic_lookup[
+                self.bishop_magics[
+                    queen_sq
+                ].get_table_index(occupancies)
+            ] & !us_bb;
+            while targets != 0 {
+                let target = pop_next_square(&mut targets);
+                ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
             }
         }
     }
