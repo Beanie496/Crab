@@ -1,4 +1,9 @@
-use crate::defs::{ Bitboard, Files, Move, Ranks, Square };
+use crate::defs::{ Bitboard, File, Files, Move, Ranks, Square };
+
+/// Returns the file of a given Square.
+pub fn file_of(square: Square) -> File {
+    square as u8 & 7
+}
 
 // Allowed dead code because this is occasionally useful for debugging.
 #[allow(dead_code)]
@@ -33,23 +38,4 @@ pub fn stringify_square(sq: Square) -> String {
     ret.push((b'a' + (sq as u8 & 7)) as char);
     ret.push((b'1' + (sq as u8 >> 3)) as char);
     ret
-}
-
-#[cfg(test)]
-mod tests {
-    use super::create_move;
-    use crate::defs::{ Pieces, Sides, Squares };
-
-    #[test]
-    fn create_move_works() {
-        // these asserts will use magic values known to be correct
-        assert_eq!(
-            create_move(Squares::A1, Squares::H8, Pieces::KNIGHT, Sides::BLACK),
-            (63 << 6) | (1 << 12) | (1 << 15),
-        );
-        assert_eq!(
-            create_move(Squares::A8, Squares::H1, Pieces::KING, Sides::WHITE),
-            (56 << 6) | 7 | (5 << 12),
-        );
-    }
 }

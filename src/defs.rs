@@ -28,6 +28,11 @@ pub type Side = usize;
 /// This is mainly for indexing so it's a usize.
 pub type Square = usize;
 
+/// All 8 compass directions.
+pub enum Direction {
+    N, NE, E, SE, S, SW, W, NW
+}
+
 /// Some pre-constructed bitboards.
 pub struct Bitboards;
 /// Enumerates files, from file 1 = 0 to file 8 = 7.
@@ -59,6 +64,7 @@ impl Bitboards {
     pub const EMPTY: Bitboard = 0;
     pub const FILE1_BB: Bitboard = 0x0101010101010101;
     pub const FILE8_BB: Bitboard = 0x8080808080808080;
+    pub const FULL: Bitboard = !0;
 }
 
 impl Files {
@@ -84,15 +90,20 @@ impl Ranks {
     pub const RANK8: Rank = 7;
 }
 
+// Allowed dead code because a unit test uses BLACK.
+#[allow(dead_code)]
 impl Sides {
     pub const WHITE: Side = 0;
+    pub const BLACK: Side = 1;
 }
 
-// Allowed dead code because a unit test uses these.
+// Allowed dead code because unit tests use these.
 #[allow(dead_code)]
 impl Squares {
     pub const A1: Square = 0;
-    pub const A8: Square = 7;
-    pub const H1: Square = 56;
+    pub const H1: Square = 7;
+    pub const E4: Square = 28;
+    pub const D5: Square = 35;
+    pub const A8: Square = 56;
     pub const H8: Square = 63;
 }
