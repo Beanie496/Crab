@@ -100,7 +100,6 @@ impl Movegen {
     }
 
     fn init_magics(&mut self) {
-
     }
 }
 
@@ -175,11 +174,9 @@ impl Movegen {
         while bishops != 0 {
             let bishop = pop_lsb(&mut bishops);
             let bishop_sq = to_square(bishop);
-            let mut targets = self.bishop_magic_lookup[
-                self.bishop_magics[
-                    bishop_sq
-                ].get_table_index(occupancies)
-            ] & !us_bb;
+            let mut targets = self.bishop_magic_lookup
+                [self.bishop_magics[bishop_sq].get_table_index(occupancies)]
+                & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(bishop_sq, target, Pieces::BISHOP, us));
@@ -190,11 +187,9 @@ impl Movegen {
         while bishops != 0 {
             let rook = pop_lsb(&mut rooks);
             let rook_sq = to_square(rook);
-            let mut targets = self.rook_magic_lookup[
-                self.rook_magics[
-                    rook_sq
-                ].get_table_index(occupancies)
-            ] & !us_bb;
+            let mut targets = self.rook_magic_lookup
+                [self.rook_magics[rook_sq].get_table_index(occupancies)]
+                & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(rook_sq, target, Pieces::ROOK, us));
@@ -205,15 +200,11 @@ impl Movegen {
         while bishops != 0 {
             let queen = pop_lsb(&mut queens);
             let queen_sq = to_square(queen);
-            let mut targets = self.rook_magic_lookup[
-                self.rook_magics[
-                    queen_sq
-                ].get_table_index(occupancies)
-            ] | self.bishop_magic_lookup[
-                self.bishop_magics[
-                    queen_sq
-                ].get_table_index(occupancies)
-            ] & !us_bb;
+            let mut targets = self.rook_magic_lookup
+                [self.rook_magics[queen_sq].get_table_index(occupancies)]
+                | self.bishop_magic_lookup
+                    [self.bishop_magics[queen_sq].get_table_index(occupancies)]
+                    & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
