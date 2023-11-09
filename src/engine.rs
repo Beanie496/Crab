@@ -1,5 +1,7 @@
 use crate::{
+    bits::init_ray_attacks,
     board::Board,
+    defs::{ Bitboards, Nums },
     movegen::Movegen,
     movelist::Movelist,
     util::stringify_move,
@@ -70,5 +72,12 @@ impl Engine {
             self.board.unmake_move(&mut self.ml);
         }
         total
+    }
+}
+
+impl Engine {
+    pub fn find_magics() {
+        let mut ray_attacks = [[Bitboards::EMPTY; Nums::SQUARES]; Nums::DIRECTIONS];
+        init_ray_attacks(&mut ray_attacks);
     }
 }

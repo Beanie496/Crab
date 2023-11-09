@@ -102,6 +102,10 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             }
 
             /* non-standard commands */
+            /* "f" - find magic numbers for each square for bishop and rook */
+            "f" => {
+                Engine::find_magics();
+            }
             /* "p" - prints current position */
             "p" => {
                 engine.pretty_print_board();

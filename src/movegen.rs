@@ -184,7 +184,7 @@ impl Movegen {
         }
 
         let mut rooks = board.pieces[Pieces::ROOK] & us_bb;
-        while bishops != 0 {
+        while rooks != 0 {
             let rook = pop_lsb(&mut rooks);
             let rook_sq = to_square(rook);
             let mut targets = self.rook_magic_lookup
@@ -197,7 +197,7 @@ impl Movegen {
         }
 
         let mut queens = board.pieces[Pieces::ROOK] & us_bb;
-        while bishops != 0 {
+        while queens != 0 {
             let queen = pop_lsb(&mut queens);
             let queen_sq = to_square(queen);
             let mut targets = self.rook_magic_lookup

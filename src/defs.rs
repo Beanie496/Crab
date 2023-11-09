@@ -62,9 +62,26 @@ pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
 
 impl Bitboards {
     pub const EMPTY: Bitboard = 0;
-    pub const FILE1_BB: Bitboard = 0x0101010101010101;
-    pub const FILE8_BB: Bitboard = 0x8080808080808080;
-    pub const FULL: Bitboard = !0;
+    pub const FILE_BB: [Bitboard; Nums::FILES] = [
+        0x0101010101010101,
+        0x0202020202020202,
+        0x0404040404040404,
+        0x0808080808080808,
+        0x1010101010101010,
+        0x2020202020202020,
+        0x4040404040404040,
+        0x8080808080808080,
+    ];
+    pub const RANK_BB: [Bitboard; Nums::RANKS] = [
+        0x00000000000000ff,
+        0x000000000000ff00,
+        0x0000000000ff0000,
+        0x00000000ff000000,
+        0x000000ff00000000,
+        0x0000ff0000000000,
+        0x00ff000000000000,
+        0xff00000000000000,
+    ];
 }
 
 impl Files {
@@ -73,10 +90,12 @@ impl Files {
 }
 
 impl Nums {
+    pub const DIRECTIONS: usize = 8;
     pub const FILES: usize = 8;
     pub const SIDES: usize = 2;
     pub const SQUARES: usize = 64;
     pub const PIECES: usize = 6;
+    pub const RANKS: usize = 8;
 }
 
 impl Pieces {

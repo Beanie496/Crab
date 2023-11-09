@@ -1,9 +1,4 @@
-use crate::defs::{ Bitboard, File, Files, Move, Ranks, Square };
-
-/// Returns the file of a given Square.
-pub fn file_of(square: Square) -> File {
-    square as u8 & 7
-}
+use crate::defs::{ Bitboard, Files, Move, Ranks, Square };
 
 // Allowed dead code because this is occasionally useful for debugging.
 #[allow(dead_code)]

@@ -1,115 +1,107 @@
 use crate::{
-    defs::{ Bitboard, Bitboards, Direction, Square },
-    util::file_of,
+    defs::{ Bitboard, Bitboards, Direction, Files, Nums, Square, Ranks },
 };
 
-/// Returns a bitboard with a ray from the given square to the edge, excluding
-/// the square itself.
-pub fn ray(direction: Direction, square: Square) -> Bitboard {
-    /* North and south go straight up and down, so simply shifting them by the
-     * square number will cause the unwanted bits to over/underflow.
-     * East subracts the bit of the square from the bit of the highest file in
-     * that rank to get 1's from the square to the edge (excluding the edge),
-     * then shifts left by one to give the correct bits.
-     * West subtracts the bit of the lowest file in the rank from the bit of
-     * the square, which immediately gives the correct bits.
-     * The 4 diagonal directions follow the same principle:
-     * If you start with the line of bits in the direction and rotate left by
-     * the correct amount, only the bits in one of the quadrants relative to
-     * the square need to be kept. The bits in the other three quadrants can be
-     * removed by &-ing the board with the bits on the correct files and on
-     * the correct ranks.
-     * ```
-     * direction: SW
-     * 0 0 0 0 0 0 0 S
-     * 0 0 0 0 0 0 1 0
-     * 0 0 0 0 0 1 0 0
-     * 0 0 0 0 1 0 0 0
-     * 0 0 0 1 0 0 0 0
-     * 0 0 1 0 0 0 0 0
-     * 0 1 0 0 0 0 0 0
-     * 1 0 0 0 0 0 0 0
-     * square: E4
-     * g g g g g g g g
-     * g g g g g g g g
-     * g g g g g g g g
-     * g g g g g g g g
-     * 0 0 0 0 S g g g
-     * 0 0 0 1 0 g g g
-     * 0 0 1 0 0 g g g
-     * 0 1 0 0 0 0 g g
-     * ```
-     * Getting the files on the left is a lot easier than the right, so for all
-     * 4 diagonal directions, the files on the left are calculated and negated
-     * if necessary. The ranks above or below are very easy to calculate - just
-     * a full bitboard shifted left by the square or `(1 << square) - 1`
-     * respectively. Then just & the correct quadrant with the correct
-     * upper/lower ranks and left/right files.
-     */
-    match direction {
-        Direction::N => {
-            (Bitboards::FILE1_BB ^ 1) << square
+/// Initialises a lookup table with ray attacks for each direction for each
+/// square.
+pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS]) {
+    // north
+    {
+        let a2_a8 = Bitboards::FILE_BB[Files::FILE1 as usize] ^ 1;
+        for square in 0..Nums::SQUARES {
+            ray_attacks[Direction::N as usize][square] = a2_a8 << square;
         }
-        Direction::NE => {
-            // This is the one quadrant where a rotate isn't needed, so no need
-            // to calculate the lower ranks.
-            let file = file_of(square);
-            let mut left_files = (1 << file) - 1;
-            left_files |= left_files << 8;
-            left_files |= left_files << 16;
-            left_files |= left_files << 32;
-            let b2_h8_diag = 0x8040201008040200;
-            (b2_h8_diag << square) & !left_files
+    }
+    // north-east
+    {
+        let mut b2_h8 = 0x8040201008040200u64;
+        for file in 0..7 {
+            let top_rank = file + 56;
+            for square in (file..top_rank).step_by(8) {
+                ray_attacks[Direction::NE as usize][square] = b2_h8 << square;
+            }
+            b2_h8 &= !Bitboards::FILE_BB[7 - file];
         }
-        Direction::E => {
-            let square_bb = 1 << square;
-            let highest_bit_of_rank = 1 << (square | 7);
-            (highest_bit_of_rank - square_bb) << 1
+    }
+    // east
+    {
+        let mut b1_h1 = Bitboards::RANK_BB[Ranks::RANK1 as usize] ^ 1;
+        // no need to loop over the final file
+        for file in 0..7 {
+            let top_rank = file + 56;
+            for square in (file..=top_rank).step_by(8) {
+                ray_attacks[Direction::E as usize][square] = b1_h1 << square;
+            }
+            b1_h1 &= !Bitboards::FILE_BB[7 - file];
         }
-        Direction::SE => {
-            let lower_ranks = (1 << square) - 1;
-            let file = file_of(square);
-            let mut left_files = (1 << file) - 1;
-            left_files |= left_files << 8;
-            left_files |= left_files << 16;
-            left_files |= left_files << 32;
-            let b7_h1_diag = 0x0002040810204080u64;
-            b7_h1_diag.rotate_left(64 + square as u32 - 56) & !left_files & lower_ranks
+    }
+    // south-east
+    {
+        let mut b7_h1 = 0x0002040810204080u64;
+        let mut square = 56;
+        while b7_h1 != 0 {
+            for rank in (0..56).step_by(8) {
+                ray_attacks[Direction::SE as usize][square] = b7_h1 >> rank;
+                square -= 8;
+            }
+            b7_h1 <<= 1;
+            b7_h1 &= !Bitboards::FILE_BB[Files::FILE1 as usize];
+            square += 57;
         }
-        Direction::S => {
-            (Bitboards::FILE8_BB ^ 0x8000000000000000) >> (square ^ 63)
+    }
+    // south
+    {
+        let h7_h1 = Bitboards::FILE_BB[Files::FILE8 as usize] ^ (1 << 63);
+        for square in 8..64 {
+            ray_attacks[Direction::S as usize][square] = h7_h1 >> (square ^ 63);
         }
-        Direction::SW => {
-            let lower_ranks = (1 << square) - 1;
-            let file = file_of(square);
-            let mut left_files = (1 << file) - 1;
-            left_files |= left_files << 8;
-            left_files |= left_files << 16;
-            left_files |= left_files << 32;
-            let a1_g7_diag = 0x0040201008040201u64;
-            a1_g7_diag.rotate_left(64 + square as u32 - 63) & left_files & lower_ranks
+    }
+    // south-west
+    {
+        let mut g7_a1 = 0x0040201008040201u64;
+        let mut square = 63;
+        while g7_a1 != 0 {
+            for file in (0..56).step_by(8) {
+                ray_attacks[Direction::SW as usize][square] = g7_a1 >> file;
+                square -= 8;
+            }
+            g7_a1 >>= 1;
+            g7_a1 &= !Bitboards::FILE_BB[Files::FILE8 as usize];
+            square += 55;
         }
-        Direction::W => {
-            let square_bb = 1 << square;
-            let lowest_bit = 1 << (square & 56);
-            square_bb - lowest_bit
+    }
+    // west
+    {
+        let mut square = 7;
+        let mut h1_a1 = Bitboards::RANK_BB[Ranks::RANK1 as usize] ^ 1 << square;
+        while h1_a1 != 0 {
+            for rank in (0..=56).step_by(8) {
+                ray_attacks[Direction::W as usize][square] = h1_a1 << rank;
+                square += 8;
+            }
+            h1_a1 >>= 1;
+            square -= 65;
         }
-        Direction::NW => {
-            let upper_ranks = Bitboards::FULL << square;
-            let file = file_of(square);
-            let mut left_files = (1 << file) - 1;
-            left_files |= left_files << 8;
-            left_files |= left_files << 16;
-            left_files |= left_files << 32;
-            let a8_g2_diag = 0x0102040810204000u64;
-            a8_g2_diag.rotate_left(64 + square as u32 - 7) & left_files & upper_ranks
+    }
+    // north-west
+    {
+        let mut square = 7;
+        let mut g2_a8 = 0x0102040810204000u64;
+        while g2_a8 != 0 {
+            for rank in (0..56).step_by(8) {
+                ray_attacks[Direction::NW as usize][square] = g2_a8 << rank;
+                square += 8;
+            }
+            g2_a8 >>= 1;
+            g2_a8 &= !Bitboards::FILE_BB[Files::FILE8 as usize];
+            square -= 57;
         }
     }
 }
 
 /// Returns a given bitboard shifted one square east without wrapping.
 pub fn east(bb: Bitboard) -> Bitboard {
-    (bb << 1) & !Bitboards::FILE1_BB
+    (bb << 1) & !Bitboards::FILE_BB[Files::FILE1 as usize]
 }
 
 /// Returns a given bitboard shifted one square north without wrapping.
@@ -150,91 +142,65 @@ pub fn to_square(bb: Bitboard) -> Square {
 
 /// Returns a given bitboard shifted one square west without wrapping.
 pub fn west(bb: Bitboard) -> Bitboard {
-    (bb >> 1) & !Bitboards::FILE8_BB
+    (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8 as usize]
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::defs::{ Direction, Squares };
-    use super::ray;
+    use crate::defs::{ Bitboards, Direction, Nums, Squares };
+    use super::init_ray_attacks;
 
     #[test]
-    fn north() {
-        assert_eq!(ray(Direction::N, Squares::A1), 0x0101010101010100);
-        assert_eq!(ray(Direction::N, Squares::H1), 0x8080808080808000);
-        assert_eq!(ray(Direction::N, Squares::E4), 0x1010101000000000);
-        assert_eq!(ray(Direction::N, Squares::D5), 0x0808080000000000);
-        assert_eq!(ray(Direction::N, Squares::A8), 0x0000000000000000);
-        assert_eq!(ray(Direction::N, Squares::H8), 0x0000000000000000);
-    }
-
-    #[test]
-    fn north_east() {
-        assert_eq!(ray(Direction::NE, Squares::A1), 0x8040201008040200);
-        assert_eq!(ray(Direction::NE, Squares::H1), 0x0000000000000000);
-        assert_eq!(ray(Direction::NE, Squares::E4), 0x0080402000000000);
-        assert_eq!(ray(Direction::NE, Squares::D5), 0x4020100000000000);
-        assert_eq!(ray(Direction::NE, Squares::A8), 0x0000000000000000);
-        assert_eq!(ray(Direction::NE, Squares::H8), 0x0000000000000000);
-    }
-
-    #[test]
-    fn east() {
-        assert_eq!(ray(Direction::E, Squares::A1), 0x00000000000000fe);
-        assert_eq!(ray(Direction::E, Squares::H1), 0x0000000000000000);
-        assert_eq!(ray(Direction::E, Squares::E4), 0x00000000e0000000);
-        assert_eq!(ray(Direction::E, Squares::D5), 0x000000f000000000);
-        assert_eq!(ray(Direction::E, Squares::A8), 0xfe00000000000000);
-        assert_eq!(ray(Direction::E, Squares::H8), 0x0000000000000000);
-    }
-
-    #[test]
-    fn south_east() {
-        assert_eq!(ray(Direction::SE, Squares::A1), 0x0000000000000000);
-        assert_eq!(ray(Direction::SE, Squares::H1), 0x0000000000000000);
-        assert_eq!(ray(Direction::SE, Squares::E4), 0x0000000000204080);
-        assert_eq!(ray(Direction::SE, Squares::D5), 0x0000000010204080);
-        assert_eq!(ray(Direction::SE, Squares::A8), 0x0002040810204080);
-        assert_eq!(ray(Direction::SE, Squares::H8), 0x0000000000000000);
-    }
-
-    #[test]
-    fn south() {
-        assert_eq!(ray(Direction::S, Squares::A1), 0x0000000000000000);
-        assert_eq!(ray(Direction::S, Squares::H1), 0x0000000000000000);
-        assert_eq!(ray(Direction::S, Squares::E4), 0x0000000000101010);
-        assert_eq!(ray(Direction::S, Squares::D5), 0x0000000008080808);
-        assert_eq!(ray(Direction::S, Squares::A8), 0x0001010101010101);
-        assert_eq!(ray(Direction::S, Squares::H8), 0x0080808080808080);
-    }
-
-    #[test]
-    fn south_west() {
-        assert_eq!(ray(Direction::SW, Squares::A1), 0x0000000000000000);
-        assert_eq!(ray(Direction::SW, Squares::H1), 0x0000000000000000);
-        assert_eq!(ray(Direction::SW, Squares::E4), 0x0000000000080402);
-        assert_eq!(ray(Direction::SW, Squares::D5), 0x0000000004020100);
-        assert_eq!(ray(Direction::SW, Squares::A8), 0x0000000000000000);
-        assert_eq!(ray(Direction::SW, Squares::H8), 0x0040201008040201);
-    }
-
-    #[test]
-    fn west() {
-        assert_eq!(ray(Direction::W, Squares::A1), 0x0000000000000000);
-        assert_eq!(ray(Direction::W, Squares::H1), 0x000000000000007f);
-        assert_eq!(ray(Direction::W, Squares::E4), 0x000000000f000000);
-        assert_eq!(ray(Direction::W, Squares::D5), 0x0000000700000000);
-        assert_eq!(ray(Direction::W, Squares::A8), 0x0000000000000000);
-        assert_eq!(ray(Direction::W, Squares::H8), 0x7f00000000000000);
-    }
-
-    #[test]
-    fn north_west() {
-        assert_eq!(ray(Direction::NW, Squares::A1), 0x0000000000000000);
-        assert_eq!(ray(Direction::NW, Squares::H1), 0x0102040810204000);
-        assert_eq!(ray(Direction::NW, Squares::E4), 0x0102040800000000);
-        assert_eq!(ray(Direction::NW, Squares::D5), 0x0102040000000000);
-        assert_eq!(ray(Direction::NW, Squares::A8), 0x0000000000000000);
-        assert_eq!(ray(Direction::NW, Squares::H8), 0x0000000000000000);
+    fn ray_attacks() {
+        let mut ray_attacks = [[Bitboards::EMPTY; Nums::SQUARES]; Nums::DIRECTIONS];
+        init_ray_attacks(&mut ray_attacks);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::A1], 0x0101010101010100);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::H1], 0x8080808080808000);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::E4], 0x1010101000000000);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::D5], 0x0808080000000000);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::A8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::N as usize][Squares::H8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::A1], 0x8040201008040200);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::H1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::E4], 0x0080402000000000);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::D5], 0x4020100000000000);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::A8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::NE as usize][Squares::H8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::A1], 0x00000000000000fe);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::H1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::E4], 0x00000000e0000000);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::D5], 0x000000f000000000);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::A8], 0xfe00000000000000);
+        assert_eq!(ray_attacks[Direction::E as usize][Squares::H8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::A1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::H1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::E4], 0x0000000000204080);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::D5], 0x0000000010204080);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::A8], 0x0002040810204080);
+        assert_eq!(ray_attacks[Direction::SE as usize][Squares::H8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::A1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::H1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::E4], 0x0000000000101010);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::D5], 0x0000000008080808);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::A8], 0x0001010101010101);
+        assert_eq!(ray_attacks[Direction::S as usize][Squares::H8], 0x0080808080808080);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::A1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::H1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::E4], 0x0000000000080402);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::D5], 0x0000000004020100);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::A8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::SW as usize][Squares::H8], 0x0040201008040201);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::A1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::H1], 0x000000000000007f);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::E4], 0x000000000f000000);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::D5], 0x0000000700000000);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::A8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::W as usize][Squares::H8], 0x7f00000000000000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::A1], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::H1], 0x0102040810204000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::E4], 0x0102040800000000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::D5], 0x0102040000000000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::A8], 0x0000000000000000);
+        assert_eq!(ray_attacks[Direction::NW as usize][Squares::H8], 0x0000000000000000);
     }
 }
