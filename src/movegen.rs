@@ -1,8 +1,9 @@
 use crate::{
     bits::{ east, north, pop_lsb, pop_next_square, south, square_of, to_square, west },
     board::Board,
-    defs::{ Bitboard, Bitboards, Nums, Pieces },
+    defs::{ Bitboard, Bitboards, Direction, Directions, Files, Nums, Piece, Pieces, Ranks, Square },
     movelist::Movelist,
+    util::{ file_of, rank_of },
 };
 use magic::Magic;
 use util::create_move;
@@ -209,6 +210,101 @@ impl Movegen {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
             }
+        }
+    }
+}
+
+impl Movegen {
+    /// Generates attacks from a square to the edge in each diagonal direction,
+    /// excluding the square and the edge.
+    pub fn bishop_mask(
+        square: Square,
+        ray_attacks: &[[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS]
+    ) -> Bitboard {
+        let mut rays =
+            ray_attacks[Directions::NE][square]
+            | ray_attacks[Directions::SE][square]
+            | ray_attacks[Directions::SW][square]
+            | ray_attacks[Directions::NW][square];
+        rays &=
+            !(Bitboards::FILE_BB[Files::FILE1 as usize]
+              | Bitboards::FILE_BB[Files::FILE8 as usize])
+            | Bitboards::FILE_BB[file_of(square) as usize];
+        rays &=
+            !(Bitboards::RANK_BB[Ranks::RANK1 as usize]
+              | Bitboards::RANK_BB[Ranks::RANK8 as usize])
+            | Bitboards::RANK_BB[rank_of(square) as usize];
+        rays
+    }
+
+    /// Generates attacks from a square to the edge in each cardinal direction,
+    /// excluding the square and the edge.
+    pub fn rook_mask(
+        square: Square,
+        ray_attacks: &[[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS]
+    ) -> Bitboard {
+        let mut rays =
+            ray_attacks[Directions::N][square]
+            | ray_attacks[Directions::E][square]
+            | ray_attacks[Directions::S][square]
+            | ray_attacks[Directions::W][square];
+        rays &=
+            !(Bitboards::FILE_BB[Files::FILE1 as usize]
+              | Bitboards::FILE_BB[Files::FILE8 as usize])
+            | Bitboards::FILE_BB[file_of(square) as usize];
+        rays &=
+            !(Bitboards::RANK_BB[Ranks::RANK1 as usize]
+              | Bitboards::RANK_BB[Ranks::RANK8 as usize])
+            | Bitboards::RANK_BB[rank_of(square) as usize];
+        rays
+    }
+}
+
+impl Movegen {
+    fn ray_attack(
+        square: Square,
+        direction: Direction,
+        blockers: Bitboard,
+        ray_attacks: &[[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS],
+    ) -> Bitboard {
+        let mut ray = ray_attacks[direction][square];
+        let blocker_direction = blockers & ray;
+        if blocker_direction == Bitboards::EMPTY {
+            return ray;
+        }
+        // See <https://www.chessprogramming.org/Classical_Approach> - NW to E
+        // inclusive have the lsb closest to the square, whereas the other four
+        // have the msb closest to the square
+        ray ^= if direction <= Directions::E || direction == Directions::NW {
+            ray_attacks[direction][blocker_direction.trailing_zeros() as usize]
+        } else {
+            ray_attacks[direction][blocker_direction.leading_zeros() as usize]
+        };
+        ray
+    }
+
+    pub fn generate_all_ray_attacks(
+        square: Square,
+        piece: Piece,
+        ray_attacks: &[[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS],
+        attack_buffer: &mut [Bitboard; 4096],
+    ) {
+        let mut blockers = Bitboards::EMPTY;
+        let start = if piece == Pieces::BISHOP { Directions::NE } else { Directions::N };
+        for d in (start..(start + Nums::DIRECTIONS)).step_by(2) {
+            blockers |= ray_attacks[d][square];
+        }
+
+        let mut first_empty = 0;
+        while blockers != 0 {
+            let mut attacks = 0;
+            for direction in (start..(start + 8)).step_by(2) {
+                attacks |= Self::ray_attack(square, direction, blockers, ray_attacks);
+            }
+            attack_buffer[first_empty] = attacks;
+            // Carry-Rippler trick
+            blockers &= blockers - 1;
+            first_empty += 1;
         }
     }
 }

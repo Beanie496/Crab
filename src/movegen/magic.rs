@@ -10,16 +10,16 @@ use crate::defs::Bitboard;
 #[derive(Clone, Copy, Default)]
 pub struct Magic {
     // calling the magic a u64 since it's just a number, not a bitboard
-    magic: u64,
-    mask: Bitboard,
+    pub magic: u64,
+    pub mask: Bitboard,
     // u16 (0-65535) is slightly too small for the rook table (102,400)
-    offset: u32,
-    shift: u8,
+    pub offset: u32,
+    pub shift: u8,
 }
 
 impl Magic {
     /// Uses the magic information for a square to give the index into the
-    /// table it is for. See https://www.chessprogramming.org/Magic_Bitboards
+    /// table it is for. See <https://www.chessprogramming.org/Magic_Bitboards>
     /// for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;

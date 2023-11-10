@@ -1,4 +1,10 @@
-use crate::defs::{ Bitboard, Files, Move, Ranks, Square };
+use crate::defs::{ Bitboard, File, Files, Move, Rank, Ranks, Square };
+use oorandom::Rand64;
+
+/// Returns the File of a given Square.
+pub fn file_of(square: Square) -> File {
+    square as u8 & 7
+}
 
 // Allowed dead code because this is occasionally useful for debugging.
 #[allow(dead_code)]
@@ -15,6 +21,22 @@ pub fn pretty_print(board: Bitboard) {
         println!();
     }
     println!();
+}
+
+/// Returns the Rank of a given Square.
+pub fn rank_of(square: Square) -> Rank {
+    square as u8 >> 3
+}
+
+/// Returns a random number with 1/8 of its bits set on average.
+pub fn gen_sparse_rand() -> u64 {
+    let mut rand_gen = Rand64::new(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+    rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
 }
 
 /// Returns a string representation of a move.

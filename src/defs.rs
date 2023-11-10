@@ -1,5 +1,9 @@
+/// This abstracts a 64-bit integer.
 pub type Bitboard = u64;
+/// This is a regular constant so it's the smallest possible.
 pub type File = u8;
+/// This is used exclusively for indexing so it's a usize.
+pub type Direction = usize;
 /**
  * From LSB onwards, a Move is as follows:
  * * Start pos == 6 bits, 0-63
@@ -28,13 +32,10 @@ pub type Side = usize;
 /// This is mainly for indexing so it's a usize.
 pub type Square = usize;
 
-/// All 8 compass directions.
-pub enum Direction {
-    N, NE, E, SE, S, SW, W, NW
-}
-
 /// Some pre-constructed bitboards.
 pub struct Bitboards;
+/// All 8 compass directions.
+pub struct Directions;
 /// Enumerates files, from file 1 = 0 to file 8 = 7.
 pub struct Files;
 /// Constants associated with Chess (sides = 2, etc.).
@@ -82,6 +83,17 @@ impl Bitboards {
         0x00ff000000000000,
         0xff00000000000000,
     ];
+}
+
+impl Directions {
+    pub const N:  Direction = 0;
+    pub const NE: Direction = 1;
+    pub const E:  Direction = 2;
+    pub const SE: Direction = 3;
+    pub const S:  Direction = 4;
+    pub const SW: Direction = 5;
+    pub const W:  Direction = 6;
+    pub const NW: Direction = 7;
 }
 
 impl Files {
