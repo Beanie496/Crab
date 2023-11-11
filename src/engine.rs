@@ -18,61 +18,14 @@ pub struct Engine {
 }
 
 impl Engine {
-    /// Returns a new Engine object initialised with default values of each
-    /// member struct.
+    /// Creates a new [`Engine`] with each member struct initialised to their
+    /// default values.
     pub fn new() -> Engine {
         Engine {
             board: Board::new(),
             mg: Movegen::new(),
             ml: Movelist::new(),
         }
-    }
-
-    pub fn pretty_print_board(&self) {
-        self.board.pretty_print();
-    }
-
-    /// Runs perft on the current position. It gives the number of positions for
-    /// each legal move on the current board or just prints "1" if it's called
-    /// on depth 0.
-    pub fn perft_root(&mut self, depth: u8) {
-        println!("Result:");
-        if depth == 0 {
-            println!("1");
-            return;
-        }
-
-        let mut ml = Movelist::new();
-        self.mg.generate_moves(&self.board, &mut ml);
-
-        let mut total = 0;
-        for mv in ml {
-            self.board.make_move(mv, &mut self.ml);
-            let moves = self.perft(depth - 1);
-            total += moves;
-            println!("{}: {moves}", stringify_move(mv));
-            self.board.unmake_move(&mut self.ml);
-        }
-        println!("Total: {total}");
-    }
-
-    /// Runs perft on the current position and returns the number of legal
-    /// moves.
-    pub fn perft(&mut self, depth: u8) -> u64 {
-        if depth == 0 {
-            return 1;
-        }
-
-        let mut ml = Movelist::new();
-        self.mg.generate_moves(&self.board, &mut ml);
-
-        let mut total = 0;
-        for mv in ml {
-            self.board.make_move(mv, &mut self.ml);
-            total += self.perft(depth - 1);
-            self.board.unmake_move(&mut self.ml);
-        }
-        total
     }
 }
 
@@ -154,5 +107,55 @@ impl Engine {
                 count += 1;
             }
         }
+    }
+
+    /// Runs perft on the current position. Prints each move followed by the
+    /// number of leaf nodes reaches from that move, or just prints "1" if
+    /// `depth == 0`.
+    pub fn perft_root(&mut self, depth: u8) {
+        println!("Result:");
+        if depth == 0 {
+            println!("1");
+            return;
+        }
+
+        let mut ml = Movelist::new();
+        self.mg.generate_moves(&self.board, &mut ml);
+
+        let mut total = 0;
+        for mv in ml {
+            self.board.make_move(mv, &mut self.ml);
+            let moves = self.perft(depth - 1);
+            total += moves;
+            println!("{}: {moves}", stringify_move(mv));
+            self.board.unmake_move(&mut self.ml);
+        }
+        println!("Total: {total}");
+    }
+
+    /// Pretty-prints the current state of the board.
+    pub fn pretty_print_board(&self) {
+        self.board.pretty_print();
+    }
+}
+
+impl Engine {
+    /// Runs perft on the current position and returns the number of legal
+    /// moves.
+    fn perft(&mut self, depth: u8) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut ml = Movelist::new();
+        self.mg.generate_moves(&self.board, &mut ml);
+
+        let mut total = 0;
+        for mv in ml {
+            self.board.make_move(mv, &mut self.ml);
+            total += self.perft(depth - 1);
+            self.board.unmake_move(&mut self.ml);
+        }
+        total
     }
 }

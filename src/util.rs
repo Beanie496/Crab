@@ -1,9 +1,14 @@
 use crate::defs::{ Bitboard, File, Files, Move, Rank, Ranks, Square };
 use oorandom::Rand64;
 
-/// Returns the File of a given Square.
+/// Calculates the file that `square` is on.
 pub fn file_of(square: Square) -> File {
     square as u8 & 7
+}
+
+/// Generates a random number with 1/8 of its bits set on average.
+pub fn gen_sparse_rand(rand_gen: &mut Rand64) -> u64 {
+    rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
 }
 
 // Allowed dead code because this is occasionally useful for debugging.
@@ -23,17 +28,12 @@ pub fn pretty_print(board: Bitboard) {
     println!();
 }
 
-/// Returns the Rank of a given Square.
+/// Calculates the rank that `square` is on.
 pub fn rank_of(square: Square) -> Rank {
     square as u8 >> 3
 }
 
-/// Returns a random number with 1/8 of its bits set on average.
-pub fn gen_sparse_rand(rand_gen: &mut Rand64) -> u64 {
-    rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
-}
-
-/// Returns a string representation of a move.
+/// Converts `mv` into its string representation.
 pub fn stringify_move(mv: Move) -> String {
     let start = mv & 0x3f;
     let end = (mv >> 6) & 0x3f;
@@ -43,7 +43,7 @@ pub fn stringify_move(mv: Move) -> String {
     ret
 }
 
-/// Returns a string representation of a square.
+/// Converts `sq` into its string representation.
 pub fn stringify_square(sq: Square) -> String {
     let mut ret = String::with_capacity(2);
     ret.push((b'a' + (sq as u8 & 7)) as char);

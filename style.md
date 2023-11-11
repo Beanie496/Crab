@@ -101,11 +101,13 @@ However, unary operators (`&`, `*`, `-`, `!`) should be attached to whatever the
 The length of variable names should be proportional to their scope. A for loop counter might be called `i`; calling a global variable `i` is criminal.
 Names should *always* be descriptive, whatever it's naming. If a variable name requires a comment, you are naming it wrong.
 
-### 8. Functions
+### 8. Functions and methods
 
 Functions shouldn't be as small as possible for the sake of being small.
 If a function is doing several separate things, fence the separate things into their own braced blocks. If a block needs to be called elsewhere, turn it into a function.
 If a function returns nothing, it should *always* have side effects. If a function returns a value, it should *never* have side effects.
+There should be up to four `impl` blocks for each struct. In order, they are for public associated functions, private associated functions, public methods and private methods. Any of the blocks can be omitted.
+Functions/methods within `impl` blocks should be sorted alphabetically.
 
 ### 9. Comments
 

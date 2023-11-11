@@ -1,5 +1,6 @@
 use crate::defs::Move;
 
+/// There is no basis to this number other than 'yeah that seems good enough`.
 const MAX_GAME_MOVES: usize = 250;
 
 /// A wrapper around an array of moves.
@@ -9,16 +10,26 @@ pub struct Movelist {
 }
 
 impl Movelist {
-    /// Returns a Movelist object with an empty move list.
+    /// Creates an empty [`Movelist`].
     pub fn new() -> Movelist {
         Movelist {
             moves: [0; MAX_GAME_MOVES],
             first_empty: 0,
         }
     }
+}
 
-    /// Pushes a move onto the move list. Panics if the move list is already
-    /// full.
+impl Movelist {
+    /// Pops a [`Move`] from the move list. Returns `Some(move)` if there are `> 0`
+    /// moves, otherwise returns `None`.
+    pub fn pop_move(&mut self) -> Option<Move> {
+        (self.first_empty > 0).then(|| {
+            self.first_empty -= 1;
+            self.moves[self.first_empty]
+        })
+    }
+
+    /// Pushes `mv` onto itself. Panics if it is already full.
     pub fn push_move(&mut self, mv: Move) {
         if self.first_empty < MAX_GAME_MOVES {
             self.moves[self.first_empty] = mv;
@@ -26,15 +37,6 @@ impl Movelist {
         } else {
             panic!("Pushing a move onto an already-full move list.");
         }
-    }
-
-    /// Pops a move from the move list. Returns `Some(move)` if there are `> 0`
-    /// moves, otherwise returns `None`.
-    pub fn pop_move(&mut self) -> Option<Move> {
-        (self.first_empty > 0).then(|| {
-            self.first_empty -= 1;
-            self.moves[self.first_empty]
-        })
     }
 }
 

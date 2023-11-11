@@ -1,6 +1,6 @@
 use crate::defs::{ Move, Piece, Side, Square };
 
-/// Returns a Move given a start square, end square, piece and side.
+/// Creates a [`Move`] given a start square, end square, piece and side.
 pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
     start as Move
         | ((end as Move) << 6)
@@ -8,7 +8,8 @@ pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move
         | ((side as Move) << 15)
 }
 
-/// Returns a tuple of a start square, end square, piece and side given a Move.
+/// Turns a [`Move`] into its components: start square, end square, piece and
+/// side, in that order.
 pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
     let start = mv & 0x3f;
     let end = (mv >> 6) & 0x3f;

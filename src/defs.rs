@@ -1,11 +1,10 @@
-/// This abstracts a 64-bit integer.
 pub type Bitboard = u64;
-/// This is a regular constant so it's the smallest possible.
 pub type File = u8;
-/// This is used exclusively for indexing so it's a usize.
 pub type Direction = usize;
 /**
- * From LSB onwards, a Move is as follows:
+ * A container for a move.
+ *
+ * From LSB onwards, a [`Move`] is as follows:
  * * Start pos == 6 bits, 0-63
  * * End pos == 6 bits, 0-63
  * * Piece == 3 bits, 0-5
@@ -23,30 +22,26 @@ pub type Direction = usize;
  * ```
  */
 pub type Move = u16;
-/// This is mainly for indexing so it's a usize
 pub type Piece = usize;
-/// This is a regular constant so it's the smallest possible value.
 pub type Rank = u8;
-/// This is mainly for indexing so it's a usize.
 pub type Side = usize;
-/// This is mainly for indexing so it's a usize.
 pub type Square = usize;
 
-/// Some pre-constructed bitboards.
+/// Pre-constructed bitboards.
 pub struct Bitboards;
 /// All 8 compass directions.
 pub struct Directions;
-/// Enumerates files, from file 1 = 0 to file 8 = 7.
+/// Enumerates files.
 pub struct Files;
-/// Constants associated with Chess (sides = 2, etc.).
+/// Miscellaneous constants associated with chess (`SIDES == 2`, etc.)
 pub struct Nums;
-/// Enumerates pieces, from pawn = 0 to king = 5.
+/// Enumerates pieces.
 pub struct Pieces;
-/// Enumerates ranks, from rank 1 = 0 to rank 8 = 7.
+/// Enumerates ranks.
 pub struct Ranks;
-/// Enumerates sides. White = 0, Black = 1.
+/// Enumerates sides.
 pub struct Sides;
-/// Enumerates squares, from a1 = 0 to a8 = 7 to h8 = 63.
+/// Enumerates squares. This engine uses little-endian rank-file mapping.
 pub struct Squares;
 
 /** An array of character constants associated with each piece on both sides.
@@ -63,6 +58,11 @@ pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
 
 impl Bitboards {
     pub const EMPTY: Bitboard = 0;
+    /// ```
+    /// assert_eq!(Bitboards::FILE_BB[Files::FILE1], 0x0101010101010101);
+    /// assert_eq!(Bitboards::FILE_BB[Files::FILE2], 0x0202020202020202);
+    /// // etc.
+    /// ```
     pub const FILE_BB: [Bitboard; Nums::FILES] = [
         0x0101010101010101,
         0x0202020202020202,
@@ -73,6 +73,11 @@ impl Bitboards {
         0x4040404040404040,
         0x8080808080808080,
     ];
+    /// ```
+    /// assert_eq!(Bitboards::RANK_BB[Ranks::RANK1], 0x00000000000000ff);
+    /// assert_eq!(Bitboards::RANK_BB[Ranks::RANK2], 0x000000000000ff01);
+    /// // etc.
+    /// ```
     pub const RANK_BB: [Bitboard; Nums::RANKS] = [
         0x00000000000000ff,
         0x000000000000ff00,

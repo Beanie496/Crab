@@ -1,26 +1,24 @@
 use crate::defs::Bitboard;
 
 /// Stores magic information for a square:
-/// - `magic` is the magic number
-/// - `mask` masks the occupancies of the whole board to only the attacked
-/// squares
-/// - offset is where in the table the lookups are
-/// - shift is the bits required to index that lookup - it's the number of
-/// squares attacked.
 #[derive(Clone, Copy, Default)]
 pub struct Magic {
-    // calling the magic a u64 since it's just a number, not a bitboard
+    /// The magic number.
     pub magic: u64,
+    /// The relevant attacked squares, excluding the edge.
     pub mask: Bitboard,
+    /// Where in the table the lookups are.
     // u16 (0-65535) is slightly too small for the rook table (102,400)
     pub offset: u32,
+    /// The bits required to index into the lookup table - it's the number of
+    /// permutations of blockers, excluding the edge (since it makes no
+    /// difference whether or not there is a piece on the edge).
     pub shift: u8,
 }
 
 impl Magic {
-    /// Uses the magic information for a square to give the index into the
-    /// table it is for. See <https://www.chessprogramming.org/Magic_Bitboards>
-    /// for an explanation.
+    /// Calculates the index into the table it is for. See
+    /// <https://www.chessprogramming.org/Magic_Bitboards> for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;
         occupancies = occupancies.wrapping_mul(self.magic);

@@ -5,12 +5,20 @@ use std::{
 
 use crate::engine::Engine;
 
+/// Functions to perform bit-related operations.
 mod bits;
+/// Items related to the board. Mainly [`Board`](board::Board).
+/// TODO: what are the two functions doing?
 mod board;
+/// Definitions and enumerations.
 mod defs;
+/// Contains [`Engine`].
 mod engine;
+/// Items related to move generation.
 mod movegen;
+/// A container for [`Movelist`](movelist::Movelist).
 mod movelist;
+/// A collection of assorted useful functions.
 mod util;
 
 fn main() {
@@ -18,6 +26,8 @@ fn main() {
     uci_main_loop(engine);
 }
 
+/// Repeatedly waits for a command and executes it according to the UCI
+/// protocol. It is not yet concurrent.
 fn uci_main_loop(mut engine: Engine) {
     let mut input = String::new();
     loop {
@@ -29,6 +39,7 @@ fn uci_main_loop(mut engine: Engine) {
     }
 }
 
+/// Dissects `line` according to the UCI protocol.
 fn handle_input_line(line: &str, engine: &mut Engine) {
     let mut line = line.trim().split(' ');
 
