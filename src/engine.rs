@@ -6,6 +6,7 @@ use crate::{
     movelist::Movelist,
     util::{ gen_sparse_rand, stringify_move },
 };
+use oorandom::Rand64;
 
 /// Master object that contains all the other major objects.
 pub struct Engine {
@@ -96,6 +97,12 @@ impl Engine {
         let mut lookup_table = [Bitboards::EMPTY; 4096];
         // this is used to store the latest iteration of each index
         let mut epoch = [0u32; 4096];
+        let mut rand_gen: Rand64 = Rand64::new(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
 
         for square in 0..Nums::SQUARES {
             let mask = if piece == Pieces::BISHOP {
@@ -103,18 +110,19 @@ impl Engine {
             } else {
                 Movegen::rook_mask(square, &ray_attacks)
             };
-            let perms = mask.count_ones();
-            let shift = 64 - perms;
-            let mut sparse_rand: u64;
-            let mut count = 0;
+            let mask_bits = mask.count_ones();
+            let perms = 1 << mask_bits;
+            let shift = 64 - mask_bits;
 
             Movegen::generate_all_ray_attacks(square, piece, &ray_attacks, &mut attacks);
 
+            let mut sparse_rand: u64;
+            let mut count = 0;
             // this repeatedly generates a sparse random number and tests it on
             // all different permutations. If the magic number works, it's
             // printed and the loop is exited.
             loop {
-                sparse_rand = gen_sparse_rand();
+                sparse_rand = gen_sparse_rand(&mut rand_gen);
                 let mut blockers = mask;
                 let mut found = true;
 
@@ -137,7 +145,7 @@ impl Engine {
                         break;
                     }
                     // Carry-Rippler trick
-                    blockers &= blockers - 1;
+                    blockers = blockers.wrapping_sub(1) & mask;
                 }
                 if found {
                     println!("Found magic for {piece_str}: {sparse_rand}");

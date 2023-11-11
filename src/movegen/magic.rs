@@ -23,7 +23,7 @@ impl Magic {
     /// for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;
-        occupancies *= self.magic;
+        occupancies = occupancies.wrapping_mul(self.magic);
         occupancies >>= self.shift as u32;
         (occupancies + self.offset as u64) as usize
     }

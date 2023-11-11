@@ -29,13 +29,7 @@ pub fn rank_of(square: Square) -> Rank {
 }
 
 /// Returns a random number with 1/8 of its bits set on average.
-pub fn gen_sparse_rand() -> u64 {
-    let mut rand_gen = Rand64::new(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
+pub fn gen_sparse_rand(rand_gen: &mut Rand64) -> u64 {
     rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
 }
 

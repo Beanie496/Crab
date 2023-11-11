@@ -289,13 +289,14 @@ impl Movegen {
         ray_attacks: &[[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS],
         attack_buffer: &mut [Bitboard; 4096],
     ) {
-        let mut blockers = Bitboards::EMPTY;
+        let mut mask = Bitboards::EMPTY;
         let start = if piece == Pieces::BISHOP { Directions::NE } else { Directions::N };
         for d in (start..(start + Nums::DIRECTIONS)).step_by(2) {
-            blockers |= ray_attacks[d][square];
+            mask |= ray_attacks[d][square];
         }
 
         let mut first_empty = 0;
+        let mut blockers = mask;
         while blockers != 0 {
             let mut attacks = 0;
             for direction in (start..(start + 8)).step_by(2) {
@@ -303,8 +304,12 @@ impl Movegen {
             }
             attack_buffer[first_empty] = attacks;
             // Carry-Rippler trick
-            blockers &= blockers - 1;
+            blockers = blockers.wrapping_sub(1) & mask;
             first_empty += 1;
         }
+        // the loop above doesn't take into account when `blockers == 0`, so
+        // manually add it here: no blockers means the attacks are just the
+        // full mask
+        attack_buffer[first_empty] = mask;
     }
 }
