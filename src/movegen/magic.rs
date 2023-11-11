@@ -13,7 +13,7 @@ pub struct Magic {
     /// The bits required to index into the lookup table - it's the number of
     /// permutations of blockers, excluding the edge (since it makes no
     /// difference whether or not there is a piece on the edge).
-    pub shift: u8,
+    pub shift: u32,
 }
 
 impl Magic {
@@ -22,7 +22,7 @@ impl Magic {
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;
         occupancies = occupancies.wrapping_mul(self.magic);
-        occupancies >>= self.shift as u32;
+        occupancies >>= self.shift;
         (occupancies + self.offset as u64) as usize
     }
 }

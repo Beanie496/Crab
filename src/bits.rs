@@ -1,10 +1,16 @@
 use crate::{
-    defs::{ Bitboard, Bitboards, Directions, Files, Nums, Square, Ranks },
+    defs::{ Bitboard, Bitboards, Directions, File, Files, Nums, Square, Rank, Ranks },
 };
+
+/// Converts `rank` and `file` into a bitboard with the bit in the given
+/// position set.
+pub fn bitboard_from_pos(rank: Rank, file: File) -> Bitboard {
+    1u64 << (rank * 8 + file) as u32
+}
 
 /// Shifts `bb` one square east without wrapping.
 pub fn east(bb: Bitboard) -> Bitboard {
-    (bb << 1) & !Bitboards::FILE_BB[Files::FILE1 as usize]
+    (bb << 1) & !Bitboards::FILE_BB[Files::FILE1]
 }
 
 /// Initialises `ray_attacks` with ray attacks for each direction for each
@@ -13,7 +19,7 @@ pub fn east(bb: Bitboard) -> Bitboard {
 pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRECTIONS]) {
     // north
     {
-        let a2_a8 = Bitboards::FILE_BB[Files::FILE1 as usize] ^ 1;
+        let a2_a8 = Bitboards::FILE_BB[Files::FILE1] ^ 1;
         for square in 0..Nums::SQUARES {
             ray_attacks[Directions::N][square] = a2_a8 << square;
         }
@@ -31,7 +37,7 @@ pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRE
     }
     // east
     {
-        let mut b1_h1 = Bitboards::RANK_BB[Ranks::RANK1 as usize] ^ 1;
+        let mut b1_h1 = Bitboards::RANK_BB[Ranks::RANK1] ^ 1;
         // no need to loop over the final file
         for file in 0..7 {
             let top_rank = file + 56;
@@ -51,13 +57,13 @@ pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRE
                 square -= 8;
             }
             b7_h1 <<= 1;
-            b7_h1 &= !Bitboards::FILE_BB[Files::FILE1 as usize];
+            b7_h1 &= !Bitboards::FILE_BB[Files::FILE1];
             square += 57;
         }
     }
     // south
     {
-        let h7_h1 = Bitboards::FILE_BB[Files::FILE8 as usize] ^ (1 << 63);
+        let h7_h1 = Bitboards::FILE_BB[Files::FILE8] ^ (1 << 63);
         for square in 8..64 {
             ray_attacks[Directions::S][square] = h7_h1 >> (square ^ 63);
         }
@@ -72,14 +78,14 @@ pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRE
                 square -= 8;
             }
             g7_a1 >>= 1;
-            g7_a1 &= !Bitboards::FILE_BB[Files::FILE8 as usize];
+            g7_a1 &= !Bitboards::FILE_BB[Files::FILE8];
             square += 55;
         }
     }
     // west
     {
         let mut square = 7;
-        let mut h1_a1 = Bitboards::RANK_BB[Ranks::RANK1 as usize] ^ 1 << square;
+        let mut h1_a1 = Bitboards::RANK_BB[Ranks::RANK1] ^ 1 << square;
         while h1_a1 != 0 {
             for rank in (0..=56).step_by(8) {
                 ray_attacks[Directions::W][square] = h1_a1 << rank;
@@ -99,7 +105,7 @@ pub fn init_ray_attacks(ray_attacks: &mut [[Bitboard; Nums::SQUARES]; Nums::DIRE
                 square += 8;
             }
             g2_a8 >>= 1;
-            g2_a8 &= !Bitboards::FILE_BB[Files::FILE8 as usize];
+            g2_a8 &= !Bitboards::FILE_BB[Files::FILE8];
             square -= 57;
         }
     }
@@ -136,7 +142,7 @@ pub fn to_square(bb: Bitboard) -> Square {
 
 /// Shifts `bb` one square west without wrapping.
 pub fn west(bb: Bitboard) -> Bitboard {
-    (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8 as usize]
+    (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8]
 }
 
 #[cfg(test)]

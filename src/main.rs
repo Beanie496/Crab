@@ -8,7 +8,6 @@ use crate::engine::Engine;
 /// Functions to perform bit-related operations.
 mod bits;
 /// Items related to the board. Mainly [`Board`](board::Board).
-/// TODO: what are the two functions doing?
 mod board;
 /// Definitions and enumerations.
 mod defs;

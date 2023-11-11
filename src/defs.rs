@@ -1,5 +1,5 @@
 pub type Bitboard = u64;
-pub type File = u8;
+pub type File = usize;
 pub type Direction = usize;
 /**
  * A container for a move.
@@ -23,7 +23,7 @@ pub type Direction = usize;
  */
 pub type Move = u16;
 pub type Piece = usize;
-pub type Rank = u8;
+pub type Rank = usize;
 pub type Side = usize;
 pub type Square = usize;
 
@@ -75,7 +75,7 @@ impl Bitboards {
     ];
     /// ```
     /// assert_eq!(Bitboards::RANK_BB[Ranks::RANK1], 0x00000000000000ff);
-    /// assert_eq!(Bitboards::RANK_BB[Ranks::RANK2], 0x000000000000ff01);
+    /// assert_eq!(Bitboards::RANK_BB[Ranks::RANK2], 0x000000000000ff00);
     /// // etc.
     /// ```
     pub const RANK_BB: [Bitboard; Nums::RANKS] = [
@@ -141,6 +141,7 @@ impl Sides {
 impl Squares {
     pub const A1: Square = 0;
     pub const H1: Square = 7;
+    pub const A3: Square = 16;
     pub const E4: Square = 28;
     pub const D5: Square = 35;
     pub const A8: Square = 56;

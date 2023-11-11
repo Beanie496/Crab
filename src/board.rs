@@ -1,10 +1,12 @@
 use crate::{
+    bits::bitboard_from_pos,
     defs::{ Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS },
     movegen::util::decompose_move,
     movelist::Movelist,
 };
 
 /// Stores information about the current state of the board.
+#[derive(Debug, PartialEq)]
 pub struct Board {
     /// `sides[0]` is the intersection of all White piece bitboards; `sides[1]`
     /// is is the intersection of all Black piece bitboards.
@@ -37,11 +39,16 @@ impl Board {
             side_to_move: Sides::WHITE,
         }
     }
+
+    /// Converts `rank` into its character representation.
+    fn rank_to_char(rank: Rank) -> char {
+        unsafe { char::from_u32_unchecked((b'A' + rank as u8) as u32) }
+    }
 }
 
 impl Board {
     /// Makes the given move on the internal board and pushes the move onto
-    /// `ml`.
+    /// `ml`. `mv` is assumed to be a valid move.
     pub fn make_move(&mut self, mv: Move, ml: &mut Movelist) {
         ml.push_move(mv);
         let (start, end, piece, side) = decompose_move(mv);
@@ -53,7 +60,7 @@ impl Board {
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
-            print!("{} | ", rank_to_char(r));
+            print!("{} | ", Self::rank_to_char(r));
             for f in Files::FILE1..=Files::FILE8 {
                 print!("{} ", self.char_piece_from_pos(r, f));
             }
@@ -90,13 +97,25 @@ impl Board {
     }
 }
 
-/// Converts `rank` and `file` into a bitboard with the bit in the given
-/// position set.
-fn bitboard_from_pos(rank: Rank, file: File) -> Bitboard {
-    1u64 << (rank * 8 + file)
-}
+#[cfg(test)]
+mod tests {
+    use crate::{
+        defs::{ Pieces, Sides, Squares },
+        movegen::util::create_move,
+        movelist::Movelist,
+    };
+    use super::Board;
 
-/// Converts `rank` into its character representation.
-fn rank_to_char(rank: Rank) -> char {
-    unsafe { char::from_u32_unchecked((b'A' + rank) as u32) }
+    #[test]
+    fn make_and_unmake() {
+        let mut board = Board::new();
+        let mut ml = Movelist::new();
+
+        let mv = create_move(Squares::A1, Squares::A3, Pieces::ROOK, Sides::WHITE);
+        board.make_move(mv, &mut ml);
+        assert_eq!(board.sides[Sides::WHITE],  0x000000000001fffe);
+        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
+        board.unmake_move(&mut ml);
+        assert_eq!(board, Board::new());
+    }
 }

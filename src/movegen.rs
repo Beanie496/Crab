@@ -72,12 +72,12 @@ impl Movegen {
             | ray_attacks[Directions::SW][square]
             | ray_attacks[Directions::NW][square];
         rays &=
-            !(Bitboards::FILE_BB[Files::FILE1 as usize]
-              | Bitboards::FILE_BB[Files::FILE8 as usize])
+            !(Bitboards::FILE_BB[Files::FILE1]
+              | Bitboards::FILE_BB[Files::FILE8])
             | Bitboards::FILE_BB[file_of(square) as usize];
         rays &=
-            !(Bitboards::RANK_BB[Ranks::RANK1 as usize]
-              | Bitboards::RANK_BB[Ranks::RANK8 as usize])
+            !(Bitboards::RANK_BB[Ranks::RANK1]
+              | Bitboards::RANK_BB[Ranks::RANK8])
             | Bitboards::RANK_BB[rank_of(square) as usize];
         rays
     }
@@ -94,12 +94,12 @@ impl Movegen {
             | ray_attacks[Directions::S][square]
             | ray_attacks[Directions::W][square];
         rays &=
-            !(Bitboards::FILE_BB[Files::FILE1 as usize]
-              | Bitboards::FILE_BB[Files::FILE8 as usize])
+            !(Bitboards::FILE_BB[Files::FILE1]
+              | Bitboards::FILE_BB[Files::FILE8])
             | Bitboards::FILE_BB[file_of(square) as usize];
         rays &=
-            !(Bitboards::RANK_BB[Ranks::RANK1 as usize]
-              | Bitboards::RANK_BB[Ranks::RANK8 as usize])
+            !(Bitboards::RANK_BB[Ranks::RANK1]
+              | Bitboards::RANK_BB[Ranks::RANK8])
             | Bitboards::RANK_BB[rank_of(square) as usize];
         rays
     }

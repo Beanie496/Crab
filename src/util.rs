@@ -3,7 +3,7 @@ use oorandom::Rand64;
 
 /// Calculates the file that `square` is on.
 pub fn file_of(square: Square) -> File {
-    square as u8 & 7
+    square & 7
 }
 
 /// Generates a random number with 1/8 of its bits set on average.
@@ -30,7 +30,7 @@ pub fn pretty_print(board: Bitboard) {
 
 /// Calculates the rank that `square` is on.
 pub fn rank_of(square: Square) -> Rank {
-    square as u8 >> 3
+    square >> 3
 }
 
 /// Converts `mv` into its string representation.
