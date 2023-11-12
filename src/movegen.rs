@@ -120,60 +120,6 @@ impl Movegen {
         self.generate_non_sliding_moves(board, ml);
         self.generate_sliding_moves(board, ml);
     }
-
-    /// Initialises pawn attack lookup table. First and last rank are ignored.
-    fn init_pawn_attacks(&mut self) {
-        for (side, table) in self.pawn_attacks.iter_mut().enumerate() {
-            // take() ignores the last rank, since pawns can't advance past.
-            // enumerate() gives both tables a value (0 or 1).
-            // skip() ignores the first rank, since pawns can't start there.
-            // It's very important that the skip is done _after_ the enumerate,
-            // as otherwise the enumerate would give A2 value 0, B2 value 1,
-            // and so on.
-            for (square, bb) in table
-                .iter_mut()
-                .take(Nums::SQUARES - Nums::FILES)
-                .enumerate()
-                .skip(Nums::FILES)
-            {
-                // adds 8 if the side is White (0) or subtracts 8 if Black (1)
-                let pushed = as_bitboard(square + 8 - side * 16);
-                *bb = east(pushed) | west(pushed);
-            }
-        }
-    }
-
-    /// Initialises knight attack lookup table.
-    fn init_knight_attacks(&mut self) {
-        for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
-            let knight = as_bitboard(square);
-            // shortened name to avoid collisions with the function
-            let mut e = east(knight);
-            let mut w = west(knight);
-            let mut attacks = north(north(e | w));
-            attacks |= south(south(e | w));
-            e = east(e);
-            w = west(w);
-            attacks |= north(e | w);
-            attacks |= south(e | w);
-            *bb = attacks
-        }
-    }
-
-    /// Initialises king attack lookup table.
-    fn init_king_attacks(&mut self) {
-        for (square, bb) in self.king_attacks.iter_mut().enumerate() {
-            let king = as_bitboard(square);
-            let mut attacks = east(king) | west(king) | king;
-            attacks |= north(attacks) | south(attacks);
-            attacks ^= king;
-            *bb = attacks;
-        }
-    }
-
-    /// Initialises the magic lookup tables with attacks and initialises a
-    /// [`Magic`] object for each square.
-    fn init_magics(&mut self) {}
 }
 
 impl Movegen {
@@ -278,6 +224,60 @@ impl Movegen {
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
+            }
+        }
+    }
+
+    /// Initialises king attack lookup table.
+    fn init_king_attacks(&mut self) {
+        for (square, bb) in self.king_attacks.iter_mut().enumerate() {
+            let king = as_bitboard(square);
+            let mut attacks = east(king) | west(king) | king;
+            attacks |= north(attacks) | south(attacks);
+            attacks ^= king;
+            *bb = attacks;
+        }
+    }
+
+    /// Initialises knight attack lookup table.
+    fn init_knight_attacks(&mut self) {
+        for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
+            let knight = as_bitboard(square);
+            // shortened name to avoid collisions with the function
+            let mut e = east(knight);
+            let mut w = west(knight);
+            let mut attacks = north(north(e | w));
+            attacks |= south(south(e | w));
+            e = east(e);
+            w = west(w);
+            attacks |= north(e | w);
+            attacks |= south(e | w);
+            *bb = attacks
+        }
+    }
+
+    /// Initialises the magic lookup tables with attacks and initialises a
+    /// [`Magic`] object for each square.
+    fn init_magics(&mut self) {}
+
+    /// Initialises pawn attack lookup table. First and last rank are ignored.
+    fn init_pawn_attacks(&mut self) {
+        for (side, table) in self.pawn_attacks.iter_mut().enumerate() {
+            // take() ignores the last rank, since pawns can't advance past.
+            // enumerate() gives both tables a value (0 or 1).
+            // skip() ignores the first rank, since pawns can't start there.
+            // It's very important that the skip is done _after_ the enumerate,
+            // as otherwise the enumerate would give A2 value 0, B2 value 1,
+            // and so on.
+            for (square, bb) in table
+                .iter_mut()
+                .take(Nums::SQUARES - Nums::FILES)
+                .enumerate()
+                .skip(Nums::FILES)
+            {
+                // adds 8 if the side is White (0) or subtracts 8 if Black (1)
+                let pushed = as_bitboard(square + 8 - side * 16);
+                *bb = east(pushed) | west(pushed);
             }
         }
     }
