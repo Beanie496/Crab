@@ -7,7 +7,7 @@ use crate::{
     movelist::Movelist,
     util::{file_of, rank_of},
 };
-use magic::Magic;
+use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
 use util::create_move;
 
 /// Items relating to magic bitboards.
@@ -212,15 +212,15 @@ impl Movegen {
             }
         }
 
-        let mut queens = board.pieces[Pieces::ROOK] & us_bb;
+        let mut queens = board.pieces[Pieces::QUEEN] & us_bb;
         while queens != 0 {
             let queen = pop_lsb(&mut queens);
             let queen_sq = to_square(queen);
-            let mut targets = self.rook_magic_lookup
+            let mut targets = (self.rook_magic_lookup
                 [self.rook_magics[queen_sq].get_table_index(occupancies)]
                 | self.bishop_magic_lookup
-                    [self.bishop_magics[queen_sq].get_table_index(occupancies)]
-                    & !us_bb;
+                    [self.bishop_magics[queen_sq].get_table_index(occupancies)])
+                & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
@@ -258,7 +258,58 @@ impl Movegen {
 
     /// Initialises the magic lookup tables with attacks and initialises a
     /// [`Magic`] object for each square.
-    fn init_magics(&mut self) {}
+    fn init_magics(&mut self) {
+        let mut b_offset = 0;
+        let mut r_offset = 0;
+
+        for square in 0..Nums::SQUARES {
+            let mut attacks = [Bitboards::EMPTY; 4096];
+
+            let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
+                & !Bitboards::FILE_BB[file_of(square)])
+                | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
+                    & !Bitboards::RANK_BB[rank_of(square)]);
+            let b_mask =
+                Movegen::sliding_attacks(square, Pieces::BISHOP, Bitboards::EMPTY) & !edges;
+            let r_mask = Movegen::sliding_attacks(square, Pieces::ROOK, Bitboards::EMPTY) & !edges;
+            let b_mask_bits = b_mask.count_ones();
+            let r_mask_bits = r_mask.count_ones();
+            let b_perms = 2usize.pow(b_mask_bits);
+            let r_perms = 2usize.pow(r_mask_bits);
+            let b_magic = Magic {
+                magic: BISHOP_MAGICS[square],
+                mask: b_mask,
+                offset: b_offset,
+                shift: 64 - b_mask_bits,
+            };
+            let r_magic = Magic {
+                magic: ROOK_MAGICS[square],
+                mask: r_mask,
+                offset: r_offset,
+                shift: 64 - r_mask_bits,
+            };
+
+            Movegen::gen_all_sliding_attacks(square, Pieces::BISHOP, &mut attacks);
+            let mut blockers = b_mask;
+            for attack in attacks.iter().take(b_perms) {
+                let index = b_magic.get_table_index(blockers);
+                self.bishop_magic_lookup[index] = *attack;
+                blockers = blockers.wrapping_sub(1) & b_mask;
+            }
+            self.bishop_magics[square] = b_magic;
+            b_offset += b_perms as u32;
+
+            Movegen::gen_all_sliding_attacks(square, Pieces::ROOK, &mut attacks);
+            let mut blockers = r_mask;
+            for attack in attacks.iter().take(r_perms) {
+                let index = r_magic.get_table_index(blockers);
+                self.rook_magic_lookup[index] = *attack;
+                blockers = blockers.wrapping_sub(1) & r_mask;
+            }
+            self.rook_magics[square] = r_magic;
+            r_offset += r_perms as u32;
+        }
+    }
 
     /// Initialises pawn attack lookup table. First and last rank are ignored.
     fn init_pawn_attacks(&mut self) {
