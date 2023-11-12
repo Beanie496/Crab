@@ -1,11 +1,11 @@
-use crate::defs::{ Move, Piece, Side, Square };
+use crate::defs::{Move, Piece, Side, Square};
 
 /// Creates a [`Move`] given a start square, end square, piece and side.
 pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
     start as Move
-        | ((end as Move) << 6)
-        | ((piece as Move) << 12)
-        | ((side as Move) << 15)
+        | (end as Move) << 6
+        | (piece as Move) << 12
+        | (side as Move) << 15
 }
 
 /// Turns a [`Move`] into its components: start square, end square, piece and
@@ -20,8 +20,8 @@ pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
 
 #[cfg(test)]
 mod tests {
-    use crate::defs::{ Pieces, Sides, Squares };
-    use super::{ create_move, decompose_move };
+    use super::{create_move, decompose_move};
+    use crate::defs::{Pieces, Sides, Squares};
 
     #[test]
     fn create_move_works() {

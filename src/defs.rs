@@ -1,6 +1,6 @@
 pub type Bitboard = u64;
 pub type File = usize;
-pub type Direction = usize;
+pub type Direction = isize;
 /**
  * A container for a move.
  *
@@ -29,7 +29,7 @@ pub type Square = usize;
 
 /// Pre-constructed bitboards.
 pub struct Bitboards;
-/// All 8 compass directions.
+/// The square difference in each of the 8 directions.
 pub struct Directions;
 /// Enumerates files.
 pub struct Files;
@@ -91,13 +91,13 @@ impl Bitboards {
 }
 
 impl Directions {
-    pub const N:  Direction = 0;
-    pub const NE: Direction = 1;
-    pub const E:  Direction = 2;
-    pub const SE: Direction = 3;
-    pub const S:  Direction = 4;
-    pub const SW: Direction = 5;
-    pub const W:  Direction = 6;
+    pub const N: Direction = 8;
+    pub const NE: Direction = 9;
+    pub const E: Direction = 1;
+    pub const SE: Direction = -7;
+    pub const S: Direction = -8;
+    pub const SW: Direction = -9;
+    pub const W: Direction = -1;
     pub const NW: Direction = 7;
 }
 
@@ -107,7 +107,6 @@ impl Files {
 }
 
 impl Nums {
-    pub const DIRECTIONS: usize = 8;
     pub const FILES: usize = 8;
     pub const SIDES: usize = 2;
     pub const SQUARES: usize = 64;
@@ -116,12 +115,12 @@ impl Nums {
 }
 
 impl Pieces {
-    pub const PAWN:   Piece = 0;
+    pub const PAWN: Piece = 0;
     pub const KNIGHT: Piece = 1;
     pub const BISHOP: Piece = 2;
-    pub const ROOK:   Piece = 3;
-    pub const QUEEN:  Piece = 4;
-    pub const KING:   Piece = 5;
+    pub const ROOK: Piece = 3;
+    pub const QUEEN: Piece = 4;
+    pub const KING: Piece = 5;
 }
 
 impl Ranks {

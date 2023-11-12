@@ -1,7 +1,4 @@
-use std::{
-    io,
-    process::exit,
-};
+use std::{io, process::exit};
 
 use crate::engine::Engine;
 
@@ -96,16 +93,12 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
                  * options specified from "uci" command.
                  */
             }
-            "stop" => {
-                /* Stop calculating immediately. */
-            }
+            "stop" => { /* Stop calculating immediately. */ }
             "uci" => {
                 /* Print ID, all options and "uciok" */
                 println!("uciok");
             }
-            "ucinewgame" => {
-                /* What it sounds like. Set pos to start pos, etc. */
-            }
+            "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
             "q" | "quit" => {
                 /* Quit as soon as possible */
                 exit(0);

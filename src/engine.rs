@@ -1,10 +1,9 @@
 use crate::{
-    bits::init_ray_attacks,
     board::Board,
-    defs::{ Bitboards, Nums, Pieces, Piece },
+    defs::{Bitboards, Files, Nums, Piece, Pieces, Ranks},
     movegen::Movegen,
     movelist::Movelist,
-    util::{ gen_sparse_rand, stringify_move },
+    util::{file_of, gen_sparse_rand, rank_of, stringify_move},
 };
 use oorandom::Rand64;
 
@@ -40,10 +39,8 @@ impl Engine {
             panic!("piece not a rook or bishop");
         };
 
-        let mut ray_attacks = [[Bitboards::EMPTY; Nums::SQUARES]; Nums::DIRECTIONS];
-        init_ray_attacks(&mut ray_attacks);
         /* 4096 is the largest number of attacks from a single square: a rook
-           attacking from one of the corners. */
+        attacking from one of the corners. */
         // this stores the attacks for each square
         let mut attacks = [Bitboards::EMPTY; 4096];
         // this is used to check if any collisions are destructive
@@ -54,20 +51,22 @@ impl Engine {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_millis()
+                .as_millis(),
         );
 
         for square in 0..Nums::SQUARES {
-            let mask = if piece == Pieces::BISHOP {
-                Movegen::bishop_mask(square, &ray_attacks)
-            } else {
-                Movegen::rook_mask(square, &ray_attacks)
-            };
+            let edges =
+                ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
+                & !Bitboards::FILE_BB[file_of(square)])
+                | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
+                  & !Bitboards::RANK_BB[rank_of(square)]);
+
+            let mask = Movegen::sliding_attacks(square, piece, Bitboards::EMPTY) & !edges;
             let mask_bits = mask.count_ones();
-            let perms = 1 << mask_bits;
+            let perms = 2usize.pow(mask_bits);
             let shift = 64 - mask_bits;
 
-            Movegen::generate_all_ray_attacks(square, piece, &ray_attacks, &mut attacks);
+            Movegen::gen_all_sliding_attacks(square, piece, &mut attacks);
 
             let mut sparse_rand: u64;
             let mut count = 0;
@@ -79,7 +78,7 @@ impl Engine {
                 let mut blockers = mask;
                 let mut found = true;
 
-                for attack in attacks.iter().take(perms as usize) {
+                for attack in attacks.iter().take(perms) {
                     let index = blockers.wrapping_mul(sparse_rand) >> shift;
                     /* Each time an index is made, it's checked to see if it's
                      * collided with one of its previous indexes. If it hasn't

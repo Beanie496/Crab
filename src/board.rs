@@ -1,6 +1,6 @@
 use crate::{
-    bits::bitboard_from_pos,
-    defs::{ Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS },
+    bits::{as_bitboard, bitboard_from_pos},
+    defs::{Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS},
     movegen::util::decompose_move,
     movelist::Movelist,
 };
@@ -52,8 +52,8 @@ impl Board {
     pub fn make_move(&mut self, mv: Move, ml: &mut Movelist) {
         ml.push_move(mv);
         let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= (1u64 << start) | (1u64 << end);
-        self.sides[side] ^= (1u64 << start) | (1u64 << end);
+        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
+        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
         self.side_to_move ^= 1;
     }
 
@@ -74,8 +74,8 @@ impl Board {
     pub fn unmake_move(&mut self, ml: &mut Movelist) {
         let mv = ml.pop_move().unwrap();
         let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= (1u64 << start) | (1u64 << end);
-        self.sides[side] ^= (1u64 << start) | (1u64 << end);
+        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
+        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
         self.side_to_move ^= 1;
     }
 }
@@ -99,12 +99,13 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
+    use super::Board;
+
     use crate::{
-        defs::{ Pieces, Sides, Squares },
+        defs::{Pieces, Sides, Squares},
         movegen::util::create_move,
         movelist::Movelist,
     };
-    use super::Board;
 
     #[test]
     fn make_and_unmake() {
@@ -113,7 +114,7 @@ mod tests {
 
         let mv = create_move(Squares::A1, Squares::A3, Pieces::ROOK, Sides::WHITE);
         board.make_move(mv, &mut ml);
-        assert_eq!(board.sides[Sides::WHITE],  0x000000000001fffe);
+        assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
         assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
         board.unmake_move(&mut ml);
         assert_eq!(board, Board::new());
