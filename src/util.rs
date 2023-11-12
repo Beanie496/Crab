@@ -1,8 +1,9 @@
+use oorandom::Rand64;
+
 use crate::{
     bits::bitboard_from_pos,
     defs::{Bitboard, Direction, File, Files, Move, Rank, Ranks, Square, Squares},
 };
-use oorandom::Rand64;
 
 /// Calculates the file that `square` is on.
 pub fn file_of(square: Square) -> File {
