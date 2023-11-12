@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     board::Board,
     defs::{Bitboards, Files, Nums, Piece, Pieces, Ranks},
@@ -5,6 +7,7 @@ use crate::{
     movelist::Movelist,
     util::{file_of, gen_sparse_rand, rank_of, stringify_move},
 };
+
 use oorandom::Rand64;
 
 /// Master object that contains all the other major objects.
@@ -115,6 +118,7 @@ impl Engine {
             return;
         }
 
+        let time = Instant::now();
         let mut ml = Movelist::new();
         self.mg.generate_moves(&self.board, &mut ml);
 
@@ -127,6 +131,8 @@ impl Engine {
             self.board.unmake_move(&mut self.ml);
         }
         println!("Total: {total}");
+        let elapsed_ms = time.elapsed().as_millis() as u64;
+        println!("Time taken: {} ms; NPS: {}", elapsed_ms, 1000 * total / elapsed_ms);
     }
 
     /// Pretty-prints the current state of the board.
