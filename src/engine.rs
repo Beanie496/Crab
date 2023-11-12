@@ -59,12 +59,10 @@ impl Engine {
                 & !Bitboards::FILE_BB[file_of(square)])
                 | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
                     & !Bitboards::RANK_BB[rank_of(square)]);
-
             let mask = Movegen::sliding_attacks(square, piece, Bitboards::EMPTY) & !edges;
             let mask_bits = mask.count_ones();
             let perms = 2usize.pow(mask_bits);
             let shift = 64 - mask_bits;
-
             Movegen::gen_all_sliding_attacks(square, piece, &mut attacks);
 
             let mut sparse_rand: u64;
