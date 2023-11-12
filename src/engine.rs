@@ -131,8 +131,12 @@ impl Engine {
             self.board.unmake_move(&mut self.ml);
         }
         println!("Total: {total}");
-        let elapsed_ms = time.elapsed().as_millis() as u64;
-        println!("Time taken: {} ms; NPS: {}", elapsed_ms, 1000 * total / elapsed_ms);
+        let elapsed_us = time.elapsed().as_micros() as u64;
+        println!(
+            "Time taken: {:.0} ms; NPS: {}",
+            elapsed_us / 1_000,
+            1_000_000 * total / elapsed_us
+        );
     }
 
     /// Pretty-prints the current state of the board.
