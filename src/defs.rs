@@ -125,6 +125,7 @@ impl Pieces {
 
 impl Ranks {
     pub const RANK1: Rank = 0;
+    pub const RANK4: Rank = 3;
     pub const RANK8: Rank = 7;
 }
 

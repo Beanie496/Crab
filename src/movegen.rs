@@ -169,8 +169,12 @@ impl Movegen {
              * yet.
              */
             let single_push = pawn.rotate_left(72 - (us as u32) * 16) & empty;
+            let double_push = single_push.rotate_left(72 - (us as u32) * 16)
+                & empty
+                // rank 4 if we're white, rank 5 if we're black
+                & Bitboards::RANK_BB[Ranks::RANK4 + us];
             let captures = self.pawn_attacks[us][to_square(pawn)] & them_bb;
-            let mut targets = single_push | captures;
+            let mut targets = single_push | double_push | captures;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
                 ml.push_move(create_move(to_square(pawn), target, Pieces::PAWN, us));
