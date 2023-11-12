@@ -74,27 +74,37 @@ mod tests {
 
     #[test]
     fn ray_attacks() {
-        assert_eq!(ray_attack(Squares::A1, Directions::N, 0), 0x0101010101010100);
         assert_eq!(
-            ray_attack(Squares::A1, Directions::N, 0x0100000000000000), 0x0101010101010100
+            ray_attack(Squares::A1, Directions::N, 0),
+            0x0101010101010100
         );
         assert_eq!(
-            ray_attack(Squares::A1, Directions::N, 0x0101000000000000), 0x0001010101010100
+            ray_attack(Squares::A1, Directions::N, 0x0100000000000000),
+            0x0101010101010100
         );
         assert_eq!(
-            ray_attack(Squares::A1, Directions::NE, 0x8040201008040200), 0x0000000000000200
+            ray_attack(Squares::A1, Directions::N, 0x0101000000000000),
+            0x0001010101010100
         );
         assert_eq!(
-            ray_attack(Squares::A1, Directions::NE, 0x8000000000000000), 0x8040201008040200
+            ray_attack(Squares::A1, Directions::NE, 0x8040201008040200),
+            0x0000000000000200
         );
         assert_eq!(
-            ray_attack(Squares::A1, Directions::NE, 0x0000000000000000), 0x8040201008040200
+            ray_attack(Squares::A1, Directions::NE, 0x8000000000000000),
+            0x8040201008040200
         );
         assert_eq!(
-            ray_attack(Squares::A8, Directions::SE, 0x0002040801020408), 0x0002000000000000
+            ray_attack(Squares::A1, Directions::NE, 0x0000000000000000),
+            0x8040201008040200
         );
         assert_eq!(
-            ray_attack(Squares::H8, Directions::SW, 0x0040201008040201), 0x0040000000000000
+            ray_attack(Squares::A8, Directions::SE, 0x0002040801020408),
+            0x0002000000000000
+        );
+        assert_eq!(
+            ray_attack(Squares::H8, Directions::SW, 0x0040201008040201),
+            0x0040000000000000
         );
     }
 }

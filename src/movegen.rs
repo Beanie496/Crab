@@ -1,5 +1,7 @@
 use crate::{
-    bits::{as_bitboard, east, north, pop_lsb, pop_next_square, ray_attack, south, to_square, west},
+    bits::{
+        as_bitboard, east, north, pop_lsb, pop_next_square, ray_attack, south, to_square, west,
+    },
     board::Board,
     defs::{Bitboard, Bitboards, Directions, Files, Nums, Piece, Pieces, Ranks, Square},
     movelist::Movelist,
@@ -65,11 +67,10 @@ impl Movegen {
     /// square to the edge exclusive and uses the Carry-Rippler trick to
     /// generate each subsequent attack.
     pub fn gen_all_sliding_attacks(square: Square, piece: Piece, attacks: &mut [Bitboard; 4096]) {
-        let edges =
-            ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
+        let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
             & !Bitboards::FILE_BB[file_of(square)])
             | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
-              & !Bitboards::RANK_BB[rank_of(square)]);
+                & !Bitboards::RANK_BB[rank_of(square)]);
         let mask = Self::sliding_attacks(square, piece, 0) & !edges;
 
         let mut blockers = mask;
@@ -85,8 +86,19 @@ impl Movegen {
     /// Generates the attack set for `piece` on `square` up to and including the
     /// given blockers. Includes the edge.
     pub fn sliding_attacks(square: Square, piece: Piece, blockers: Bitboard) -> Bitboard {
-        let bishop_directions = [ Directions::NE, Directions::SE, Directions::SW, Directions::NW ];
-        let rook_directions = [ Directions::N, Directions::E, Directions::S, Directions::W ];
+        let bishop_directions = [
+            Directions::NE,
+            Directions::SE,
+            Directions::SW,
+            Directions::NW,
+        ];
+        #[rustfmt::skip]
+        let rook_directions = [
+            Directions::N,
+            Directions::E,
+            Directions::S,
+            Directions::W
+        ];
         let directions = if piece == Pieces::BISHOP {
             bishop_directions
         } else {

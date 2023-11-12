@@ -2,10 +2,7 @@ use crate::defs::{Move, Piece, Side, Square};
 
 /// Creates a [`Move`] given a start square, end square, piece and side.
 pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
-    start as Move
-        | (end as Move) << 6
-        | (piece as Move) << 12
-        | (side as Move) << 15
+    start as Move | (end as Move) << 6 | (piece as Move) << 12 | (side as Move) << 15
 }
 
 /// Turns a [`Move`] into its components: start square, end square, piece and

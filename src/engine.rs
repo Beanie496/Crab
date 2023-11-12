@@ -55,11 +55,10 @@ impl Engine {
         );
 
         for square in 0..Nums::SQUARES {
-            let edges =
-                ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
+            let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
                 & !Bitboards::FILE_BB[file_of(square)])
                 | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
-                  & !Bitboards::RANK_BB[rank_of(square)]);
+                    & !Bitboards::RANK_BB[rank_of(square)]);
 
             let mask = Movegen::sliding_attacks(square, piece, Bitboards::EMPTY) & !edges;
             let mask_bits = mask.count_ones();
