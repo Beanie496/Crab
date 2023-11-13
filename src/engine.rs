@@ -5,7 +5,7 @@ use oorandom::Rand64;
 use crate::{
     board::Board,
     defs::{Bitboards, Files, Nums, Piece, Pieces, Ranks},
-    movegen::{magic::MAX_BLOCKERS, Movegen },
+    movegen::{magic::MAX_BLOCKERS, Movegen},
     movelist::Movelist,
     util::{file_of, gen_sparse_rand, rank_of, stringify_move},
 };

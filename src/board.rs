@@ -10,13 +10,13 @@ use crate::{
 pub struct Board {
     /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     /// is is the intersection of all Black piece bitboards.
-    pub sides: [Bitboard; Nums::SIDES],
+    sides: [Bitboard; Nums::SIDES],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     /// is the knights, and so on, as according to the order set by
     /// [`Pieces`](crate::defs::Pieces).
-    pub pieces: [Bitboard; Nums::PIECES],
+    pieces: [Bitboard; Nums::PIECES],
     /// The side to move - 0 or 1 for White or Black respectively.
-    pub side_to_move: Side,
+    side_to_move: Side,
 }
 
 impl Board {
@@ -78,6 +78,11 @@ impl Board {
         }
         println!("    ---------------");
         println!("    1 2 3 4 5 6 7 8");
+    }
+
+    /// Returns side to move
+    pub fn side_to_move(&self) -> Side {
+        self.side_to_move
     }
 
     /// Returns the board of the side according to `IS_WHITE`.

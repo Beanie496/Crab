@@ -66,7 +66,11 @@ impl Movegen {
     /// `attacks`. It starts with a full blocker board that goes from the
     /// square to the edge exclusive and uses the Carry-Rippler trick to
     /// generate each subsequent attack.
-    pub fn gen_all_sliding_attacks(square: Square, piece: Piece, attacks: &mut [Bitboard; MAX_BLOCKERS]) {
+    pub fn gen_all_sliding_attacks(
+        square: Square,
+        piece: Piece,
+        attacks: &mut [Bitboard; MAX_BLOCKERS],
+    ) {
         let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
             & !Bitboards::FILE_BB[file_of(square)])
             | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
@@ -116,7 +120,7 @@ impl Movegen {
 impl Movegen {
     /// Generates all legal moves for `board` and puts them in `ml`.
     pub fn generate_moves(&self, board: &Board, ml: &mut Movelist) {
-        if board.side_to_move == Sides::WHITE {
+        if board.side_to_move() == Sides::WHITE {
             self.generate_pawn_moves::<true>(board, ml);
             self.generate_non_sliding_moves::<true>(board, ml);
             self.generate_sliding_moves::<true>(board, ml);
