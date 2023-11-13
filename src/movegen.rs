@@ -131,21 +131,21 @@ impl Movegen {
 
         let mut knights = board.pieces[Pieces::KNIGHT] & us_bb;
         while knights != 0 {
-            let knight = pop_lsb(&mut knights);
-            let mut targets = self.knight_attacks[to_square(knight)] & !us_bb;
+            let knight = pop_next_square(&mut knights);
+            let mut targets = self.knight_attacks[knight] & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(to_square(knight), target, Pieces::KNIGHT, us));
+                ml.push_move(create_move(knight, target, Pieces::KNIGHT, us));
             }
         }
 
         let mut kings = board.pieces[Pieces::KING] & us_bb;
         while kings != 0 {
-            let king = pop_lsb(&mut kings);
-            let mut targets = self.king_attacks[to_square(king)] & !us_bb;
+            let king = pop_next_square(&mut kings);
+            let mut targets = self.king_attacks[king] & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(to_square(king), target, Pieces::KING, us));
+                ml.push_move(create_move(king, target, Pieces::KING, us));
             }
         }
     }
@@ -192,42 +192,39 @@ impl Movegen {
 
         let mut bishops = board.pieces[Pieces::BISHOP] & us_bb;
         while bishops != 0 {
-            let bishop = pop_lsb(&mut bishops);
-            let bishop_sq = to_square(bishop);
+            let bishop = pop_next_square(&mut bishops);
             let mut targets = self.bishop_magic_lookup
-                [self.bishop_magics[bishop_sq].get_table_index(occupancies)]
+                [self.bishop_magics[bishop].get_table_index(occupancies)]
                 & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(bishop_sq, target, Pieces::BISHOP, us));
+                ml.push_move(create_move(bishop, target, Pieces::BISHOP, us));
             }
         }
 
         let mut rooks = board.pieces[Pieces::ROOK] & us_bb;
         while rooks != 0 {
-            let rook = pop_lsb(&mut rooks);
-            let rook_sq = to_square(rook);
+            let rook = pop_next_square(&mut rooks);
             let mut targets = self.rook_magic_lookup
-                [self.rook_magics[rook_sq].get_table_index(occupancies)]
+                [self.rook_magics[rook].get_table_index(occupancies)]
                 & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(rook_sq, target, Pieces::ROOK, us));
+                ml.push_move(create_move(rook, target, Pieces::ROOK, us));
             }
         }
 
         let mut queens = board.pieces[Pieces::QUEEN] & us_bb;
         while queens != 0 {
-            let queen = pop_lsb(&mut queens);
-            let queen_sq = to_square(queen);
+            let queen = pop_next_square(&mut queens);
             let mut targets = (self.rook_magic_lookup
-                [self.rook_magics[queen_sq].get_table_index(occupancies)]
+                [self.rook_magics[queen].get_table_index(occupancies)]
                 | self.bishop_magic_lookup
-                    [self.bishop_magics[queen_sq].get_table_index(occupancies)])
+                    [self.bishop_magics[queen].get_table_index(occupancies)])
                 & !us_bb;
             while targets != 0 {
                 let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(queen_sq, target, Pieces::QUEEN, us));
+                ml.push_move(create_move(queen, target, Pieces::QUEEN, us));
             }
         }
     }
