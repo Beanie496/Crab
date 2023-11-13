@@ -108,8 +108,8 @@ impl Engine {
 
     /// Runs perft on the current position. Prints each move followed by the
     /// number of leaf nodes reaches from that move, or just prints "1" if
-    /// `depth == 0`.
-    pub fn perft_root(&mut self, depth: u8) {
+    /// `depth == 0`. Prints total node count, time and NPS at the end.
+    pub fn perft(&mut self, depth: u8) {
         println!("Result:");
         if depth == 0 {
             println!("1");
@@ -123,7 +123,7 @@ impl Engine {
         let mut total = 0;
         for mv in ml {
             self.board.make_move(mv, &mut self.ml);
-            let moves = self.perft(depth - 1);
+            let moves = self.perft_inner(depth - 1);
             total += moves;
             println!("{}: {moves}", stringify_move(mv));
             self.board.unmake_move(&mut self.ml);
@@ -146,7 +146,7 @@ impl Engine {
 impl Engine {
     /// Runs perft on the current position and returns the number of legal
     /// moves.
-    fn perft(&mut self, depth: u8) -> u64 {
+    fn perft_inner(&mut self, depth: u8) -> u64 {
         if depth == 0 {
             return 1;
         }
@@ -157,7 +157,7 @@ impl Engine {
         let mut total = 0;
         for mv in ml {
             self.board.make_move(mv, &mut self.ml);
-            total += self.perft(depth - 1);
+            total += self.perft_inner(depth - 1);
             self.board.unmake_move(&mut self.ml);
         }
         total

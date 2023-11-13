@@ -7,7 +7,7 @@ use crate::{
     movelist::Movelist,
     util::{file_of, rank_of},
 };
-use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
+use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::create_move;
 
 /// Items relating to magic bitboards.

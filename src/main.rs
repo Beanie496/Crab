@@ -118,7 +118,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             "perft" => {
                 if let Some(num) = line.next() {
                     if let Ok(result) = num.parse::<u8>() {
-                        engine.perft_root(result);
+                        engine.perft(result);
                     } else {
                         println!("Must give a number between 0 and 255.");
                     }
