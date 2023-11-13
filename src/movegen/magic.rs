@@ -82,7 +82,9 @@ pub const BISHOP_MAGICS: [Bitboard; Nums::SQUARES] = [
     4620763597834879264,
     72638153366733312,
 ];
-
+// 4096 is the largest number of blocker permutations from a single square: a
+// rook attacking from one of the corners
+pub const MAX_BLOCKERS: usize = 4096;
 pub const ROOK_MAGICS: [Bitboard; Nums::SQUARES] = [
     36033333578174594,
     10394312406808535040,

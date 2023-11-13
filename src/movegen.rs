@@ -11,7 +11,7 @@ use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
 use util::create_move;
 
 /// Items relating to magic bitboards.
-mod magic;
+pub mod magic;
 /// Useful functions for move generation specifically.
 pub mod util;
 
@@ -66,7 +66,7 @@ impl Movegen {
     /// `attacks`. It starts with a full blocker board that goes from the
     /// square to the edge exclusive and uses the Carry-Rippler trick to
     /// generate each subsequent attack.
-    pub fn gen_all_sliding_attacks(square: Square, piece: Piece, attacks: &mut [Bitboard; 4096]) {
+    pub fn gen_all_sliding_attacks(square: Square, piece: Piece, attacks: &mut [Bitboard; MAX_BLOCKERS]) {
         let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
             & !Bitboards::FILE_BB[file_of(square)])
             | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
@@ -252,7 +252,7 @@ impl Movegen {
         let mut r_offset = 0;
 
         for square in 0..Nums::SQUARES {
-            let mut attacks = [Bitboards::EMPTY; 4096];
+            let mut attacks = [Bitboards::EMPTY; MAX_BLOCKERS];
 
             let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
                 & !Bitboards::FILE_BB[file_of(square)])

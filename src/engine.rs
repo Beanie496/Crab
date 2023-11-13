@@ -5,7 +5,7 @@ use oorandom::Rand64;
 use crate::{
     board::Board,
     defs::{Bitboards, Files, Nums, Piece, Pieces, Ranks},
-    movegen::Movegen,
+    movegen::{magic::MAX_BLOCKERS, Movegen },
     movelist::Movelist,
     util::{file_of, gen_sparse_rand, rank_of, stringify_move},
 };
@@ -42,14 +42,12 @@ impl Engine {
             panic!("piece not a rook or bishop");
         };
 
-        /* 4096 is the largest number of attacks from a single square: a rook
-        attacking from one of the corners. */
         // this stores the attacks for each square
-        let mut attacks = [Bitboards::EMPTY; 4096];
+        let mut attacks = [Bitboards::EMPTY; MAX_BLOCKERS];
         // this is used to check if any collisions are destructive
-        let mut lookup_table = [Bitboards::EMPTY; 4096];
+        let mut lookup_table = [Bitboards::EMPTY; MAX_BLOCKERS];
         // this is used to store the latest iteration of each index
-        let mut epoch = [0u32; 4096];
+        let mut epoch = [0u32; MAX_BLOCKERS];
         let mut rand_gen: Rand64 = Rand64::new(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
