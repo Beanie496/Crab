@@ -10,7 +10,7 @@ use crate::{
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::create_move;
 
-/// Items relating to magic bitboards.
+/// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
 pub mod util;
