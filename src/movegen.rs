@@ -1,6 +1,6 @@
 use crate::{
     bits::{
-        as_bitboard, east, north, pop_lsb, pop_next_square, ray_attack, south, to_square, west,
+        as_bitboard, BitIter, east, north, pop_lsb, ray_attack, south, to_square, west,
     },
     board::Board,
     defs::{Bitboard, Bitboards, Directions, Files, Nums, Piece, Pieces, Ranks, Square},
@@ -21,8 +21,8 @@ pub struct Movegen {
     pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
     knight_attacks: [Bitboard; Nums::SQUARES],
     king_attacks: [Bitboard; Nums::SQUARES],
-    bishop_magic_lookup: [Bitboard; BISHOP_SIZE],
-    rook_magic_lookup: [Bitboard; ROOK_SIZE],
+    bishop_magic_table: [Bitboard; BISHOP_SIZE],
+    rook_magic_table: [Bitboard; ROOK_SIZE],
     bishop_magics: [Magic; Nums::SQUARES],
     rook_magics: [Magic; Nums::SQUARES],
 }
@@ -50,8 +50,8 @@ impl Movegen {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
             king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
-            bishop_magic_lookup: [Bitboards::EMPTY; BISHOP_SIZE],
-            rook_magic_lookup: [Bitboards::EMPTY; ROOK_SIZE],
+            bishop_magic_table: [Bitboards::EMPTY; BISHOP_SIZE],
+            rook_magic_table: [Bitboards::EMPTY; ROOK_SIZE],
             bishop_magics: [Magic::default(); Nums::SQUARES],
             rook_magics: [Magic::default(); Nums::SQUARES],
         };
@@ -123,28 +123,29 @@ impl Movegen {
 }
 
 impl Movegen {
+    /// Finds the bishop attacks from `square` with the given blockers.
+    fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_magic_table[self.bishop_magics[square].get_table_index(blockers)]
+    }
+
     /// Generates all legal knight and king moves for `board` and puts them in
     /// `ml`.
     fn generate_non_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
         let us = board.side_to_move;
         let us_bb = board.sides[us];
 
-        let mut knights = board.pieces[Pieces::KNIGHT] & us_bb;
-        while knights != 0 {
-            let knight = pop_next_square(&mut knights);
-            let mut targets = self.knight_attacks[knight] & !us_bb;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
+        let knights = BitIter::new(board.pieces[Pieces::KNIGHT] & us_bb);
+        for knight in knights {
+            let targets = BitIter::new(self.knight_attacks(knight) & !us_bb);
+            for target in targets {
                 ml.push_move(create_move(knight, target, Pieces::KNIGHT, us));
             }
         }
 
-        let mut kings = board.pieces[Pieces::KING] & us_bb;
-        while kings != 0 {
-            let king = pop_next_square(&mut kings);
-            let mut targets = self.king_attacks[king] & !us_bb;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
+        let kings = BitIter::new(board.pieces[Pieces::KING] & us_bb);
+        for king in kings {
+            let targets = BitIter::new(self.king_attacks(king) & !us_bb);
+            for target in targets {
                 ml.push_move(create_move(king, target, Pieces::KING, us));
             }
         }
@@ -174,9 +175,8 @@ impl Movegen {
                 // rank 4 if we're white, rank 5 if we're black
                 & Bitboards::RANK_BB[Ranks::RANK4 + us];
             let captures = self.pawn_attacks[us][to_square(pawn)] & them_bb;
-            let mut targets = single_push | double_push | captures;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
+            let targets = BitIter::new(single_push | double_push | captures);
+            for target in targets {
                 ml.push_move(create_move(to_square(pawn), target, Pieces::PAWN, us));
             }
         }
@@ -190,41 +190,27 @@ impl Movegen {
         let them_bb = board.sides[1 - us];
         let occupancies = us_bb | them_bb;
 
-        let mut bishops = board.pieces[Pieces::BISHOP] & us_bb;
-        while bishops != 0 {
-            let bishop = pop_next_square(&mut bishops);
-            let mut targets = self.bishop_magic_lookup
-                [self.bishop_magics[bishop].get_table_index(occupancies)]
-                & !us_bb;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
+        let bishops = BitIter::new(board.pieces[Pieces::BISHOP] & us_bb);
+        for bishop in bishops {
+            let targets = BitIter::new(self.bishop_attacks(bishop, occupancies) & !us_bb);
+            for target in targets {
                 ml.push_move(create_move(bishop, target, Pieces::BISHOP, us));
             }
         }
 
-        let mut rooks = board.pieces[Pieces::ROOK] & us_bb;
-        while rooks != 0 {
-            let rook = pop_next_square(&mut rooks);
-            let mut targets = self.rook_magic_lookup
-                [self.rook_magics[rook].get_table_index(occupancies)]
-                & !us_bb;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
+        let rooks = BitIter::new(board.pieces[Pieces::ROOK] & us_bb);
+        for rook in rooks {
+            let targets = BitIter::new(self.rook_attacks(rook, occupancies) & !us_bb);
+            for target in targets {
                 ml.push_move(create_move(rook, target, Pieces::ROOK, us));
             }
         }
 
-        let mut queens = board.pieces[Pieces::QUEEN] & us_bb;
-        while queens != 0 {
-            let queen = pop_next_square(&mut queens);
-            let mut targets = (self.rook_magic_lookup
-                [self.rook_magics[queen].get_table_index(occupancies)]
-                | self.bishop_magic_lookup
-                    [self.bishop_magics[queen].get_table_index(occupancies)])
-                & !us_bb;
-            while targets != 0 {
-                let target = pop_next_square(&mut targets);
-                ml.push_move(create_move(queen, target, Pieces::QUEEN, us));
+        let queens = BitIter::new(board.pieces[Pieces::QUEEN] & us_bb);
+        for queen in queens {
+            let targets = BitIter::new(self.queen_attacks(queen, occupancies) & !us_bb);
+            for target in targets {
+                ml.push_move(create_move(queen, target, Pieces::BISHOP, us));
             }
         }
     }
@@ -294,7 +280,7 @@ impl Movegen {
             let mut blockers = b_mask;
             for attack in attacks.iter().take(b_perms) {
                 let index = b_magic.get_table_index(blockers);
-                self.bishop_magic_lookup[index] = *attack;
+                self.bishop_magic_table[index] = *attack;
                 blockers = blockers.wrapping_sub(1) & b_mask;
             }
             self.bishop_magics[square] = b_magic;
@@ -304,7 +290,7 @@ impl Movegen {
             let mut blockers = r_mask;
             for attack in attacks.iter().take(r_perms) {
                 let index = r_magic.get_table_index(blockers);
-                self.rook_magic_lookup[index] = *attack;
+                self.rook_magic_table[index] = *attack;
                 blockers = blockers.wrapping_sub(1) & r_mask;
             }
             self.rook_magics[square] = r_magic;
@@ -332,5 +318,25 @@ impl Movegen {
                 *bb = east(pushed) | west(pushed);
             }
         }
+    }
+
+    /// Finds the king attacks from `square`.
+    fn king_attacks(&self, square: Square) -> Bitboard {
+        self.king_attacks[square]
+    }
+
+    /// Finds the knight attacks from `square`.
+    fn knight_attacks(&self, square: Square) -> Bitboard {
+        self.knight_attacks[square]
+    }
+
+    /// Finds the queen attacks from `square` with the given blockers.
+    fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
+    }
+
+    /// Finds the rook attacks from `square` with the given blockers.
+    fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.rook_magic_table[self.rook_magics[square].get_table_index(blockers)]
     }
 }

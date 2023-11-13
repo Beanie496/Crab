@@ -3,6 +3,30 @@ use crate::{
     util::is_valid,
 };
 
+pub struct BitIter {
+    board: Bitboard,
+}
+
+impl BitIter {
+    pub fn new(bb: Bitboard) -> BitIter {
+        Self {
+            board: bb,
+        }
+    }
+}
+
+impl Iterator for BitIter {
+    type Item = Square;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.board == 0 {
+            None
+        } else {
+            Some(pop_next_square(&mut self.board))
+        }
+    }
+}
+
 /// Converts `square` into its corresponding bitboard.
 pub fn as_bitboard(square: Square) -> Bitboard {
     1 << square
