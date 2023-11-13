@@ -3,21 +3,23 @@ use crate::{
     util::is_valid,
 };
 
+/// A thin wrapper over a [`Bitboard`] to allow iteration over it.
 pub struct BitIter {
     board: Bitboard,
 }
 
 impl BitIter {
+    /// Wraps a [`Bitboard`] in a [`BitIter`].
     pub fn new(bb: Bitboard) -> BitIter {
-        Self {
-            board: bb,
-        }
+        Self { board: bb }
     }
 }
 
 impl Iterator for BitIter {
     type Item = Square;
 
+    /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
+    /// that bit. Returns [`None`] if there are no set bits.
     fn next(&mut self) -> Option<Self::Item> {
         if self.board == 0 {
             None
@@ -46,6 +48,15 @@ pub fn east(bb: Bitboard) -> Bitboard {
 /// Shifts `bb` one square north without wrapping.
 pub fn north(bb: Bitboard) -> Bitboard {
     bb << 8
+}
+
+/// Calculates the square one step forward, depending on the pawn side.
+pub fn pawn_push<const IS_WHITE: bool>(bb: Bitboard) -> Bitboard {
+    if IS_WHITE {
+        north(bb)
+    } else {
+        south(bb)
+    }
 }
 
 /// Clears the least significant bit of `bb` and returns it.

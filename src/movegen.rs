@@ -1,9 +1,9 @@
 use crate::{
     bits::{
-        as_bitboard, BitIter, east, north, pop_lsb, ray_attack, south, to_square, west,
+        as_bitboard, east, north, pawn_push, pop_lsb, ray_attack, south, to_square, west, BitIter,
     },
     board::Board,
-    defs::{Bitboard, Bitboards, Directions, Files, Nums, Piece, Pieces, Ranks, Square},
+    defs::{Bitboard, Bitboards, Directions, Files, Nums, Piece, Pieces, Ranks, Sides, Square},
     movelist::Movelist,
     util::{file_of, rank_of},
 };
@@ -116,9 +116,15 @@ impl Movegen {
 impl Movegen {
     /// Generates all legal moves for `board` and puts them in `ml`.
     pub fn generate_moves(&self, board: &Board, ml: &mut Movelist) {
-        self.generate_pawn_moves(board, ml);
-        self.generate_non_sliding_moves(board, ml);
-        self.generate_sliding_moves(board, ml);
+        if board.side_to_move == Sides::WHITE {
+            self.generate_pawn_moves::<true>(board, ml);
+            self.generate_non_sliding_moves::<true>(board, ml);
+            self.generate_sliding_moves::<true>(board, ml);
+        } else {
+            self.generate_pawn_moves::<false>(board, ml);
+            self.generate_non_sliding_moves::<false>(board, ml);
+            self.generate_sliding_moves::<false>(board, ml);
+        }
     }
 }
 
@@ -130,87 +136,83 @@ impl Movegen {
 
     /// Generates all legal knight and king moves for `board` and puts them in
     /// `ml`.
-    fn generate_non_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
-        let us = board.side_to_move;
-        let us_bb = board.sides[us];
+    fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, board: &Board, ml: &mut Movelist) {
+        let us_bb = board.sides::<IS_WHITE>();
 
-        let knights = BitIter::new(board.pieces[Pieces::KNIGHT] & us_bb);
+        let knights = BitIter::new(board.pieces::<{ Pieces::KNIGHT }>() & us_bb);
         for knight in knights {
             let targets = BitIter::new(self.knight_attacks(knight) & !us_bb);
             for target in targets {
-                ml.push_move(create_move(knight, target, Pieces::KNIGHT, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::KNIGHT }>(knight, target));
             }
         }
 
-        let kings = BitIter::new(board.pieces[Pieces::KING] & us_bb);
+        let kings = BitIter::new(board.pieces::<{ Pieces::KING }>() & us_bb);
         for king in kings {
             let targets = BitIter::new(self.king_attacks(king) & !us_bb);
             for target in targets {
-                ml.push_move(create_move(king, target, Pieces::KING, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::KING }>(king, target));
             }
         }
     }
 
     /// Generates all legal pawn moves for `board` and puts them in `ml`.
-    fn generate_pawn_moves(&self, board: &Board, ml: &mut Movelist) {
-        let us = board.side_to_move;
-        let us_bb = board.sides[us];
-        let them_bb = board.sides[1 - us];
-        let empty = !(us_bb | them_bb);
-        let mut pawns = board.pieces[Pieces::PAWN] & us_bb;
+    fn generate_pawn_moves<const IS_WHITE: bool>(&self, board: &Board, ml: &mut Movelist) {
+        let us_bb = board.sides::<IS_WHITE>();
+        let occupancies = board.occupancies();
+        let them_bb = occupancies ^ us_bb;
+        let empty = !occupancies;
+
+        let mut pawns = board.pieces::<{ Pieces::PAWN }>() & us_bb;
         while pawns != 0 {
             let pawn = pop_lsb(&mut pawns);
-            /* Learned this rotate left trick from Rustic -
-             * <https://github.com/mvanthoor/rustic>
-             * Since `0xdeadbeef.rotate_left(64 + x) == 0xdeadbeef` where
-             * x = 0, you can set x to any positive or negative number to
-             * effectively shift left or right respectively by x's magnitude,
-             * as long as it doesn't overflow. I'm unsure how fast this is
-             * compared to C++-style generics, but performance is not an issue
-             * yet.
-             */
-            let single_push = pawn.rotate_left(72 - (us as u32) * 16) & empty;
-            let double_push = single_push.rotate_left(72 - (us as u32) * 16)
-                & empty
-                // rank 4 if we're white, rank 5 if we're black
-                & Bitboards::RANK_BB[Ranks::RANK4 + us];
-            let captures = self.pawn_attacks[us][to_square(pawn)] & them_bb;
+            let single_push = pawn_push::<IS_WHITE>(pawn) & empty;
+            let double_push_rank = if IS_WHITE {
+                Bitboards::RANK_BB[Ranks::RANK4]
+            } else {
+                Bitboards::RANK_BB[Ranks::RANK5]
+            };
+            let double_push = pawn_push::<IS_WHITE>(single_push) & empty & double_push_rank;
+
+            let captures = self.pawn_attacks::<IS_WHITE>(to_square(pawn)) & them_bb;
+
             let targets = BitIter::new(single_push | double_push | captures);
             for target in targets {
-                ml.push_move(create_move(to_square(pawn), target, Pieces::PAWN, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::PAWN }>(
+                    to_square(pawn),
+                    target,
+                ));
             }
         }
     }
 
     /// Generates all legal bishop, rook and queen moves for `board` and puts
     /// them in `ml`.
-    fn generate_sliding_moves(&self, board: &Board, ml: &mut Movelist) {
-        let us = board.side_to_move;
-        let us_bb = board.sides[us];
-        let them_bb = board.sides[1 - us];
-        let occupancies = us_bb | them_bb;
+    fn generate_sliding_moves<const IS_WHITE: bool>(&self, board: &Board, ml: &mut Movelist) {
+        let us_bb = board.sides::<IS_WHITE>();
+        let occupancies = board.occupancies();
 
-        let bishops = BitIter::new(board.pieces[Pieces::BISHOP] & us_bb);
+        let bishops = BitIter::new(board.pieces::<{ Pieces::BISHOP }>() & us_bb);
         for bishop in bishops {
             let targets = BitIter::new(self.bishop_attacks(bishop, occupancies) & !us_bb);
             for target in targets {
-                ml.push_move(create_move(bishop, target, Pieces::BISHOP, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::BISHOP }>(bishop, target));
             }
         }
 
-        let rooks = BitIter::new(board.pieces[Pieces::ROOK] & us_bb);
+        let rooks = BitIter::new(board.pieces::<{ Pieces::ROOK }>() & us_bb);
         for rook in rooks {
             let targets = BitIter::new(self.rook_attacks(rook, occupancies) & !us_bb);
             for target in targets {
-                ml.push_move(create_move(rook, target, Pieces::ROOK, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::ROOK }>(rook, target));
             }
         }
 
-        let queens = BitIter::new(board.pieces[Pieces::QUEEN] & us_bb);
+        let queens = BitIter::new(board.pieces::<{ Pieces::QUEEN }>() & us_bb);
         for queen in queens {
             let targets = BitIter::new(self.queen_attacks(queen, occupancies) & !us_bb);
             for target in targets {
-                ml.push_move(create_move(queen, target, Pieces::BISHOP, us));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::QUEEN }>(queen, target));
             }
         }
     }
@@ -313,8 +315,8 @@ impl Movegen {
                 .enumerate()
                 .skip(Nums::FILES)
             {
-                // adds 8 if the side is White (0) or subtracts 8 if Black (1)
-                let pushed = as_bitboard(square + 8 - side * 16);
+                // adds 8 if the side is White (1) or subtracts 8 if Black (0)
+                let pushed = as_bitboard(square - 8 + side * 16);
                 *bb = east(pushed) | west(pushed);
             }
         }
@@ -328,6 +330,15 @@ impl Movegen {
     /// Finds the knight attacks from `square`.
     fn knight_attacks(&self, square: Square) -> Bitboard {
         self.knight_attacks[square]
+    }
+
+    /// Finds the pawn attacks from `square`.
+    fn pawn_attacks<const IS_WHITE: bool>(&self, square: Square) -> Bitboard {
+        if IS_WHITE {
+            self.pawn_attacks[Sides::WHITE][square]
+        } else {
+            self.pawn_attacks[Sides::BLACK][square]
+        }
     }
 
     /// Finds the queen attacks from `square` with the given blockers.

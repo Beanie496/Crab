@@ -1,8 +1,8 @@
 use crate::defs::{Move, Piece, Side, Square};
 
 /// Creates a [`Move`] given a start square, end square, piece and side.
-pub fn create_move(start: Square, end: Square, piece: Piece, side: Side) -> Move {
-    start as Move | (end as Move) << 6 | (piece as Move) << 12 | (side as Move) << 15
+pub fn create_move<const IS_WHITE: bool, const PIECE: Piece>(start: Square, end: Square) -> Move {
+    start as Move | (end as Move) << 6 | (PIECE as Move) << 12 | (IS_WHITE as Move) << 15
 }
 
 /// Turns a [`Move`] into its components: start square, end square, piece and
@@ -24,12 +24,12 @@ mod tests {
     fn create_move_works() {
         // these asserts will use magic values known to be correct
         assert_eq!(
-            create_move(Squares::A1, Squares::H8, Pieces::KNIGHT, Sides::BLACK),
-            63 << 6 | 1 << 12 | 1 << 15,
+            create_move::<false, { Pieces::KNIGHT }>(Squares::A1, Squares::H8),
+            63 << 6 | 1 << 12,
         );
         assert_eq!(
-            create_move(Squares::A8, Squares::H1, Pieces::KING, Sides::WHITE),
-            56 | 7 << 6 | 5 << 12,
+            create_move::<true, { Pieces::KING }>(Squares::A8, Squares::H1),
+            56 | 7 << 6 | 5 << 12 | 1 << 15,
         );
     }
 
@@ -37,11 +37,11 @@ mod tests {
     fn decompose_move_works() {
         assert_eq!(
             decompose_move(63 << 6 | 1 << 12 | 1 << 15),
-            (Squares::A1, Squares::H8, Pieces::KNIGHT, Sides::BLACK),
+            (Squares::A1, Squares::H8, Pieces::KNIGHT, Sides::WHITE),
         );
         assert_eq!(
             decompose_move(56 | 7 << 6 | 5 << 12),
-            (Squares::A8, Squares::H1, Pieces::KING, Sides::WHITE),
+            (Squares::A8, Squares::H1, Pieces::KING, Sides::BLACK),
         );
     }
 }

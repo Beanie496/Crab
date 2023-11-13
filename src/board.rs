@@ -1,6 +1,6 @@
 use crate::{
     bits::{as_bitboard, bitboard_from_pos},
-    defs::{Bitboard, File, Files, Move, Nums, Rank, Ranks, Side, Sides, PIECE_CHARS},
+    defs::{Bitboard, File, Files, Move, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
     movegen::util::decompose_move,
     movelist::Movelist,
 };
@@ -8,7 +8,7 @@ use crate::{
 /// Stores information about the current state of the board.
 #[derive(Debug, PartialEq)]
 pub struct Board {
-    /// `sides[0]` is the intersection of all White piece bitboards; `sides[1]`
+    /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     /// is is the intersection of all Black piece bitboards.
     pub sides: [Bitboard; Nums::SIDES],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
@@ -25,8 +25,8 @@ impl Board {
     pub fn new() -> Board {
         Board {
             sides: [
-                0x000000000000ffff, // White
                 0xffff000000000000, // Black
+                0x000000000000ffff, // White
             ],
             pieces: [
                 0x00ff00000000ff00, // Pawns
@@ -57,6 +57,16 @@ impl Board {
         self.side_to_move ^= 1;
     }
 
+    /// Returns all the occupied squares on the board.
+    pub fn occupancies(&self) -> Bitboard {
+        self.sides::<true>() | self.sides::<false>()
+    }
+
+    /// Returns the piece bitboard given by `piece`.
+    pub fn pieces<const PIECE: Piece>(&self) -> Bitboard {
+        self.pieces[PIECE]
+    }
+
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
@@ -68,6 +78,15 @@ impl Board {
         }
         println!("    ---------------");
         println!("    1 2 3 4 5 6 7 8");
+    }
+
+    /// Returns the board of the side according to `IS_WHITE`.
+    pub fn sides<const IS_WHITE: bool>(&self) -> Bitboard {
+        if IS_WHITE {
+            self.sides[Sides::WHITE]
+        } else {
+            self.sides[Sides::BLACK]
+        }
     }
 
     /// Pops a move off `ml` and unplays it.
@@ -112,7 +131,7 @@ mod tests {
         let mut board = Board::new();
         let mut ml = Movelist::new();
 
-        let mv = create_move(Squares::A1, Squares::A3, Pieces::ROOK, Sides::WHITE);
+        let mv = create_move::<true, { Pieces::ROOK }>(Squares::A1, Squares::A3);
         board.make_move(mv, &mut ml);
         assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
         assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);

@@ -126,14 +126,15 @@ impl Pieces {
 impl Ranks {
     pub const RANK1: Rank = 0;
     pub const RANK4: Rank = 3;
+    pub const RANK5: Rank = 4;
     pub const RANK8: Rank = 7;
 }
 
 // Allowed dead code because a unit test uses BLACK.
 #[allow(dead_code)]
 impl Sides {
-    pub const WHITE: Side = 0;
-    pub const BLACK: Side = 1;
+    pub const BLACK: Side = 0;
+    pub const WHITE: Side = 1;
 }
 
 // Allowed dead code because unit tests use these.
