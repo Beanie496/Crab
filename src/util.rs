@@ -42,11 +42,7 @@ pub fn is_valid_square(square: Square) -> bool {
 pub fn pretty_print(board: Bitboard) {
     for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
         for f in Files::FILE1..=Files::FILE8 {
-            if board & bitboard_from_pos(r, f) != 0 {
-                print!("1 ");
-            } else {
-                print!("0 ");
-            }
+            print!("{} ", (board & bitboard_from_pos(r, f) != 0) as u8);
         }
         println!();
     }
