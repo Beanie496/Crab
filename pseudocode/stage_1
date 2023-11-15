@@ -114,63 +114,36 @@ ENDFUNC
 
 FUNC generate_moves(board, movelist):
     generate_pawn_moves(board, movelist)
-    generate_non_sliding_moves(board, movelist)
-    generate_sliding_moves(board, movelist)
 ENDFUNC
 
 FUNC generate_pawn_moves(board, movelist):
+    us = board.side_to_move
+    empty = ~(board.sides[0] | board.sides[1])
+    pawns = board.pieces[0] & board.sides[us]
+
     WHILE board.pawns != 0:
-        src = pop_next_square(board.pawns)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
+        pawn = pop_lsb(&board.pawns)
+        // when we're White, this left-shifts by 8
+        // when we're Black, this right-shifts by 8
+        single_push = pawn.rotate_left(72 - us * 16) & empty
+        targets = single_push
+        WHILE targets != 0:
+            target = pop_next_square(&targets)
+            movelist.push_move(to_square(pawn), target)
+        ENDWHILE
     ENDWHILE
 ENDFUNC
 
-FUNC generate_non_sliding_moves(board, movelist):
-    knights = board.knights
-    kings = board.kings
-
-    WHILE knights != 0
-        src = pop_next_square(knights)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
-    ENDWHILE
-
-    WHILE kings != 0
-        src = pop_next_square(kings)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
-    ENDWHILE
+FUNC pop_lsb(&bb):
+    ret = *bb & -*bb
+    *bb &= *bb - 1
+    RETURN ret
 ENDFUNC
 
-FUNC generate_sliding_moves(board, movelist):
-    bishops = board.bishops
-    rooks = board.rooks
-    queens = board.queens
-
-    WHILE bishops != 0:
-        src = pop_next_square(bishops)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
-    ENDWHILE
-
-    WHILE rooks != 0:
-        src = pop_next_square(rooks)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
-    ENDWHILE
-
-    WHILE queens != 0:
-        src = pop_next_square(queens)
-        // random number from 0 to 63
-        dest = random(0, 63)
-        movelist.push_move(lsb, dest)
-    ENDWHILE
+FUNC pop_next_square(&bb):
+    ret = bit_scan_forward(*bb)
+    *bb &= *bb - 1
+    RETURN ret
 ENDFUNC
 
 FUNC pop_next_square(&bb):
