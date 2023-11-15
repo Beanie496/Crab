@@ -149,6 +149,15 @@ FUNC generate_non_sliding_moves(board, movelist)
             movelist.push_move(to_square(pawn), target)
         ENDWHILE
     ENDWHILE
+
+    WHILE king != 0:
+        knight = pop_lsb(king)
+        targets = knight_attacks[to_square(king)] & ~us_bb
+        WHILE targets != 0:
+            target = pop_next_square(king)
+            movelist.push_move(to_square(pawn), target)
+        ENDWHILE
+    ENDWHILE
 FUNC
 
 FUNC init_pawn_attacks():
