@@ -87,14 +87,14 @@ METHOD Board.make_move(move):
     self.pieces[piece] ^= 1 << start | 1 << end
     self.sides[side] ^= 1 << start | 1 << end
     self.side_to_move ^= 1
-METHOD
+ENDMETHOD
 
 METHOD Board.unmake_move(move):
     (start, end, piece, side) = decompose_move(mv)
     self.pieces[piece] ^= 1 << start | 1 << end
     self.sides[side] ^= 1 << start | 1 << end
     self.side_to_move ^= 1
-METHOD
+ENDMETHOD
 
 FUNC perft(depth):
     IF depth == 0:
@@ -118,6 +118,7 @@ ENDFUNC
 
 FUNC generate_pawn_moves(board, movelist):
     us = board.side_to_move
+    them_bb = board.sides[1 - us]
     empty = ~(board.sides[0] | board.sides[1])
     pawns = board.pieces[0] & board.sides[us]
 
@@ -126,12 +127,33 @@ FUNC generate_pawn_moves(board, movelist):
         // when we're White, this left-shifts by 8
         // when we're Black, this right-shifts by 8
         single_push = pawn.rotate_left(72 - us * 16) & empty
+        captures = pawn_attacks[us][square_of(pawn)] & them_bb
         targets = single_push
         WHILE targets != 0:
             target = pop_next_square(&targets)
             movelist.push_move(to_square(pawn), target)
         ENDWHILE
     ENDWHILE
+ENDFUNC
+
+FUNC init_pawn_attacks():
+    FOR side = 0 TO side = 1:
+        FOR square = 0 TO square = 63:
+            push = 1 << (square + 8 - side * 16)
+            attacks = east(push) | west(push)
+            pawn_attacks[side][square] = attacks
+        NEXT square
+    NEXT side
+ENDFUNC
+
+FUNC east(bb)
+    FILE_A = 0x0101010101010101
+    RETURN bb << 1 & ~FILE_A
+ENDFUNC
+
+FUNC west(bb)
+    FILE_H = 0x8080808080808080
+    RETURN bb >> 1 & ~FILE_H
 ENDFUNC
 
 FUNC pop_lsb(&bb):
