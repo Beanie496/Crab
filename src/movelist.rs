@@ -11,8 +11,8 @@ pub struct Movelist {
 
 impl Movelist {
     /// Creates an empty [`Movelist`].
-    pub fn new() -> Movelist {
-        Movelist {
+    pub fn new() -> Self {
+        Self {
             moves: [0; MAX_GAME_MOVES],
             first_empty: 0,
         }

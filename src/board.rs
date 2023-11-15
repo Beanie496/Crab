@@ -22,8 +22,8 @@ pub struct Board {
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position.
-    pub fn new() -> Board {
-        Board {
+    pub fn new() -> Self {
+        Self {
             sides: [
                 0xffff000000000000, // Black
                 0x000000000000ffff, // White

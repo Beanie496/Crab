@@ -45,8 +45,8 @@ const ROOK_SIZE: usize = 102_400;
 impl Movegen {
     /// Creates a new [`Movegen`] with empty lookup tables, then initialises
     /// each of the tables.
-    pub fn new() -> Movegen {
-        let mut mg = Movegen {
+    pub fn new() -> Self {
+        let mut mg = Self {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
             king_attacks: [Bitboards::EMPTY; Nums::SQUARES],

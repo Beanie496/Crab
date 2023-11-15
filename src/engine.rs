@@ -22,8 +22,8 @@ pub struct Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
-    pub fn new() -> Engine {
-        Engine {
+    pub fn new() -> Self {
+        Self {
             board: Board::new(),
             mg: Movegen::new(),
             ml: Movelist::new(),
