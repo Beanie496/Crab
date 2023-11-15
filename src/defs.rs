@@ -8,7 +8,9 @@ pub type Direction = isize;
  * * Start pos == 6 bits, 0-63
  * * End pos == 6 bits, 0-63
  * * Piece == 3 bits, 0-5
- * * Side == 1 bit
+ * * Side == 1 bit.
+ * Storing the side to move is >50% faster than reading `side_to_move` off
+ * [`Board`](crate::board::Board).
  *
  * The start and end are obvious. The piece and side are for fast access into
  * the board's arrays instead of requiring a match statement.
