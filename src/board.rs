@@ -39,11 +39,6 @@ impl Board {
             side_to_move: Sides::WHITE,
         }
     }
-
-    /// Converts `rank` into its character representation.
-    fn rank_to_char(rank: Rank) -> char {
-        unsafe { char::from_u32_unchecked((b'A' + rank as u8) as u32) }
-    }
 }
 
 impl Board {
@@ -70,14 +65,14 @@ impl Board {
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
-            print!("{} | ", Self::rank_to_char(r));
+            print!("{} | ", r + 1);
             for f in Files::FILE1..=Files::FILE8 {
                 print!("{} ", self.char_piece_from_pos(r, f));
             }
             println!();
         }
         println!("    ---------------");
-        println!("    1 2 3 4 5 6 7 8");
+        println!("    a b c d e f g h");
     }
 
     /// Returns side to move

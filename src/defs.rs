@@ -54,8 +54,8 @@ pub struct Squares;
  * ```
  */
 pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
-    ['P', 'N', 'B', 'R', 'Q', 'K'],
     ['p', 'n', 'b', 'r', 'q', 'k'],
+    ['P', 'N', 'B', 'R', 'Q', 'K'],
 ];
 
 impl Bitboards {
