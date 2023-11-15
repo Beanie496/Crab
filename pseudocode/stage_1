@@ -122,8 +122,8 @@ FUNC generate_pawn_moves(board, movelist):
     empty = ~(board.sides[0] | board.sides[1])
     pawns = board.pieces[0] & board.sides[us]
 
-    WHILE board.pawns != 0:
-        pawn = pop_lsb(&board.pawns)
+    WHILE pawns != 0:
+        pawn = pop_lsb(&pawns)
         // when we're White, this left-shifts by 8
         // when we're Black, this right-shifts by 8
         single_push = pawn.rotate_left(72 - us * 16) & empty
