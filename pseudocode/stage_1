@@ -1,118 +1,166 @@
-/* data structures (lookup tables) */
+/* data structures (lookup tables & structs) */
+STRUCT Board:
+    white:   u64,
+    black:   u64,
+    pawns:   u64,
+    knights: u64,
+    bishops: u64,
+    rooks:   u64,
+    queens:  u64,
+    kings:   u64,
+ENDSTRUCT
 
-
-/* constants - not technically important but needed to understand the
-   algorithms */
-FILE1 = 0
-FILE8 = 7
-RANK1 = 0
-RANK8 = 7
-SQ_A1 = 0
-SQ_A2 = 1
-// ...
-SQ_A8 = 7
-// ...
-SQ_B8 = 15
-// ..
-SQ_H8 = 63
-/* 1 0 0 0 0 0 0 0
- * 1 0 0 0 0 0 0 0
- * ...
- * 1 0 0 0 0 0 0 0
- */
-FILE1_BB = 0x0101010101010101
-/* 0 0 0 0 0 0 0 1
- * 0 0 0 0 0 0 0 1
- * ...
- * 0 0 0 0 0 0 0 1
- */
-FILE8_BB = 0x8080808080808080
-/* 0 0 0 0 0 0 0 0
- * 0 0 0 0 0 0 0 0
- * ...
- * 1 1 1 1 1 1 1 1
- */
-RANK1_BB = 0x00000000000000ff
-RANK4_BB = 0x00000000ff000000
-/* 1 1 1 1 1 1 1 1
- * 0 0 0 0 0 0 0 0
- * ...
- * 0 0 0 0 0 0 0 0
- */
-RANK8_BB = 0xff00000000000000
-
+STRUCT Movelist:
+    moves: [u16; 250]
+    first_empty: usize
+ENDSTRUCT
 
 /* algorithms */
+FUNC main():
+    uci_main_loop()
+ENDFUNC
+
+FUNC uci_main_loop():
+    WHILE true:
+        input = INPUT_LINE()
+        handle_input_line(line)
+    ENDWHILE
+ENDFUNC
+
+FUNC handle_input_line(line):
+    tokens = line.split_on(' ')
+
+    word = line[0]
+    SWITCH word:
+        case "debug":
+            // debug mode
+            break
+        case "go":
+            // start calculating
+            break
+        // etc.
+    ENDSWITCH
+ENDFUNC
+
+FUNC pretty_print(bb):
+    FOR rank = 7 TO rank = 0:
+        FOR file = 0 TO file = 7:
+            IF board & (1 << r * 8 + f) != 0:
+                OUTPUT("1 ")
+            ELSE:
+                OUTPUT("0 ")
+        NEXT file
+        OUTPUT("\n")
+    NEXT rank
+ENDFUNC
+
+METHOD Board.pretty_print():
+    FOR rank = 7 TO rank = 0:
+        OUTPUT(rank + " | ")
+        FOR file = 0 TO file = 7:
+            OUTPUT(char_piece_from_pos(rank, file)
+        NEXT file
+    NEXT rank
+ENDMETHOD
+
+METHOD Board.char_piece_from_pos(rank, file):
+    square_bb = bitboard_from_pos(rank, file)
+    IF sq_bb & self.white != 0:
+        IF sq_bb & self.pawns != 0:
+            RETURN 'P'
+        ELSE IF sq_bb & self.knights != 0:
+            // etc.
+        ENDIF
+    ELSE IF sq_bb & self.black != 0:
+        IF sq_bb & self.pawns != 0:
+            RETURN 'p'
+        ELSE IF sq_bb & self.knights != 0:
+            // etc.
+        ENDIF
+    ELSE
+        RETURN 0
+    ENDIF
+ENDMETHOD
+
 FUNC perft(depth):
     IF depth == 0:
         RETURN 1
     ENDIF
+
     generate_moves()
+
     total = 0
     FOR move IN movelist:
+        make_move()
         total += perft(depth - 1)
+        unmake_move()
     NEXT move
     RETURN total
 ENDFUNC
 
 FUNC generate_moves(board, movelist):
     generate_pawn_moves(board, movelist)
-    generate_non_sliding_moves<KNIGHT>(board, movelist)
-    generate_non_sliding_moves<KING>(board, movelist)
-    generate_sliding_moves<BISHOP>(board, movelist)
-    generate_sliding_moves<ROOK>(board, movelist)
-    generate_sliding_moves<QUEEN>(board, movelist)
+    generate_non_sliding_moves(board, movelist)
+    generate_sliding_moves(board, movelist)
 ENDFUNC
 
 FUNC generate_pawn_moves(board, movelist):
     WHILE board.pawns != 0:
-        src = pop_next_square(&board.pawns)
+        src = pop_next_square(board.pawns)
         // random number from 0 to 63
         dest = random(0, 63)
-        movelist.push_move<PAWN>(lsb, dest)
+        movelist.push_move(lsb, dest)
     ENDWHILE
 ENDFUNC
 
-// NON_SLIDING_PIECE == {KNIGHT,KING} - not pawn
-FUNC generate_non_sliding_moves<NON_SLIDING_PIECE>(board, movelist):
-    IF PIECE == KNIGHT:
-        src = pop_next_square(&board.knights)
+FUNC generate_non_sliding_moves(board, movelist):
+    knights = board.knights
+    kings = board.kings
+
+    WHILE knights != 0
+        src = pop_next_square(knights)
         // random number from 0 to 63
         dest = random(0, 63)
-        movelist.push_move<PAWN>(lsb, dest)
-    ELSE
-        src = pop_next_square(&board.kings)
+        movelist.push_move(lsb, dest)
+    ENDWHILE
+
+    WHILE kings != 0
+        src = pop_next_square(kings)
         // random number from 0 to 63
         dest = random(0, 63)
-        movelist.push_move<PAWN>(lsb, dest)
-    ENDIF
+        movelist.push_move(lsb, dest)
+    ENDWHILE
 ENDFUNC
 
-// SLIDING_PIECE == {BISHOP,ROOK,QUEEN}
-FUNC generate_sliding_moves<SLIDING_PIECE>(board, movelist):
-    // this is more Rust than pseudocode, but the distiction
-    // between a switch and match statement is important
-    MATCH SLIDING_PIECE:
-        BISHOP:
-            src = pop_next_square(&board.bishops)
-            // random number from 0 to 63
-            dest = random(0, 63)
-            movelist.push_move<PAWN>(lsb, dest)
-        ROOK:
-            src = pop_next_square(&board.rooks)
-            // random number from 0 to 63
-            dest = random(0, 63)
-            movelist.push_move<PAWN>(lsb, dest)
-        QUEEN:
-            src = pop_next_square(&board.queens)
-            // random number from 0 to 63
-            dest = random(0, 63)
-            movelist.push_move<PAWN>(lsb, dest)
-    ENDMATCH
+FUNC generate_sliding_moves(board, movelist):
+    bishops = board.bishops
+    rooks = board.rooks
+    queens = board.queens
+
+    WHILE bishops != 0:
+        src = pop_next_square(bishops)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move(lsb, dest)
+    ENDWHILE
+
+    WHILE rooks != 0:
+        src = pop_next_square(rooks)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move(lsb, dest)
+    ENDWHILE
+
+    WHILE queens != 0:
+        src = pop_next_square(queens)
+        // random number from 0 to 63
+        dest = random(0, 63)
+        movelist.push_move(lsb, dest)
+    ENDWHILE
 ENDFUNC
 
 FUNC pop_next_square(&bb):
-    shift = *bb.trailing_zeros
+    shift = *bb.trailing_zeros()
     *bb ^= 1 << shift
     return shift
 ENDFUNC
