@@ -82,6 +82,20 @@ METHOD Board.char_piece_from_pos(rank, file):
     ENDIF
 ENDMETHOD
 
+METHOD Board.make_move(move):
+    (start, end, piece, side) = decompose_move(mv)
+    self.pieces[piece] ^= 1 << start | 1 << end
+    self.sides[side] ^= 1 << start | 1 << end
+    self.side_to_move ^= 1
+METHOD
+
+METHOD Board.unmake_move(move):
+    (start, end, piece, side) = decompose_move(mv)
+    self.pieces[piece] ^= 1 << start | 1 << end
+    self.sides[side] ^= 1 << start | 1 << end
+    self.side_to_move ^= 1
+METHOD
+
 FUNC perft(depth):
     IF depth == 0:
         RETURN 1
