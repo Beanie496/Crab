@@ -114,6 +114,7 @@ ENDFUNC
 
 FUNC generate_moves(board, movelist):
     generate_pawn_moves(board, movelist)
+    generate_non_sliding_moves(board, movelist)
 ENDFUNC
 
 FUNC generate_pawn_moves(board, movelist):
@@ -135,6 +136,20 @@ FUNC generate_pawn_moves(board, movelist):
         ENDWHILE
     ENDWHILE
 ENDFUNC
+
+FUNC generate_non_sliding_moves(board, movelist)
+    us_bb = board.sides[board.side_to_move]
+    knights = board.pieces[1]
+
+    WHILE knights != 0:
+        knight = pop_lsb(knights)
+        targets = knight_attacks[to_square(knight)] & ~us_bb
+        WHILE targets != 0:
+            target = pop_next_square(knight)
+            movelist.push_move(to_square(pawn), target)
+        ENDWHILE
+    ENDWHILE
+FUNC
 
 FUNC init_pawn_attacks():
     FOR side = 0 TO side = 1:
