@@ -172,6 +172,17 @@ FUNC init_knight_attacks():
         w = west(w)
         attacks = north(north(e | w))
         attacks |= south(south(e | w))
+        knight_attacks[square] = attacks
+    NEXT square
+ENDFUNC
+
+FUNC init_king_attacks():
+    FOR square = 0 TO square = 63
+        king = 1 << square
+        attacks = east(king) | west(king) | king
+        attacks |= north(attacks) | south(attacks)
+        attacks ^= king
+        king_attacks[square] = attacks
     NEXT square
 ENDFUNC
 
@@ -203,10 +214,4 @@ FUNC pop_next_square(&bb):
     ret = bit_scan_forward(*bb)
     *bb &= *bb - 1
     RETURN ret
-ENDFUNC
-
-FUNC pop_next_square(&bb):
-    shift = *bb.trailing_zeros()
-    *bb ^= 1 << shift
-    return shift
 ENDFUNC
