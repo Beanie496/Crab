@@ -146,6 +146,28 @@ FUNC init_pawn_attacks():
     NEXT side
 ENDFUNC
 
+FUNC init_knight_attacks():
+    FOR square = 0 TO square = 63
+        knight = 1 << square
+        e = east(knights)
+        w = west(knights)
+        attacks = north(north(e | w))
+        attacks |= south(south(e | w))
+        e = east(e)
+        w = west(w)
+        attacks = north(north(e | w))
+        attacks |= south(south(e | w))
+    NEXT square
+ENDFUNC
+
+FUNC north(bb)
+    bb << 8
+ENDFUNC
+
+FUNC south(bb)
+    bb >> 8
+ENDFUNC
+
 FUNC east(bb)
     FILE_A = 0x0101010101010101
     RETURN bb << 1 & ~FILE_A
