@@ -269,18 +269,8 @@ impl Movegen {
             let r_mask_bits = r_mask.count_ones();
             let b_perms = 2usize.pow(b_mask_bits);
             let r_perms = 2usize.pow(r_mask_bits);
-            let b_magic = Magic {
-                magic: BISHOP_MAGICS[square],
-                mask: b_mask,
-                offset: b_offset,
-                shift: 64 - b_mask_bits,
-            };
-            let r_magic = Magic {
-                magic: ROOK_MAGICS[square],
-                mask: r_mask,
-                offset: r_offset,
-                shift: 64 - r_mask_bits,
-            };
+            let b_magic = Magic::new(BISHOP_MAGICS[square], b_mask, b_offset, 64 - b_mask_bits);
+            let r_magic = Magic::new(ROOK_MAGICS[square], r_mask, r_offset, 64 - r_mask_bits);
 
             Movegen::gen_all_sliding_attacks(square, Pieces::BISHOP, &mut attacks);
             let mut blockers = b_mask;
@@ -290,7 +280,7 @@ impl Movegen {
                 blockers = blockers.wrapping_sub(1) & b_mask;
             }
             self.bishop_magics[square] = b_magic;
-            b_offset += b_perms as u32;
+            b_offset += b_perms;
 
             Movegen::gen_all_sliding_attacks(square, Pieces::ROOK, &mut attacks);
             let mut blockers = r_mask;
@@ -300,7 +290,7 @@ impl Movegen {
                 blockers = blockers.wrapping_sub(1) & r_mask;
             }
             self.rook_magics[square] = r_magic;
-            r_offset += r_perms as u32;
+            r_offset += r_perms;
         }
     }
 

@@ -4,16 +4,16 @@ use crate::defs::{Bitboard, Nums};
 #[derive(Clone, Copy, Default)]
 pub struct Magic {
     /// The magic number.
-    pub magic: u64,
+    magic: u64,
     /// The relevant attacked squares, excluding the edge.
-    pub mask: Bitboard,
+    mask: Bitboard,
     /// Where in the table the lookups are.
     // u16 (0-65535) is slightly too small for the rook table (102,400)
-    pub offset: u32,
+    offset: u32,
     /// The bits required to index into the lookup table - it's the number of
     /// permutations of blockers, excluding the edge (since it makes no
     /// difference whether or not there is a piece on the edge).
-    pub shift: u32,
+    shift: u32,
 }
 
 pub const BISHOP_MAGICS: [Bitboard; Nums::SQUARES] = [
@@ -151,6 +151,17 @@ pub const ROOK_MAGICS: [Bitboard; Nums::SQUARES] = [
     4556382779486756,
     5836806168129044614,
 ];
+
+impl Magic {
+    pub fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
+        Self {
+            magic,
+            mask,
+            offset: offset as u32,
+            shift,
+        }
+    }
+}
 
 impl Magic {
     /// Calculates the index into the table it is for. See
