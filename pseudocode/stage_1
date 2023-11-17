@@ -34,10 +34,10 @@ FUNC handle_input_line(line):
     SWITCH word:
         case "debug":
             // debug mode
-            break
+            BREAK
         case "go":
             // start calculating
-            break
+            BREAK
         // etc.
     ENDSWITCH
 ENDFUNC
@@ -194,6 +194,60 @@ FUNC init_king_attacks():
         king_attacks[square] = attacks
     NEXT square
 ENDFUNC
+
+FUNC ray(direction, square):
+    SWITCH direction:
+        CASE N:
+            RETURN 0x0101010101010100 << square
+        CASE NE:
+            file = file_of(square)
+            left_files = (1 << file) - 1
+            left_files |= left_files << 8
+            left_files |= left_files << 16
+            left_files |= left_files << 32
+            b2_h8_diag = 0x8040201008040200
+            RETURN (b2_h8_diag << square) & ~left_files
+        CASE E:
+            square_bb = 1 << square
+            highest_bit_of_rank = 1 << (square | 7)
+            RETURN (highest_bit_of_rank - square_bb) << 1
+        CASE SE:
+            lower_ranks = (1 << square) - 1
+            file = file_of(square)
+            left_files = (1 << file) - 1
+            left_files |= left_files << 8
+            left_files |= left_files << 16
+            left_files |= left_files << 32
+            b7_h1_diag = 0x0002040810204080
+            RETURN rotate_left(b7_h1_diag, 64 + square - 56) & ~left_files & lower_ranks
+        CASE S:
+            RETURN (0x0080808080808080) >> (square ^ 63)
+        CASE SW:
+            lower_ranks = (1 << square) - 1
+            file = file_of(square)
+            left_files = (1 << file) - 1
+            left_files |= left_files << 8
+            left_files |= left_files << 16
+            left_files |= left_files << 32
+            a1_g7_diag = 0x0040201008040201
+            RETURN rotate_left(a1_g7_diag, 64 + square - 63) & left_files & lower_ranks
+        CASE W:
+            square_bb = 1 << square
+            lowest_bit = 1 << (square & 56)
+            RETURN square_bb - lowest_bit
+        CASE NW:
+            upper_ranks = Bitboards::FULL << square
+            file = file_of(square)
+            left_files = (1 << file) - 1
+            left_files |= left_files << 8
+            left_files |= left_files << 16
+            left_files |= left_files << 32
+            a8_g2_diag = 0x0102040810204000
+            RETURN rotate_left(a8_g2_diag, 64 + square - 7) & left_files & upper_ranks
+        // no default case needed because there cannot be any more variants in Rust.
+    ENDSWITCH
+ENDFUNC
+
 
 FUNC north(bb)
     bb << 8
