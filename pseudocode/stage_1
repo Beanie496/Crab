@@ -195,57 +195,85 @@ FUNC init_king_attacks():
     NEXT square
 ENDFUNC
 
-FUNC ray(direction, square):
-    SWITCH direction:
-        CASE N:
-            RETURN 0x0101010101010100 << square
-        CASE NE:
-            file = file_of(square)
-            left_files = (1 << file) - 1
-            left_files |= left_files << 8
-            left_files |= left_files << 16
-            left_files |= left_files << 32
-            b2_h8_diag = 0x8040201008040200
-            RETURN (b2_h8_diag << square) & ~left_files
-        CASE E:
-            square_bb = 1 << square
-            highest_bit_of_rank = 1 << (square | 7)
-            RETURN (highest_bit_of_rank - square_bb) << 1
-        CASE SE:
-            lower_ranks = (1 << square) - 1
-            file = file_of(square)
-            left_files = (1 << file) - 1
-            left_files |= left_files << 8
-            left_files |= left_files << 16
-            left_files |= left_files << 32
-            b7_h1_diag = 0x0002040810204080
-            RETURN rotate_left(b7_h1_diag, 64 + square - 56) & ~left_files & lower_ranks
-        CASE S:
-            RETURN (0x0080808080808080) >> (square ^ 63)
-        CASE SW:
-            lower_ranks = (1 << square) - 1
-            file = file_of(square)
-            left_files = (1 << file) - 1
-            left_files |= left_files << 8
-            left_files |= left_files << 16
-            left_files |= left_files << 32
-            a1_g7_diag = 0x0040201008040201
-            RETURN rotate_left(a1_g7_diag, 64 + square - 63) & left_files & lower_ranks
-        CASE W:
-            square_bb = 1 << square
-            lowest_bit = 1 << (square & 56)
-            RETURN square_bb - lowest_bit
-        CASE NW:
-            upper_ranks = Bitboards::FULL << square
-            file = file_of(square)
-            left_files = (1 << file) - 1
-            left_files |= left_files << 8
-            left_files |= left_files << 16
-            left_files |= left_files << 32
-            a8_g2_diag = 0x0102040810204000
-            RETURN rotate_left(a8_g2_diag, 64 + square - 7) & left_files & upper_ranks
-        // no default case needed because there cannot be any more variants in Rust.
-    ENDSWITCH
+FUNC init_ray_attacks(ray_attacks)
+    a2_h8 = 0x0101010101010100
+    FOR square = 0 TO square = 63:
+        ray_attacks[0][square] = a2_h8 << square
+    NEXT square
+
+    b2_h8 = 0x8040201008040200
+    FOR file = 0 TO file = 6:
+        top_rank = file + 56
+        FOR square = file TO square = top_rank - 8 STEP 8:
+            ray_attacks[1][square] = b2_h8 << square
+        NEXT square
+        b2_h8 &= ~(0x0101010101010101 << (7 - file))
+    NEXT file
+
+    b1_h1 = 0x00000000000000fe
+    FOR file = 0 TO file = 6:
+        top_rank = file + 56
+        FOR square = file TO square = top_rank STEP 8:
+            ray_attacks[2][square] = b1_h1 << square
+        NEXT square
+        b1_h1 &= ~(0x0101010101010101 << (7 - file))
+    NEXT file
+
+    b7_h1 = 0x0002040810204080
+    square = 56
+    WHILE b7_h1 != 0:
+        FOR rank = 0 TO rank = 48 STEP 8:
+            ray_attacks[3][square] = b7_h1 >> rank
+            square -= 8
+        NEXT rank
+
+        b7_h1 <<= 1
+        b7_h1 &= ~0x0101010101010101
+        square += 57
+    ENDWHILE
+
+    h7_h1 = 0x0080808080808080
+    FOR square = 8 TO square = 56:
+        ray_attacks[4][square] = h7_h1 >> (square ^ 63)
+    NEXT square
+
+    g7_a1 = 0x0040201008040201
+    square = 63
+    WHILE g7_a1 != 0:
+        FOR file = 0 TO file = 48 STEP 8:
+            ray_attacks[5][square] = g7_a1 >> file
+            square -= 8
+        NEXT file
+
+        g7_a1 >>= 1
+        g7_a1 &= ~0x8080808080808080
+        square += 55
+    ENDWHILE
+
+    square = 7
+    g1_a1 = 0x000000000000007f
+    WHILE h1_a1 != 0:
+        FOR rank = 0 TO rank = 56 STEP 8:
+            ray_attacks[6][square] = h1_a1 << rank
+            square += 8
+        NEXT rank
+
+        h1_a1 >>= 1
+        square -= 65
+    ENDWHILE
+
+    square = 7
+    g2_a8 = 0x0102040810204000
+    WHILE g2_a8 != 0:
+        FOR rank = 0 TO rank = 48 STEP 8:
+            ray_attacks[7][square] = g2_a8 << rank
+            square += 8
+        NEXT rank
+
+        g2_a8 >>= 1
+        g2_a8 &= ~0x8080808080808080
+        square -= 57
+    ENDWHILE
 ENDFUNC
 
 
