@@ -66,13 +66,12 @@ impl Engine {
             let shift = 64 - mask_bits;
             Movegen::gen_all_sliding_attacks(square, piece, &mut attacks);
 
-            let mut sparse_rand: u64;
             let mut count = 0;
             // this repeatedly generates a sparse random number and tests it on
             // all different permutations. If the magic number works, it's
             // printed and the loop is exited.
             loop {
-                sparse_rand = gen_sparse_rand(&mut rand_gen);
+                let sparse_rand = gen_sparse_rand(&mut rand_gen);
                 let mut blockers = mask;
                 let mut found = true;
 
