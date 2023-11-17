@@ -1,18 +1,18 @@
 /* data structures (lookup tables & structs) */
 STRUCT Board:
-    white:   u64,
-    black:   u64,
-    pawns:   u64,
-    knights: u64,
-    bishops: u64,
-    rooks:   u64,
-    queens:  u64,
-    kings:   u64,
+    u64 white,
+    u64 black,
+    u64 pawns,
+    u64 knights,
+    u64 bishops,
+    u64 rooks,
+    u64 queens,
+    u64 kings,
 ENDSTRUCT
 
 STRUCT Movelist:
-    moves: [u16; 250]
-    first_empty: usize
+    u16 moves[250],
+    usize first_empty,
 ENDSTRUCT
 
 /* algorithms */
@@ -110,6 +110,57 @@ FUNC perft(depth):
         unmake_move()
     NEXT move
     RETURN total
+ENDFUNC
+
+FUNC find_magics(piece):
+    IF piece == BISHOP:
+        piece_str = "bishop"
+    ELSE
+        piece_str = "rook"
+    ENDIF
+
+    attacks[4096] = { 0 }
+    lookup_table[4096] = { 0 }
+    epoch[4096] = { 0 }
+
+    FOR square = 0 TO square = 63:
+        IF piece == BISHOP:
+            mask = bishop_mask(square, ray_attacks)
+        ELSE
+            mask = rook_mask(square, ray_attacks)
+        ENDIF
+        perms = popcnt(mask)
+        shift = 64 - perms
+
+        generate_all_ray_attacks(square, piece, ray_attacks, attacks)
+
+        count = 0
+        WHILE true:
+            sparse_rand = gen_sparse_rand()
+            blockers = mask
+            found = true
+
+            FOR i = 0 TO i = perms:
+                index = blockers * sparse_rand >> shift
+
+                IF epoch[index] < count:
+                    epoch[index] = count
+                    lookup_table[index] = attacks[i]
+                ELSE IF lookup_table[index] != attacks[i]
+                    found = false
+                    break
+                ENDIF
+                blockers &= blockers - 1
+            NEXT i
+
+            IF found:
+                OUTPUT("Found magic for " + piece_str + ": " + sparse_rand)
+                break
+            ENDIF
+
+            count++
+        ENDWHILE
+    NEXT square
 ENDFUNC
 
 FUNC generate_moves(board, movelist):
