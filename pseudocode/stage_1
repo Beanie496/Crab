@@ -119,9 +119,11 @@ FUNC find_magics(piece):
         piece_str = "rook"
     ENDIF
 
+    ray_attacks[8][64]
     attacks[4096] = { 0 }
     lookup_table[4096] = { 0 }
     epoch[4096] = { 0 }
+    init_ray_attacks(ray_attacks)
 
     FOR square = 0 TO square = 63:
         IF piece == BISHOP:
