@@ -10,6 +10,13 @@ STRUCT Board:
     u64 kings,
 ENDSTRUCT
 
+STRUCT Magic:
+    u64 magic,
+    u64 mask,
+    u32 shift,
+    u32 offset,
+ENDSTRUCT
+
 STRUCT Movelist:
     u16 moves[250],
     usize first_empty,
@@ -110,6 +117,53 @@ FUNC perft(depth):
         unmake_move()
     NEXT move
     RETURN total
+ENDFUNC
+
+FUNC init_magics():
+    b_offset = 0
+    r_offset = 0
+
+    FOR square = 0 TO square = 63:
+        attacks[4096] = { 0 }
+        edges = 0x8181818181818181 & !(0x0101010101010101 << file_of(square))
+            | 0xff000000000000ff & !(0x00000000000000ff << rank_of(square))
+        b_mask = sliding_attacks(square, 2, 0) & !edges
+        r_mask = sliding_attacks(square, 3, 0) & !edges
+        b_mask_bits = popcnt(b_mask)
+        r_mask_bits = popcnt(r_mask)
+        b_perms = pow(2, b_mask_bits)
+        r_perms = pow(2, r_mask_bits)
+        b_magic = Magic:
+            magic = BISHOP_MAGICS[square],
+            mask = b_mask,
+            offset = b_offset,
+            shift = 64 - b_mask_bits
+        r_magic = Magic:
+            magic = ROOK_MAGICS[square],
+            mask = r_mask,
+            offset = r_offset,
+            shift = 64 - r_mask_bits
+
+        generate_all_ray_attacks(square, piece, ray_attacks, attacks)
+        blockers = b_mask
+        FOR attack = 0 TO attack = b_perms:
+            index = get_table_index(b_magic, blockers)
+            bishop_magic_lookup[index] = attacks[attack]
+            blockers = blockers - 1 & b_mask
+        NEXT attack
+        bishop_magics[square] = b_magic
+        b_offset += b_perms
+
+        generate_all_ray_attacks(square, piece, ray_attacks, attacks)
+        blockers = r_mask
+        FOR attack = 0 TO attack = r_perms:
+            index = get_table_index(r_magic, blockers)
+            rook_magic_lookup[index] = attacks[attack]
+            blockers = blockers - 1 & r_mask
+        NEXT attack
+        rook_magics[square] = r_magic
+        r_offset += r_perms
+    NEXT square
 ENDFUNC
 
 FUNC find_magics(piece):
