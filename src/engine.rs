@@ -26,4 +26,9 @@ impl Engine {
     pub fn pretty_print_board(&self) {
         self.board.pretty_print();
     }
+
+    /// Sets `self.board` to its starting position.
+    pub fn set_startpos(&mut self) {
+        self.board = Board::new();
+    }
 }

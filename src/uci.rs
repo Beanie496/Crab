@@ -1,4 +1,4 @@
-use std::{io, process::exit};
+use std::{io, process::exit, str::Split};
 
 use crate::engine::Engine;
 
@@ -21,6 +21,12 @@ impl Uci {
 }
 
 impl Uci {
+    /// Given an iterator over a FEN string, convert it to a position and
+    /// modify the board state of `engine` to reflect that.
+    fn handle_fen_string(_line: &Split<'_, char>, _engine: &mut Engine) {
+        todo!()
+    }
+
     /// Dissects `line` according to the UCI protocol.
     fn handle_input_line(line: &str, engine: &mut Engine) {
         let mut line = line.trim().split(' ');
@@ -83,6 +89,16 @@ impl Uci {
                      * The moves should look like, for example,
                      * "e2e4".
                      */
+                    // add FEN only for now - not moves
+                    if let Some(string) = line.next() {
+                        match string {
+                            "fen" => {
+                                Self::handle_fen_string(&line, engine);
+                            }
+                            "startpos" => engine.set_startpos(),
+                            _ => (),
+                        }
+                    }
                 }
                 "setoption" => {
                     /* Next element of line_iter should be "name".
