@@ -2,6 +2,7 @@ use crate::{board::Board, movegen::Movegen};
 
 mod find_magics;
 mod perft;
+mod search;
 
 /// Master object that contains all the other major objects.
 pub struct Engine {

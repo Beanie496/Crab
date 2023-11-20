@@ -28,9 +28,10 @@ impl Uci {
         // handle each UCI option
         if let Some(command) = line.next() {
             match command {
-                "debug" => {
-                    /* Sets debug to "on" or "off". Default "off". */
-                    /* This can be ignored. */
+                // Ignored commands
+                "debug" | "ponderhit" => {
+                    /* "debug": Sets debug to "on" or "off". Default "off". */
+                    /* "ponderhit": The user has played the expected move. */
                 }
                 "go" => {
                     /* Start calculating from the current position,
@@ -52,16 +53,26 @@ impl Uci {
                      * - movetime: search for exactly x ms
                      * - infinite: search until "stop" command
                      *   received. Do not exit search otherwise.
-                     * - perft [unofficial]: run perft to x plies
                      */
+                    // just depth for now, as making this easily extensible
+                    // would take a little time
+                    if let Some(string) = line.next() {
+                        if string != "depth" {
+                            return;
+                        }
+                        if let Some(depth) = line.next() {
+                            match depth.parse::<u8>() {
+                                Ok(result) => engine.search(Some(result)),
+                                Err(result) => println!("{}; must give 0-255", result),
+                            }
+                        }
+                    } else {
+                        engine.search(None);
+                    }
                 }
                 "isready" => {
                     /* Immediately print "readyok" */
                     println!("readyok");
-                }
-                "ponderhit" => {
-                    /* The user has played the expected move. */
-                    /* Don't implement. */
                 }
                 "position" => {
                     /* Next element should be "fen" or "startpos".
@@ -102,11 +113,10 @@ impl Uci {
                 }
                 /* "perft n", where n is a number - run perft to depth n */
                 "perft" => {
-                    if let Some(num) = line.next() {
-                        if let Ok(result) = num.parse::<u8>() {
-                            engine.perft(result);
-                        } else {
-                            println!("Must give a number between 0 and 255.");
+                    if let Some(depth) = line.next() {
+                        match depth.parse::<u8>() {
+                            Ok(result) => engine.perft(result),
+                            Err(result) => println!("{}; must give 0-255", result),
                         }
                     }
                 }
