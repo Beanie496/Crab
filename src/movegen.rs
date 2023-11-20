@@ -33,7 +33,7 @@ pub struct Movegen {
 /// attacks.) Repeated once per quadrant: `2.pow(6)` blocker permutations for
 /// the corner, `2.pow(5)` for each non-corner edge and each square adjacent to
 /// an edge, `2.pow(7)` for the squares adjacent or diagonal to a corner and
-/// `2.pow(9)` for the corners themselves.
+/// `2.pow(9)` for the centre.
 const BISHOP_SIZE: usize = 5_248;
 /// The number of bitboards required to store all rook attacks, where each
 /// element corresponds to one permutation of blockers. (This means some
