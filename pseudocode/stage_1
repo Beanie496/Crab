@@ -222,28 +222,42 @@ ENDFUNC
 FUNC generate_moves(board, movelist):
     generate_pawn_moves(board, movelist)
     generate_non_sliding_moves(board, movelist)
+    generate_sliding_moves(board, movelist)
 ENDFUNC
 
 FUNC generate_pawn_moves(board, movelist):
-    us = board.side_to_move
-    them_bb = board.sides[1 - us]
-    empty = ~(board.sides[0] | board.sides[1])
-    pawns = board.pieces[0] & board.sides[us]
+    us_bb = board.sides::<IS_WHITE>
+    occupancies = board.occupancies()
+    them_bb = occupancies ^ us_bb
+    empty = !occupancies
 
+    pawns = board.pieces::<0> & us_bb
     WHILE pawns != 0:
         pawn = pop_lsb(&pawns)
-        // when we're White, this left-shifts by 8
-        // when we're Black, this right-shifts by 8
-        single_push = pawn.rotate_left(72 - us * 16) & empty
-        single_push = single_push.rotate_left(72 - us * 16)
+        single_push = pawn_push::<IS_WHITE>(pawn)
+        IF IS_WHITE:
+            double_push_rank = 0x00000000ff000000
+        ELSE:
+            double_push_rank = 0x000000ff00000000
+        ENDIF
+        double_push = pawn_push::<IS_WHITE>(single_push)
             & empty
             // 4 if we're White, 5 if we're Black
-            & (0x0404040404040404 << us)
-        captures = pawn_attacks[us][square_of(pawn)] & them_bb
+            & double_push_rank
+        captures = pawn_attacks::<IS_WHITE>(to_square(pawn)) & them_bb
         targets = single_push | double_push | captures
+        promotion_targets = targets & 0xff0000000000ff
+        targets ^= promotion_targets
         WHILE targets != 0:
             target = pop_next_square(&targets)
-            movelist.push_move(to_square(pawn), target)
+            movelist.push_move(create_move::<IS_WHITE, 0>(to_square(pawn), target))
+        ENDWHILE
+        WHILE promotion_targets != 0:
+            target = pop_next_square(&promotion_targets)
+            movelist.push_move(create_move::<IS_WHITE, 1>(to_square(pawn), target))
+            movelist.push_move(create_move::<IS_WHITE, 2>(to_square(pawn), target))
+            movelist.push_move(create_move::<IS_WHITE, 3>(to_square(pawn), target))
+            movelist.push_move(create_move::<IS_WHITE, 4>(to_square(pawn), target))
         ENDWHILE
     ENDWHILE
 ENDFUNC
