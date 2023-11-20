@@ -253,7 +253,7 @@ FUNC generate_non_sliding_moves(board, movelist)
         targets = knight_attacks[to_square(knight)] & ~us_bb
         WHILE targets != 0:
             target = pop_next_square(knight)
-            movelist.push_move(to_square(pawn), target)
+            movelist.push_move(to_square(knight), target)
         ENDWHILE
     ENDWHILE
 
@@ -262,10 +262,58 @@ FUNC generate_non_sliding_moves(board, movelist)
         targets = knight_attacks[to_square(king)] & ~us_bb
         WHILE targets != 0:
             target = pop_next_square(king)
-            movelist.push_move(to_square(pawn), target)
+            movelist.push_move(to_square(king), target)
         ENDWHILE
     ENDWHILE
 FUNC
+
+FUNC generate_sliding_moves(board, movelist):
+    us = board.side_to_move
+    us_bb = board.sides[us]
+    them_bb = board.sides[1 - us]
+    occupancies = us_bb | them_bb
+
+    bishops = board.pieces[2] & us_bb
+    WHILE bishops != 0:
+        bishop = pop_lsb(&bishops)
+        bishop_sq = to_square(bishop)
+        targets = bishop_magic_lookup[
+            get_table_index(bishop_magics[bishop_sq], occupancies)
+        ] & !us_bb
+        WHILE targets != 0:
+            target = pop_next_square(targets)
+            movelist.push_move(create_move(to_square(bishop), target, 2, us))
+        ENDWHILE
+    ENDWHILE
+
+    rooks = board.pieces[3] & us_bb
+    WHILE rooks != 0:
+        rook = pop_lsb(&rooks)
+        rook_sq = to_square(rook)
+        targets = rook_magic_lookup[
+            get_table_index(rook_magics[rook_sq], occupancies)
+        ] & !us_bb
+        WHILE targets != 0:
+            target = pop_next_square(targets)
+            movelist.push_move(create_move(to_square(rook), target, 3, us))
+        ENDWHILE
+    ENDWHILE
+
+    queens = board.pieces[4] & us_bb
+    WHILE queens != 0:
+        queen = pop_lsb(&queens)
+        queen_sq = to_square(queen)
+        targets = rook_magic_lookup[
+            get_table_index(rook_magics[rook_sq], occupancies)
+        ] | bishop_magic_lookup[
+            get_table_index(bishop_magics[bishop_sq], occupancies)
+        ] & !us_bb
+        WHILE targets != 0:
+            target = pop_next_square(targets)
+            movelist.push_move(create_move(to_square(queen), target, 4, us))
+        ENDWHILE
+    ENDWHILE
+ENDFUNC
 
 FUNC init_pawn_attacks():
     FOR side = 0 TO side = 1:
