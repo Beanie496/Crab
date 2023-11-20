@@ -1,3 +1,5 @@
+//! Crab, a UCI-compatible chess engine for my A-level project written in Rust.
+
 use crate::uci::Uci;
 
 /// Functions to perform bit-related operations.
@@ -6,7 +8,7 @@ mod bits;
 mod board;
 /// Definitions and enumerations.
 mod defs;
-/// A container for [`Engine`].
+/// A container for [`Engine`](engine::Engine).
 mod engine;
 /// Items related to move generation.
 mod movegen;
