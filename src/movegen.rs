@@ -170,6 +170,7 @@ impl Movegen {
         let mut pawns = board.pieces::<{ Pieces::PAWN }>() & us_bb;
         while pawns != 0 {
             let pawn = pop_lsb(&mut pawns);
+            let pawn_sq = to_square(pawn);
             let single_push = pawn_push::<IS_WHITE>(pawn) & empty;
             let double_push_rank = if IS_WHITE {
                 Bitboards::RANK_BB[Ranks::RANK4]
@@ -178,14 +179,20 @@ impl Movegen {
             };
             let double_push = pawn_push::<IS_WHITE>(single_push) & empty & double_push_rank;
 
-            let captures = self.pawn_attacks::<IS_WHITE>(to_square(pawn)) & them_bb;
+            let captures = self.pawn_attacks::<IS_WHITE>(pawn_sq) & them_bb;
 
-            let targets = BitIter::new(single_push | double_push | captures);
-            for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::PAWN }>(
-                    to_square(pawn),
-                    target,
-                ));
+            let targets = single_push | double_push | captures;
+            let promotion_targets =
+                targets & (Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8]);
+            let normal_targets = targets ^ promotion_targets;
+            for target in BitIter::new(normal_targets) {
+                ml.push_move(create_move::<IS_WHITE, { Pieces::PAWN }>(pawn_sq, target));
+            }
+            for target in BitIter::new(promotion_targets) {
+                ml.push_move(create_move::<IS_WHITE, { Pieces::KNIGHT }>(pawn_sq, target));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::BISHOP }>(pawn_sq, target));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::ROOK }>(pawn_sq, target));
+                ml.push_move(create_move::<IS_WHITE, { Pieces::QUEEN }>(pawn_sq, target));
             }
         }
     }
