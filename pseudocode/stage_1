@@ -435,7 +435,6 @@ FUNC init_ray_attacks(ray_attacks)
     ENDWHILE
 ENDFUNC
 
-
 FUNC north(bb)
     bb << 8
 ENDFUNC
