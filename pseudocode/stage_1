@@ -235,8 +235,12 @@ FUNC generate_pawn_moves(board, movelist):
         // when we're White, this left-shifts by 8
         // when we're Black, this right-shifts by 8
         single_push = pawn.rotate_left(72 - us * 16) & empty
+        single_push = single_push.rotate_left(72 - us * 16)
+            & empty
+            // 4 if we're White, 5 if we're Black
+            & (0x0404040404040404 << us)
         captures = pawn_attacks[us][square_of(pawn)] & them_bb
-        targets = single_push
+        targets = single_push | double_push | captures
         WHILE targets != 0:
             target = pop_next_square(&targets)
             movelist.push_move(to_square(pawn), target)
