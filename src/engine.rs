@@ -14,9 +14,6 @@ use crate::{
 pub struct Engine {
     board: Board,
     mg: Movegen,
-    /// The current move list, from the starting position (set by the user or
-    /// the default start pos) to the current position.
-    ml: Movelist,
 }
 
 impl Engine {
@@ -26,7 +23,6 @@ impl Engine {
         Self {
             board: Board::new(),
             mg: Movegen::new(),
-            ml: Movelist::new(),
         }
     }
 }
@@ -121,11 +117,11 @@ impl Engine {
 
         let mut total = 0;
         for mv in ml {
-            self.board.make_move(mv, &mut self.ml);
+            self.board.make_move(mv);
             let moves = self.perft_inner(depth - 1);
             total += moves;
             println!("{}: {moves}", stringify_move(mv));
-            self.board.unmake_move(&mut self.ml);
+            self.board.unmake_move();
         }
         println!("Total: {total}");
         let elapsed_us = time.elapsed().as_micros() as u64;
@@ -155,9 +151,9 @@ impl Engine {
 
         let mut total = 0;
         for mv in ml {
-            self.board.make_move(mv, &mut self.ml);
+            self.board.make_move(mv);
             total += self.perft_inner(depth - 1);
-            self.board.unmake_move(&mut self.ml);
+            self.board.unmake_move();
         }
         total
     }
