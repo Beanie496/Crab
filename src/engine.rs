@@ -1,4 +1,4 @@
-use crate::{board::Board, movegen::Movegen};
+use crate::board::{movegen::Movegen, Board};
 
 mod find_magics;
 mod perft;

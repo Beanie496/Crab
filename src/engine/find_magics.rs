@@ -2,8 +2,8 @@ use oorandom::Rand64;
 
 use super::Engine;
 use crate::{
+    board::movegen::{magic::MAX_BLOCKERS, Movegen},
     defs::{Bitboards, Files, Nums, Piece, Pieces, Ranks},
-    movegen::{magic::MAX_BLOCKERS, Movegen},
     util::{file_of, gen_sparse_rand, rank_of},
 };
 

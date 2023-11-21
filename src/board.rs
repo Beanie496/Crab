@@ -1,9 +1,12 @@
 use crate::{
     bits::{as_bitboard, bitboard_from_pos},
     defs::{Bitboard, File, Files, Move, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
-    movegen::util::decompose_move,
     movelist::Movelist,
 };
+use movegen::util::decompose_move;
+
+/// Items related to move generation.
+pub mod movegen;
 
 /// Stores information about the current state of the board.
 pub struct Board {

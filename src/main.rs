@@ -10,8 +10,6 @@ mod board;
 mod defs;
 /// A container for [`Engine`](engine::Engine).
 mod engine;
-/// Items related to move generation.
-mod movegen;
 /// A container for [`Movelist`](movelist::Movelist).
 mod movelist;
 /// Handles UCI input
