@@ -57,16 +57,6 @@ impl Board {
         self.side_to_move ^= 1;
     }
 
-    /// Returns all the occupied squares on the board.
-    pub fn occupancies(&self) -> Bitboard {
-        self.sides::<true>() | self.sides::<false>()
-    }
-
-    /// Returns the piece bitboard given by `piece`.
-    pub fn pieces<const PIECE: Piece>(&self) -> Bitboard {
-        self.pieces[PIECE]
-    }
-
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
@@ -78,20 +68,6 @@ impl Board {
         }
         println!("    ---------------");
         println!("    a b c d e f g h");
-    }
-
-    /// Returns side to move
-    pub fn side_to_move(&self) -> Side {
-        self.side_to_move
-    }
-
-    /// Returns the board of the side according to `IS_WHITE`.
-    pub fn sides<const IS_WHITE: bool>(&self) -> Bitboard {
-        if IS_WHITE {
-            self.sides[Sides::WHITE]
-        } else {
-            self.sides[Sides::BLACK]
-        }
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.
@@ -119,6 +95,30 @@ impl Board {
         }
         '0'
     }
+
+    /// Returns all the occupied squares on the board.
+    fn occupancies(&self) -> Bitboard {
+        self.sides::<true>() | self.sides::<false>()
+    }
+
+    /// Returns the piece bitboard given by `piece`.
+    fn pieces<const PIECE: Piece>(&self) -> Bitboard {
+        self.pieces[PIECE]
+    }
+
+    /// Returns side to move
+    fn side_to_move(&self) -> Side {
+        self.side_to_move
+    }
+
+    /// Returns the board of the side according to `IS_WHITE`.
+    fn sides<const IS_WHITE: bool>(&self) -> Bitboard {
+        if IS_WHITE {
+            self.sides[Sides::WHITE]
+        } else {
+            self.sides[Sides::BLACK]
+        }
+    }
 }
 
 #[cfg(test)]
@@ -126,8 +126,8 @@ mod tests {
     use super::Board;
 
     use crate::{
+        board::movegen::util::create_move,
         defs::{Pieces, Sides, Squares},
-        movegen::util::create_move,
     };
 
     #[test]

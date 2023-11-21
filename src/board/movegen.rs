@@ -1,8 +1,8 @@
+use super::Board;
 use crate::{
     bits::{
         as_bitboard, east, north, pawn_push, pop_lsb, ray_attack, south, to_square, west, BitIter,
     },
-    board::Board,
     defs::{Bitboard, Bitboards, Directions, Files, Nums, Piece, Pieces, Ranks, Sides, Square},
     movelist::Movelist,
     util::{file_of, rank_of},
