@@ -12,7 +12,6 @@ pub mod movegen;
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    lookup: Lookup,
     /// The moves played since the initial position.
     played_moves: Movelist,
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
@@ -28,10 +27,10 @@ pub struct Board {
 
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
-    /// position.
+    /// position and initialises the static lookup tables.
     pub fn new() -> Self {
+        Lookup::init();
         Self {
-            lookup: Lookup::new(),
             played_moves: Movelist::new(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),

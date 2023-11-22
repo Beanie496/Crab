@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Stores magic information for a square:
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct Magic {
     /// The magic number.
     magic: u64,
@@ -159,12 +159,23 @@ pub const ROOK_MAGICS: [Bitboard; Nums::SQUARES] = [
 ];
 
 impl Magic {
+    /// Returns a [`Magic`] with the fields set to the given parameters.
     pub fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
         Self {
             magic,
             mask,
             offset: offset as u32,
             shift,
+        }
+    }
+
+    /// Returns a 0-initialised [`Magic`].
+    pub const fn default() -> Self {
+        Self {
+            magic: 0,
+            mask: 0,
+            offset: 0,
+            shift: 0,
         }
     }
 }

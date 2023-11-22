@@ -27,6 +27,10 @@ pub struct Lookup {
     rook_magics: [Magic; Nums::SQUARES],
 }
 
+/// The lookup tables used at runtime.
+// initialised at runtime
+static mut LOOKUPS: Lookup = Lookup::empty();
+
 /// The number of bitboards required to store all bishop attacks, where each
 /// element corresponds to one permutation of blockers. (This means some
 /// elements will be duplicates, as different blockers can have the same
@@ -66,7 +70,7 @@ impl Board {
 
         let knights = BitIter::new(self.pieces::<{ Pieces::KNIGHT }>() & us_bb);
         for knight in knights {
-            let targets = BitIter::new(self.lookup.knight_attacks(knight) & !us_bb);
+            let targets = BitIter::new(unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb);
             for target in targets {
                 ml.push_move(create_move::<IS_WHITE, { Pieces::KNIGHT }>(knight, target));
             }
@@ -74,7 +78,7 @@ impl Board {
 
         let kings = BitIter::new(self.pieces::<{ Pieces::KING }>() & us_bb);
         for king in kings {
-            let targets = BitIter::new(self.lookup.king_attacks(king) & !us_bb);
+            let targets = BitIter::new(unsafe { LOOKUPS.king_attacks(king) } & !us_bb);
             for target in targets {
                 ml.push_move(create_move::<IS_WHITE, { Pieces::KING }>(king, target));
             }
@@ -100,7 +104,7 @@ impl Board {
             };
             let double_push = pawn_push::<IS_WHITE>(single_push) & empty & double_push_rank;
 
-            let captures = self.lookup.pawn_attacks::<IS_WHITE>(pawn_sq) & them_bb;
+            let captures = unsafe { LOOKUPS.pawn_attacks::<IS_WHITE>(pawn_sq) } & them_bb;
 
             let targets = single_push | double_push | captures;
             let promotion_targets =
@@ -126,7 +130,8 @@ impl Board {
 
         let bishops = BitIter::new(self.pieces::<{ Pieces::BISHOP }>() & us_bb);
         for bishop in bishops {
-            let targets = BitIter::new(self.lookup.bishop_attacks(bishop, occupancies) & !us_bb);
+            let targets =
+                BitIter::new(unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb);
             for target in targets {
                 ml.push_move(create_move::<IS_WHITE, { Pieces::BISHOP }>(bishop, target));
             }
@@ -134,7 +139,7 @@ impl Board {
 
         let rooks = BitIter::new(self.pieces::<{ Pieces::ROOK }>() & us_bb);
         for rook in rooks {
-            let targets = BitIter::new(self.lookup.rook_attacks(rook, occupancies) & !us_bb);
+            let targets = BitIter::new(unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb);
             for target in targets {
                 ml.push_move(create_move::<IS_WHITE, { Pieces::ROOK }>(rook, target));
             }
@@ -142,7 +147,8 @@ impl Board {
 
         let queens = BitIter::new(self.pieces::<{ Pieces::QUEEN }>() & us_bb);
         for queen in queens {
-            let targets = BitIter::new(self.lookup.queen_attacks(queen, occupancies) & !us_bb);
+            let targets =
+                BitIter::new(unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb);
             for target in targets {
                 ml.push_move(create_move::<IS_WHITE, { Pieces::QUEEN }>(queen, target));
             }
@@ -151,9 +157,20 @@ impl Board {
 }
 
 impl Lookup {
-    /// Creates a new [`Lookup`] with initialised tables.
-    pub fn new() -> Self {
-        let mut lookup = Self {
+    /// Initialises the tables of [`LOOKUPS`].
+    pub fn init() {
+        unsafe {
+            LOOKUPS.init_pawn_attacks();
+            LOOKUPS.init_knight_attacks();
+            LOOKUPS.init_king_attacks();
+            LOOKUPS.init_magics();
+        };
+    }
+
+    /// Returns a [`Lookup`] with empty tables.
+    // used to declare a static `Lookup` variable
+    pub const fn empty() -> Self {
+        Self {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
             king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
@@ -161,12 +178,7 @@ impl Lookup {
             rook_magic_table: [Bitboards::EMPTY; ROOK_SIZE],
             bishop_magics: [Magic::default(); Nums::SQUARES],
             rook_magics: [Magic::default(); Nums::SQUARES],
-        };
-        lookup.init_pawn_attacks();
-        lookup.init_knight_attacks();
-        lookup.init_king_attacks();
-        lookup.init_magics();
-        lookup
+        }
     }
 }
 
