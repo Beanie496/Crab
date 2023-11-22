@@ -21,8 +21,8 @@ pub fn horizontal_distance(square_1: Square, square_2: Square) -> u8 {
 }
 
 /// Checks if `square` can go in the given direction.
-pub fn is_valid(square: Square, direction: Direction) -> bool {
-    let dest = square.wrapping_add(direction as usize);
+pub fn is_valid<const DIRECTION: Direction>(square: Square) -> bool {
+    let dest = square.wrapping_add(DIRECTION as usize);
     // credit to Stockfish, as I didn't come up with this code.
     // It checks if `square` is still within the board, and if it is, it checks
     // if it hasn't wrapped (because if it has wrapped, the distance will be
@@ -87,9 +87,9 @@ mod tests {
 
     #[test]
     fn is_valid_works() {
-        assert!(is_valid(Squares::A1, Directions::N));
-        assert!(is_valid(Squares::A1, Directions::E));
-        assert!(!is_valid(Squares::A1, Directions::S));
-        assert!(!is_valid(Squares::A1, Directions::W));
+        assert!(is_valid::<{ Directions::N }>(Squares::A1));
+        assert!(is_valid::<{ Directions::E }>(Squares::A1));
+        assert!(!is_valid::<{ Directions::S }>(Squares::A1));
+        assert!(!is_valid::<{ Directions::W }>(Squares::A1));
     }
 }

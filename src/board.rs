@@ -3,13 +3,16 @@ use crate::{
     defs::{Bitboard, File, Files, Move, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
     movelist::Movelist,
 };
-use movegen::util::decompose_move;
+use movegen::{util::decompose_move, Lookup};
+
+pub use movegen::magic::find_magics;
 
 /// Items related to move generation.
 pub mod movegen;
 
 /// Stores information about the current state of the board.
 pub struct Board {
+    lookup: Lookup,
     /// The moves played since the initial position.
     played_moves: Movelist,
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
@@ -28,21 +31,48 @@ impl Board {
     /// position.
     pub fn new() -> Self {
         Self {
+            lookup: Lookup::new(),
             played_moves: Movelist::new(),
-            pieces: [
-                0x00ff00000000ff00, // Pawns
-                0x4200000000000042, // Knights
-                0x2400000000000024, // Bishops
-                0x8100000000000081, // Rooks
-                0x0800000000000008, // Queens
-                0x1000000000000010, // Kings
-            ],
-            sides: [
-                0xffff000000000000, // Black
-                0x000000000000ffff, // White
-            ],
-            side_to_move: Sides::WHITE,
+            pieces: Self::default_pieces(),
+            sides: Self::default_sides(),
+            side_to_move: Self::default_side(),
         }
+    }
+}
+
+impl Board {
+    /// Returns the pieces of the starting position.
+    /// ```
+    /// assert_eq!(default_pieces()[Pieces::PAWN], 0x00ff00000000ff00);
+    /// // etc.
+    /// ```
+    fn default_pieces() -> [Bitboard; Nums::PIECES] {
+        [
+            0x00ff00000000ff00, // Pawns
+            0x4200000000000042, // Knights
+            0x2400000000000024, // Bishops
+            0x8100000000000081, // Rooks
+            0x0800000000000008, // Queens
+            0x1000000000000010, // Kings
+        ]
+    }
+
+    /// Returns the sides of the starting position.
+    /// ```
+    /// assert_eq!(default_pieces()[Sides::WHITE], 0x000000000000ffff);
+    /// assert_eq!(default_pieces()[Sides::BLACK], 0xffff000000000000);
+    /// ```
+    fn default_sides() -> [Bitboard; Nums::SIDES] {
+        [
+            0xffff000000000000, // Black
+            0x000000000000ffff, // White
+        ]
+    }
+
+    /// Returns the side to move from the starting position. Unless chess 1.1
+    /// has been released, this will be [`Sides::WHITE`].
+    fn default_side() -> Side {
+        Sides::WHITE
     }
 }
 
@@ -68,6 +98,13 @@ impl Board {
         }
         println!("    ---------------");
         println!("    a b c d e f g h");
+    }
+
+    /// Resets the board.
+    pub fn set_startpos(&mut self) {
+        self.pieces = Self::default_pieces();
+        self.sides = Self::default_sides();
+        self.side_to_move = Self::default_side();
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.

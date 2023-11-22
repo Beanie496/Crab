@@ -16,7 +16,7 @@ impl Engine {
 
         let time = Instant::now();
         let mut ml = Movelist::new();
-        self.mg.generate_moves(&self.board, &mut ml);
+        self.board.generate_moves(&mut ml);
 
         let mut total = 0;
         for mv in ml {
@@ -45,7 +45,7 @@ impl Engine {
         }
 
         let mut ml = Movelist::new();
-        self.mg.generate_moves(&self.board, &mut ml);
+        self.board.generate_moves(&mut ml);
 
         let mut total = 0;
         for mv in ml {

@@ -1,13 +1,14 @@
-use crate::board::{movegen::Movegen, Board};
+use crate::{
+    board::{find_magics, Board},
+    defs::Piece,
+};
 
-mod find_magics;
 mod perft;
 mod search;
 
 /// Master object that contains all the other major objects.
 pub struct Engine {
     board: Board,
-    mg: Movegen,
 }
 
 impl Engine {
@@ -16,8 +17,12 @@ impl Engine {
     pub fn new() -> Self {
         Self {
             board: Board::new(),
-            mg: Movegen::new(),
         }
+    }
+
+    /// Wrapper for [`find_magics`].
+    pub fn find_magics<const PIECE: Piece>() {
+        find_magics::<PIECE>();
     }
 }
 
@@ -27,8 +32,8 @@ impl Engine {
         self.board.pretty_print();
     }
 
-    /// Sets `self.board` to its starting position.
+    /// Resets `self.board`.
     pub fn set_startpos(&mut self) {
-        self.board = Board::new();
+        self.board.set_startpos();
     }
 }

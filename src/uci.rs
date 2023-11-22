@@ -120,8 +120,8 @@ impl Uci {
                 /* non-standard commands */
                 /* "f" - find magic numbers for each square for bishop and rook */
                 "f" => {
-                    Engine::find_magics(crate::defs::Pieces::BISHOP);
-                    Engine::find_magics(crate::defs::Pieces::ROOK);
+                    Engine::find_magics::<{ crate::defs::Pieces::BISHOP }>();
+                    Engine::find_magics::<{ crate::defs::Pieces::ROOK }>();
                 }
                 /* "p" - prints current position */
                 "p" => {
