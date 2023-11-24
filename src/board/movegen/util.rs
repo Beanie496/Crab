@@ -6,6 +6,21 @@ use crate::{
     util::{as_bitboard, file_of, rank_of},
 };
 
+/// Creates a [`Move`] given a start square, end square, piece and side.
+pub fn create_move<const IS_WHITE: bool, const PIECE: Piece>(start: Square, end: Square) -> Move {
+    start as Move | (end as Move) << 6 | (PIECE as Move) << 12 | (IS_WHITE as Move) << 15
+}
+
+/// Turns a [`Move`] into its components: start square, end square, piece and
+/// side, in that order.
+pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
+    let start = mv & 0x3f;
+    let end = (mv >> 6) & 0x3f;
+    let piece = (mv >> 12) & 0x7;
+    let side = (mv >> 15) & 0x1;
+    (start as Square, end as Square, piece as Piece, side as Side)
+}
+
 /// Shifts `bb` one square east without wrapping.
 pub fn east(bb: Bitboard) -> Bitboard {
     (bb << 1) & !Bitboards::FILE_BB[Files::FILE1]
@@ -35,6 +50,27 @@ pub fn gen_all_sliding_attacks<const PIECE: Piece>(
     attacks[first_empty] = sliding_attacks::<PIECE>(square, 0);
 }
 
+/// Finds the horizontal distance between `square_1` and `square_2`
+pub fn horizontal_distance(square_1: Square, square_2: Square) -> u8 {
+    (file_of(square_1) as i8 - file_of(square_2) as i8).unsigned_abs()
+}
+
+/// Checks if `square` can go in the given direction.
+pub fn is_valid<const DIRECTION: Direction>(square: Square) -> bool {
+    let dest = square.wrapping_add(DIRECTION as usize);
+    // credit to Stockfish, as I didn't come up with this code.
+    // It checks if `square` is still within the board, and if it is, it checks
+    // if it hasn't wrapped (because if it has wrapped, the distance will be
+    // larger than 2).
+    is_valid_square(dest) && horizontal_distance(square, dest) <= 1
+}
+
+/// Checks if `square` is within the board.
+pub fn is_valid_square(square: Square) -> bool {
+    // `square` is a usize so it can't be less than 0.
+    square <= Squares::H8
+}
+
 /// Shifts `bb` one square north without wrapping.
 pub fn north(bb: Bitboard) -> Bitboard {
     bb << 8
@@ -47,6 +83,20 @@ pub fn pawn_push<const IS_WHITE: bool>(bb: Bitboard) -> Bitboard {
     } else {
         south(bb)
     }
+}
+
+/// Generates an attack from `square` in the given direction up to and
+/// including the first encountered bit set in `blockers`. `blockers` is
+/// assumed not to include `square` itself.
+pub fn ray_attack<const DIRECTION: Direction>(mut square: Square, blockers: Bitboard) -> Bitboard {
+    let mut attacks = Bitboards::EMPTY;
+    // checks if the next square is valid and if the piece can move from the
+    // square
+    while is_valid::<DIRECTION>(square) && as_bitboard(square) & blockers == 0 {
+        square = square.wrapping_add(DIRECTION as usize);
+        attacks |= as_bitboard(square);
+    }
+    attacks
 }
 
 /// Generates the attack set for `piece` on `square` up to and including the
@@ -72,59 +122,9 @@ pub fn south(bb: Bitboard) -> Bitboard {
     bb >> 8
 }
 
-/// Generates an attack from `square` in the given direction up to and
-/// including the first encountered bit set in `blockers`. `blockers` is
-/// assumed not to include `square` itself.
-pub fn ray_attack<const DIRECTION: Direction>(mut square: Square, blockers: Bitboard) -> Bitboard {
-    let mut attacks = Bitboards::EMPTY;
-    // checks if the next square is valid and if the piece can move from the
-    // square
-    while is_valid::<DIRECTION>(square) && as_bitboard(square) & blockers == 0 {
-        square = square.wrapping_add(DIRECTION as usize);
-        attacks |= as_bitboard(square);
-    }
-    attacks
-}
-
 /// Shifts `bb` one square west without wrapping.
 pub fn west(bb: Bitboard) -> Bitboard {
     (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8]
-}
-
-/// Creates a [`Move`] given a start square, end square, piece and side.
-pub fn create_move<const IS_WHITE: bool, const PIECE: Piece>(start: Square, end: Square) -> Move {
-    start as Move | (end as Move) << 6 | (PIECE as Move) << 12 | (IS_WHITE as Move) << 15
-}
-
-/// Turns a [`Move`] into its components: start square, end square, piece and
-/// side, in that order.
-pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
-    let start = mv & 0x3f;
-    let end = (mv >> 6) & 0x3f;
-    let piece = (mv >> 12) & 0x7;
-    let side = (mv >> 15) & 0x1;
-    (start as Square, end as Square, piece as Piece, side as Side)
-}
-
-/// Finds the horizontal distance between `square_1` and `square_2`
-pub fn horizontal_distance(square_1: Square, square_2: Square) -> u8 {
-    (file_of(square_1) as i8 - file_of(square_2) as i8).unsigned_abs()
-}
-
-/// Checks if `square` can go in the given direction.
-pub fn is_valid<const DIRECTION: Direction>(square: Square) -> bool {
-    let dest = square.wrapping_add(DIRECTION as usize);
-    // credit to Stockfish, as I didn't come up with this code.
-    // It checks if `square` is still within the board, and if it is, it checks
-    // if it hasn't wrapped (because if it has wrapped, the distance will be
-    // larger than 2).
-    is_valid_square(dest) && horizontal_distance(square, dest) <= 1
-}
-
-/// Checks if `square` is within the board.
-pub fn is_valid_square(square: Square) -> bool {
-    // `square` is a usize so it can't be less than 0.
-    square <= Squares::H8
 }
 
 #[cfg(test)]
