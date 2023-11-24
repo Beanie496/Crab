@@ -7,10 +7,10 @@ use movegen::Lookup;
 
 pub use movegen::magic::find_magics;
 
-/// Bit-related functions relating to piece movement.
-mod bits;
 /// Items related to move generation.
 mod movegen;
+/// Bit-related functions relating to piece movement.
+mod util;
 
 /// Stores information about the current state of the board.
 pub struct Board {

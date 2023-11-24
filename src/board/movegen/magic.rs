@@ -1,7 +1,7 @@
 use oorandom::Rand64;
 
 use crate::{
-    board::bits::{gen_all_sliding_attacks, sliding_attacks},
+    board::util::{gen_all_sliding_attacks, sliding_attacks},
     defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks},
     util::{file_of, gen_sparse_rand, rank_of},
 };

@@ -1,5 +1,5 @@
 use super::{
-    bits::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west},
+    util::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west},
     Board,
 };
 use crate::{
