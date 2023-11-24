@@ -1,7 +1,7 @@
 use crate::{
-    bits::bitboard_from_pos,
     defs::{Bitboard, File, Files, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
     movelist::Movelist,
+    util::bitboard_from_pos,
 };
 use movegen::Lookup;
 

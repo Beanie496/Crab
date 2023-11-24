@@ -1,7 +1,6 @@
 use crate::{
-    bits::as_bitboard,
     defs::{Bitboard, Bitboards, Direction, Directions, Files, Piece, Pieces, Ranks, Square},
-    util::{file_of, is_valid, rank_of},
+    util::{as_bitboard, file_of, is_valid, rank_of},
 };
 
 /// Shifts `bb` one square east without wrapping.

@@ -3,10 +3,9 @@ use super::{
     Board,
 };
 use crate::{
-    bits::{as_bitboard, pop_lsb, to_square, BitIter},
     defs::{Bitboard, Bitboards, Files, Move, Nums, Pieces, Ranks, Sides, Square},
     movelist::Movelist,
-    util::{file_of, rank_of},
+    util::{as_bitboard, file_of, pop_lsb, rank_of, to_square, BitIter},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{create_move, decompose_move};
