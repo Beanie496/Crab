@@ -186,7 +186,7 @@ impl Lookup {
     }
 
     /// Returns a [`Lookup`] with empty tables.
-    // used to declare a static `Lookup` variable
+    // used to initialise a static `Lookup` variable
     pub const fn empty() -> Self {
         Self {
             pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
