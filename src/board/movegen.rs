@@ -1,20 +1,20 @@
-use super::Board;
+use super::{
+    bits::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west},
+    Board,
+};
 use crate::{
-    bits::{
-        as_bitboard, east, gen_all_sliding_attacks, north, pawn_push, pop_lsb, sliding_attacks,
-        south, to_square, west, BitIter,
-    },
-    defs::{Bitboard, Bitboards, Files, Nums, Pieces, Ranks, Sides, Square},
+    bits::{as_bitboard, pop_lsb, to_square, BitIter},
+    defs::{Bitboard, Bitboards, Files, Move, Nums, Pieces, Ranks, Sides, Square},
     movelist::Movelist,
     util::{file_of, rank_of},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::create_move;
+use util::{create_move, decompose_move};
 
 /// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
-pub mod util;
+mod util;
 
 /// Contains lookup tables for each piece.
 pub struct Lookup {
@@ -59,6 +59,25 @@ impl Board {
             self.generate_non_sliding_moves::<false>(ml);
             self.generate_sliding_moves::<false>(ml);
         }
+    }
+
+    /// Makes the given move on the internal board. `mv` is assumed to be a
+    /// valid move.
+    pub fn make_move(&mut self, mv: Move) {
+        self.played_moves.push_move(mv);
+        let (start, end, piece, side) = decompose_move(mv);
+        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
+        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
+        self.side_to_move ^= 1;
+    }
+
+    /// Unplays the most recent move. Assumes that a move has been played.
+    pub fn unmake_move(&mut self) {
+        let mv = self.played_moves.pop_move().unwrap();
+        let (start, end, piece, side) = decompose_move(mv);
+        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
+        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
+        self.side_to_move ^= 1;
     }
 }
 

@@ -1,14 +1,16 @@
 use crate::{
-    bits::{as_bitboard, bitboard_from_pos},
-    defs::{Bitboard, File, Files, Move, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
+    bits::bitboard_from_pos,
+    defs::{Bitboard, File, Files, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
     movelist::Movelist,
 };
-use movegen::{util::decompose_move, Lookup};
+use movegen::Lookup;
 
 pub use movegen::magic::find_magics;
 
+/// Bit-related functions relating to piece movement.
+mod bits;
 /// Items related to move generation.
-pub mod movegen;
+mod movegen;
 
 /// Stores information about the current state of the board.
 pub struct Board {
@@ -76,16 +78,6 @@ impl Board {
 }
 
 impl Board {
-    /// Makes the given move on the internal board. `mv` is assumed to be a
-    /// valid move.
-    pub fn make_move(&mut self, mv: Move) {
-        self.played_moves.push_move(mv);
-        let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
-        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
-        self.side_to_move ^= 1;
-    }
-
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
@@ -104,15 +96,6 @@ impl Board {
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
         self.side_to_move = Self::default_side();
-    }
-
-    /// Unplays the most recent move. Assumes that a move has been played.
-    pub fn unmake_move(&mut self) {
-        let mv = self.played_moves.pop_move().unwrap();
-        let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
-        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
-        self.side_to_move ^= 1;
     }
 }
 
