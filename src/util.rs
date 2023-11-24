@@ -1,6 +1,6 @@
 use oorandom::Rand64;
 
-use crate::defs::{Bitboard, Direction, File, Files, Move, Rank, Ranks, Square, Squares};
+use crate::defs::{Bitboard, File, Files, Move, Rank, Ranks, Square};
 
 /// A thin wrapper over a [`Bitboard`] to allow iteration over it.
 pub struct BitIter {
@@ -28,6 +28,17 @@ impl Iterator for BitIter {
     }
 }
 
+/// Converts `square` into its corresponding bitboard.
+pub fn as_bitboard(square: Square) -> Bitboard {
+    1 << square
+}
+
+/// Converts `rank` and `file` into a bitboard with the bit in the given
+/// position set.
+pub fn bitboard_from_pos(rank: Rank, file: File) -> Bitboard {
+    1 << (rank * 8 + file)
+}
+
 /// Calculates the file that `square` is on.
 pub fn file_of(square: Square) -> File {
     square & 7
@@ -38,25 +49,18 @@ pub fn gen_sparse_rand(rand_gen: &mut Rand64) -> u64 {
     rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
 }
 
-/// Finds the horizontal distance between `square_1` and `square_2`
-pub fn horizontal_distance(square_1: Square, square_2: Square) -> u8 {
-    (file_of(square_1) as i8 - file_of(square_2) as i8).unsigned_abs()
+/// Clears the least significant bit of `bb` and returns it.
+pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
+    let popped_bit = *bb & bb.wrapping_neg();
+    *bb ^= popped_bit;
+    popped_bit
 }
 
-/// Checks if `square` can go in the given direction.
-pub fn is_valid<const DIRECTION: Direction>(square: Square) -> bool {
-    let dest = square.wrapping_add(DIRECTION as usize);
-    // credit to Stockfish, as I didn't come up with this code.
-    // It checks if `square` is still within the board, and if it is, it checks
-    // if it hasn't wrapped (because if it has wrapped, the distance will be
-    // larger than 2).
-    is_valid_square(dest) && horizontal_distance(square, dest) <= 1
-}
-
-/// Checks if `square` is within the board.
-pub fn is_valid_square(square: Square) -> bool {
-    // `square` is a usize so it can't be less than 0.
-    square <= Squares::H8
+/// Clears the least significant bit of `bb` and returns the position of it.
+pub fn pop_next_square(bb: &mut Bitboard) -> Square {
+    let shift = bb.trailing_zeros();
+    *bb ^= 1 << shift;
+    shift as Square
 }
 
 // Allowed dead code because this is occasionally useful for debugging.
@@ -93,31 +97,6 @@ pub fn stringify_square(sq: Square) -> String {
     ret.push((b'a' + (sq as u8 & 7)) as char);
     ret.push((b'1' + (sq as u8 >> 3)) as char);
     ret
-}
-
-/// Converts `square` into its corresponding bitboard.
-pub fn as_bitboard(square: Square) -> Bitboard {
-    1 << square
-}
-
-/// Converts `rank` and `file` into a bitboard with the bit in the given
-/// position set.
-pub fn bitboard_from_pos(rank: Rank, file: File) -> Bitboard {
-    1 << (rank * 8 + file)
-}
-
-/// Clears the least significant bit of `bb` and returns it.
-pub fn pop_lsb(bb: &mut Bitboard) -> Bitboard {
-    let popped_bit = *bb & bb.wrapping_neg();
-    *bb ^= popped_bit;
-    popped_bit
-}
-
-/// Clears the least significant bit of `bb` and returns the position of it.
-pub fn pop_next_square(bb: &mut Bitboard) -> Square {
-    let shift = bb.trailing_zeros();
-    *bb ^= 1 << shift;
-    shift as Square
 }
 
 /// Finds the position of the least significant bit of `bb`.

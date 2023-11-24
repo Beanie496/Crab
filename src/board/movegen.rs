@@ -1,14 +1,14 @@
-use super::{
-    util::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west},
-    Board,
-};
+use super::Board;
 use crate::{
     defs::{Bitboard, Bitboards, Files, Move, Nums, Pieces, Ranks, Sides, Square},
     movelist::Movelist,
     util::{as_bitboard, file_of, pop_lsb, rank_of, to_square, BitIter},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{create_move, decompose_move};
+use util::{
+    create_move, decompose_move, east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks,
+    south, west,
+};
 
 /// Items related to magic bitboards.
 pub mod magic;
@@ -327,5 +327,28 @@ impl Lookup {
     /// Finds the rook attacks from `square` with the given blockers.
     fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         self.rook_magic_table[self.rook_magics[square].get_table_index(blockers)]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Board;
+
+    use crate::{
+        board::movegen::util::create_move,
+        defs::{Pieces, Sides, Squares},
+    };
+
+    #[test]
+    fn make_and_unmake() {
+        let mut board = Board::new();
+
+        let mv = create_move::<true, { Pieces::ROOK }>(Squares::A1, Squares::A3);
+        board.make_move(mv);
+        assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
+        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
+        board.unmake_move();
+        assert_eq!(board.sides[Sides::WHITE], 0x000000000000ffff);
+        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000000081);
     }
 }

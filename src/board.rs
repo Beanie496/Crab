@@ -9,8 +9,6 @@ pub use movegen::magic::find_magics;
 
 /// Items related to move generation.
 mod movegen;
-/// Bit-related functions relating to piece movement.
-mod util;
 
 /// Stores information about the current state of the board.
 pub struct Board {
@@ -137,28 +135,5 @@ impl Board {
         } else {
             self.sides[Sides::BLACK]
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Board;
-
-    use crate::{
-        board::movegen::util::create_move,
-        defs::{Pieces, Sides, Squares},
-    };
-
-    #[test]
-    fn make_and_unmake() {
-        let mut board = Board::new();
-
-        let mv = create_move::<true, { Pieces::ROOK }>(Squares::A1, Squares::A3);
-        board.make_move(mv);
-        assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
-        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
-        board.unmake_move();
-        assert_eq!(board.sides[Sides::WHITE], 0x000000000000ffff);
-        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000000081);
     }
 }
