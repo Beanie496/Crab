@@ -20,6 +20,11 @@ impl Movelist {
 }
 
 impl Movelist {
+    /// Returns the number of stored moves.
+    pub fn moves(&self) -> usize {
+        self.first_empty
+    }
+
     /// Pops a [`Move`] from the move list. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     pub fn pop_move(&mut self) -> Option<Move> {

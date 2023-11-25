@@ -21,9 +21,13 @@ impl Engine {
         let mut total = 0;
         for mv in ml {
             self.board.make_move(mv);
-            let moves = self.perft_inner(depth - 1);
-            total += moves;
-            println!("{}: {moves}", stringify_move(mv));
+            if depth == 1 {
+                println!("{}: 1", stringify_move(mv));
+            } else {
+                let moves = self.perft_inner(depth - 1);
+                total += moves;
+                println!("{}: {moves}", stringify_move(mv));
+            }
             self.board.unmake_move();
         }
         println!("Total: {total}");
@@ -40,12 +44,12 @@ impl Engine {
     /// Runs perft on the current position and returns the number of legal
     /// moves.
     fn perft_inner(&mut self, depth: u8) -> u64 {
-        if depth == 0 {
-            return 1;
-        }
-
         let mut ml = Movelist::new();
         self.board.generate_moves(&mut ml);
+
+        if depth == 1 {
+            return ml.moves() as u64;
+        }
 
         let mut total = 0;
         for mv in ml {
