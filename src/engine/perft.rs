@@ -23,6 +23,7 @@ impl Engine {
             self.board.make_move(mv);
             if depth == 1 {
                 println!("{}: 1", stringify_move(mv));
+                total += 1;
             } else {
                 let moves = self.perft_inner(depth - 1);
                 total += moves;
