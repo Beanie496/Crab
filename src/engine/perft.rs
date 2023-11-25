@@ -4,9 +4,11 @@ use super::Engine;
 use crate::{movelist::Movelist, util::stringify_move};
 
 impl Engine {
-    /// Runs perft on the current position. Prints each move followed by the
-    /// number of leaf nodes reaches from that move, or just prints "1" if
-    /// `depth == 0`. Prints total node count, time and NPS at the end.
+    /// Counts the number of leaf nodes `depth` moves in the future.
+    ///
+    /// If `IS_ROOT`, it also prints each move followed by the number of leaf
+    /// nodes reached from that move, or just "1" if `depth == 0`, and
+    /// prints total node count, time and NPS at the end.
     pub fn perft<const IS_ROOT: bool>(&mut self, depth: u8) -> u64 {
         if IS_ROOT {
             println!("Result:");
