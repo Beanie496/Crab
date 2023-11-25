@@ -30,8 +30,9 @@ impl Engine {
             }
             self.board.unmake_move();
         }
-        println!("Total: {total}");
+
         let elapsed_us = time.elapsed().as_micros() as u64;
+        println!("Total: {total}");
         println!(
             "Time taken: {:.0} ms; NPS: {}",
             elapsed_us / 1_000,
