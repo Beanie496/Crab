@@ -8,8 +8,6 @@ mod board;
 mod defs;
 /// A container for [`Engine`](engine::Engine).
 mod engine;
-/// A container for [`Movelist`](movelist::Movelist).
-mod movelist;
 /// Handles UCI input
 mod uci;
 /// Miscellaneous useful functions.

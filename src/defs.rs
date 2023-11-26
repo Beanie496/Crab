@@ -1,29 +1,6 @@
 pub type Bitboard = u64;
 pub type File = usize;
 pub type Direction = isize;
-/**
- * A container for a move.
- *
- * From LSB onwards, a [`Move`] is as follows:
- * * Start pos == 6 bits, 0-63
- * * End pos == 6 bits, 0-63
- * * Piece == 3 bits, 0-5
- * * Side == 1 bit.
- * Storing the side to move is >50% faster than reading `side_to_move` off
- * [`Board`](crate::board::Board).
- *
- * The start and end are obvious. The piece and side are for fast access into
- * the board's arrays instead of requiring a match statement.
- * ```
- * Move ==
- *     ((start & 0x3f) << 0)
- *     | ((end & 0x3f) << 6)
- *     | ((piece & 0x7) << 12)
- *     | ((side & 0x1) << 15);
- *
- * ```
- */
-pub type Move = u16;
 pub type Piece = usize;
 pub type Rank = usize;
 pub type Side = usize;
@@ -123,6 +100,7 @@ impl Pieces {
     pub const ROOK: Piece = 3;
     pub const QUEEN: Piece = 4;
     pub const KING: Piece = 5;
+    pub const NONE: Piece = 6;
 }
 
 impl Ranks {
@@ -132,8 +110,6 @@ impl Ranks {
     pub const RANK8: Rank = 7;
 }
 
-// Allowed dead code because a unit test uses BLACK.
-#[allow(dead_code)]
 impl Sides {
     pub const BLACK: Side = 0;
     pub const WHITE: Side = 1;
@@ -143,10 +119,16 @@ impl Sides {
 #[allow(dead_code)]
 impl Squares {
     pub const A1: Square = 0;
+    pub const C1: Square = 2;
+    pub const E1: Square = 4;
+    pub const G1: Square = 6;
     pub const H1: Square = 7;
     pub const A3: Square = 16;
     pub const E4: Square = 28;
     pub const D5: Square = 35;
+    pub const C6: Square = 42;
+    pub const E6: Square = 44;
+    pub const A7: Square = 48;
     pub const A8: Square = 56;
     pub const H8: Square = 63;
 }

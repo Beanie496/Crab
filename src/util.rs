@@ -1,6 +1,6 @@
 use oorandom::Rand64;
 
-use crate::defs::{Bitboard, File, Files, Move, Rank, Ranks, Square};
+use crate::defs::{Bitboard, File, Files, Rank, Ranks, Square};
 
 /// A thin wrapper over a [`Bitboard`] to allow iteration over it.
 pub struct BitIter {
@@ -79,16 +79,6 @@ pub fn pretty_print(board: Bitboard) {
 /// Calculates the rank that `square` is on.
 pub fn rank_of(square: Square) -> Rank {
     square >> 3
-}
-
-/// Converts `mv` into its string representation.
-pub fn stringify_move(mv: Move) -> String {
-    let start = mv & 0x3f;
-    let end = (mv >> 6) & 0x3f;
-    let mut ret = String::with_capacity(4);
-    ret += &stringify_square(start as Square);
-    ret += &stringify_square(end as Square);
-    ret
 }
 
 /// Converts `sq` into its string representation.

@@ -11,7 +11,7 @@ The order for each file should be as shown:
 - `mod`s
 - Types
 - Enums/unions/structs in that order, unless needed otherwise
-- Global variables
+- Consts/statics
 - Traits
 - Impls
 - Functions definitions, in descending order of abstraction (so main() first)

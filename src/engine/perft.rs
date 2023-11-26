@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use super::Engine;
-use crate::{movelist::Movelist, util::stringify_move};
+use crate::board::movegen::Moves;
 
 impl Engine {
     /// Counts the number of leaf nodes `depth` moves in the future.
@@ -19,11 +19,11 @@ impl Engine {
         }
 
         let time = Instant::now();
-        let mut ml = Movelist::new();
-        self.board.generate_moves(&mut ml);
+        let mut moves = Moves::new();
+        self.board.generate_moves(&mut moves);
 
         let mut total = 0;
-        for mv in ml {
+        for mv in moves {
             let is_leaf = depth == 1;
             let moves = if IS_ROOT && is_leaf {
                 1
@@ -32,9 +32,9 @@ impl Engine {
                 let is_next_leaf = next_depth == 1;
                 self.board.make_move(mv);
                 let result = if is_next_leaf {
-                    let mut next_ml = Movelist::new();
-                    self.board.generate_moves(&mut next_ml);
-                    next_ml.moves() as u64
+                    let mut next_moves = Moves::new();
+                    self.board.generate_moves(&mut next_moves);
+                    next_moves.moves() as u64
                 } else {
                     self.perft::<false>(next_depth)
                 };
@@ -43,7 +43,7 @@ impl Engine {
             };
             total += moves;
             if IS_ROOT {
-                println!("{}: {moves}", stringify_move(mv));
+                println!("{}: {moves}", mv.stringify());
             }
         }
 

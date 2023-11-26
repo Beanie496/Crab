@@ -1,24 +1,26 @@
 use crate::{
+    board::Move,
     defs::{
-        Bitboard, Bitboards, Direction, Directions, Files, Move, Piece, Pieces, Ranks, Side,
-        Square, Squares,
+        Bitboard, Bitboards, Direction, Directions, Files, Piece, Pieces, Ranks, Sides, Square,
+        Squares, PIECE_CHARS,
     },
-    util::{as_bitboard, file_of, rank_of},
+    util::{as_bitboard, file_of, rank_of, stringify_square},
 };
 
-/// Creates a [`Move`] given a start square, end square, piece and side.
-pub fn create_move<const IS_WHITE: bool, const PIECE: Piece>(start: Square, end: Square) -> Move {
-    start as Move | (end as Move) << 6 | (PIECE as Move) << 12 | (IS_WHITE as Move) << 15
-}
-
-/// Turns a [`Move`] into its components: start square, end square, piece and
-/// side, in that order.
-pub fn decompose_move(mv: Move) -> (Square, Square, Piece, Side) {
-    let start = mv & 0x3f;
-    let end = (mv >> 6) & 0x3f;
-    let piece = (mv >> 12) & 0x7;
-    let side = (mv >> 15) & 0x1;
-    (start as Square, end as Square, piece as Piece, side as Side)
+impl Move {
+    /// Converts `mv` into its string representation.
+    pub fn stringify(&self) -> String {
+        let start = (self.mv & Self::START_MASK) >> Self::START_SHIFT;
+        let end = (self.mv & Self::END_MASK) >> Self::END_SHIFT;
+        let mut ret = String::with_capacity(5);
+        ret += &stringify_square(start as Square);
+        ret += &stringify_square(end as Square);
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            ret.push(PIECE_CHARS[Sides::BLACK][self.promotion_piece()]);
+        }
+        ret
+    }
 }
 
 /// Shifts `bb` one square east without wrapping.
@@ -125,35 +127,4 @@ pub fn south(bb: Bitboard) -> Bitboard {
 /// Shifts `bb` one square west without wrapping.
 pub fn west(bb: Bitboard) -> Bitboard {
     (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{create_move, decompose_move};
-    use crate::defs::{Pieces, Sides, Squares};
-
-    #[test]
-    fn create_move_works() {
-        // these asserts will use magic values known to be correct
-        assert_eq!(
-            create_move::<false, { Pieces::KNIGHT }>(Squares::A1, Squares::H8),
-            63 << 6 | 1 << 12,
-        );
-        assert_eq!(
-            create_move::<true, { Pieces::KING }>(Squares::A8, Squares::H1),
-            56 | 7 << 6 | 5 << 12 | 1 << 15,
-        );
-    }
-
-    #[test]
-    fn decompose_move_works() {
-        assert_eq!(
-            decompose_move(63 << 6 | 1 << 12 | 1 << 15),
-            (Squares::A1, Squares::H8, Pieces::KNIGHT, Sides::WHITE),
-        );
-        assert_eq!(
-            decompose_move(56 | 7 << 6 | 5 << 12),
-            (Squares::A8, Squares::H1, Pieces::KING, Sides::BLACK),
-        );
-    }
 }

@@ -1,29 +1,49 @@
 use crate::{
-    defs::{Bitboard, File, Files, Nums, Piece, Rank, Ranks, Side, Sides, PIECE_CHARS},
-    movelist::Movelist,
+    defs::{
+        Bitboard, File, Files, Nums, Piece, Pieces, Rank, Ranks, Side, Sides, Square, PIECE_CHARS,
+    },
     util::bitboard_from_pos,
 };
-use movegen::Lookup;
+use movegen::{Lookup, Move};
 
 pub use movegen::magic::find_magics;
 
 /// Items related to move generation.
-mod movegen;
+pub mod movegen;
 
 /// Stores information about the current state of the board.
 pub struct Board {
-    /// The moves played since the initial position.
     played_moves: Movelist,
-    /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
-    /// is the knights, and so on, as according to the order set by
-    /// [`Pieces`](crate::defs::Pieces).
+    // An array of piece values, used for seeing which pieces are on the start
+    // and end square.
+    // `piece_board[SQUARE] == piece on that square`.
+    piece_board: [Piece; Nums::SQUARES],
+    // `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
+    // is the knights, and so on, as according to the order set by
+    // [`Pieces`].
     pieces: [Bitboard; Nums::PIECES],
-    /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
-    /// is is the intersection of all Black piece bitboards.
+    // `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
+    // is is the intersection of all Black piece bitboards.
     sides: [Bitboard; Nums::SIDES],
-    /// The side to move - 0 or 1 for White or Black respectively.
     side_to_move: Side,
 }
+
+/// A [`Move`] with metadata used for quickly unmaking moves.
+#[derive(Clone, Copy)]
+struct GameMove {
+    captured: Piece,
+    mv: Move,
+    piece: Piece,
+}
+
+/// The history of the board.
+struct Movelist {
+    moves: [GameMove; MAX_GAME_MOVES],
+    first_empty: usize,
+}
+
+/// There is no basis to this number other than 'yeah that seems good enough`.
+const MAX_GAME_MOVES: usize = 250;
 
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
@@ -32,6 +52,7 @@ impl Board {
         Lookup::init();
         Self {
             played_moves: Movelist::new(),
+            piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
             side_to_move: Self::default_side(),
@@ -39,7 +60,55 @@ impl Board {
     }
 }
 
+impl GameMove {
+    /// Creates a [`GameMove`] with the data set to the parameters given.
+    pub fn new(mv: Move, piece: Piece, captured: Piece) -> Self {
+        Self {
+            captured,
+            mv,
+            piece,
+        }
+    }
+}
+
+impl Movelist {
+    /// Creates an empty [`Movelist`].
+    pub fn new() -> Self {
+        Self {
+            moves: [GameMove::new(Move::null(), Pieces::NONE, Pieces::NONE); MAX_GAME_MOVES],
+            first_empty: 0,
+        }
+    }
+}
+
 impl Board {
+    /// Returns the piece board of the starting position.
+    /// ```
+    /// assert_eq!(default_piece_board()[Squares::A1], Pieces::ROOK);
+    /// assert_eq!(default_piece_board()[Squares::B1], Pieces::KNIGHT);
+    /// assert_eq!(default_piece_board()[Squares::A8], Pieces::ROOK);
+    /// // etc.
+    /// ```
+    #[rustfmt::skip]
+    fn default_piece_board() -> [Piece; Nums::SQUARES] {
+        let p = Pieces::PAWN;
+        let n = Pieces::KNIGHT;
+        let b = Pieces::BISHOP;
+        let r = Pieces::ROOK;
+        let q = Pieces::QUEEN;
+        let k = Pieces::KING;
+        let e = Pieces::NONE;
+        [
+            r, n, b, q, k, b, n, r,
+            p, p, p, p, p, p, p, p,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            p, p, p, p, p, p, p, p,
+            r, n, b, q, k, b, n, r,
+        ]
+    }
     /// Returns the pieces of the starting position.
     /// ```
     /// assert_eq!(default_pieces()[Pieces::PAWN], 0x00ff00000000ff00);
@@ -97,6 +166,42 @@ impl Board {
     }
 }
 
+impl GameMove {
+    /// Seperates a [`GameMove`] into a [`Move`] with its metadata:
+    /// [all the fields of [`Move::decompose`]], piece being moved, piece
+    /// being captured, in that order.
+    pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece, Piece, Piece) {
+        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
+            self.mv.decompose();
+        (
+            start,
+            end,
+            is_castling,
+            is_en_passant,
+            is_promotion,
+            promotion_piece,
+            self.piece,
+            self.captured,
+        )
+    }
+}
+
+impl Movelist {
+    /// Pops a [`Move`] with its metadata from the list. Assumes that `self`
+    /// contains at least one element.
+    pub fn pop_move(&mut self) -> GameMove {
+        self.first_empty -= 1;
+        self.moves[self.first_empty]
+    }
+
+    /// Pushes a move with metadata onto the list. Assumes that `self` will not
+    /// overflow.
+    pub fn push_move(&mut self, mv: Move, piece: Piece, captured: Piece) {
+        self.moves[self.first_empty] = GameMove::new(mv, piece, captured);
+        self.first_empty += 1;
+    }
+}
+
 impl Board {
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
@@ -113,9 +218,19 @@ impl Board {
         '0'
     }
 
+    /// Flip the side to move.
+    fn flip_side(&mut self) {
+        self.side_to_move ^= 1;
+    }
+
     /// Returns all the occupied squares on the board.
     fn occupancies(&self) -> Bitboard {
         self.sides::<true>() | self.sides::<false>()
+    }
+
+    /// Returns the piece on `square`.
+    fn piece_on(&self, square: Square) -> Piece {
+        self.piece_board[square]
     }
 
     /// Returns the piece bitboard given by `piece`.
@@ -123,7 +238,7 @@ impl Board {
         self.pieces[PIECE]
     }
 
-    /// Returns side to move
+    /// Returns the side to move.
     fn side_to_move(&self) -> Side {
         self.side_to_move
     }

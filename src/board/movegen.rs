@@ -1,19 +1,15 @@
 use super::Board;
 use crate::{
-    defs::{Bitboard, Bitboards, Files, Move, Nums, Pieces, Ranks, Sides, Square},
-    movelist::Movelist,
+    defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks, Sides, Square},
     util::{as_bitboard, file_of, pop_lsb, rank_of, to_square, BitIter},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{
-    create_move, decompose_move, east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks,
-    south, west,
-};
+use util::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west};
 
 /// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
-mod util;
+pub mod util;
 
 /// Contains lookup tables for each piece.
 pub struct Lookup {
@@ -26,9 +22,25 @@ pub struct Lookup {
     rook_magics: [Magic; Nums::SQUARES],
 }
 
-/// The lookup tables used at runtime.
-// initialised at runtime
-static mut LOOKUPS: Lookup = Lookup::empty();
+/**
+ * A wrapper for a move and associated methods.
+ *
+ * From LSB onwards, a [`Move`] is as follows:
+ * * Start pos == 6 bits, 0-63
+ * * End pos == 6 bits, 0-63
+ * * Flags == 2 bits.
+ * * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
+ */
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Move {
+    mv: u16,
+}
+
+/// An array of [`Move`]s
+pub struct Moves {
+    moves: [Move; MAX_LEGAL_MOVES],
+    first_empty: usize,
+}
 
 /// The number of bitboards required to store all bishop attacks, where each
 /// element corresponds to one permutation of blockers. (This means some
@@ -44,53 +56,267 @@ const BISHOP_SIZE: usize = 5_248;
 /// attacks.) There are `2.pow(12)` blocker permutations for each corner,
 /// `2.pow(11)` for each non-corner edge and `2.pow(10)` for all others.
 const ROOK_SIZE: usize = 102_400;
+/// Maximum number of legal moves that can be reached in a standard chess game.
+///
+/// Example: `R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1`
+const MAX_LEGAL_MOVES: usize = 218;
+/// The lookup tables used at runtime.
+// initialised at runtime
+static mut LOOKUPS: Lookup = Lookup::empty();
+
+impl Move {
+    pub const START_MASK: u16 = 0b11_1111;
+    pub const START_SHIFT: usize = 0;
+    pub const END_MASK: u16 = 0b1111_1100_0000;
+    pub const END_SHIFT: usize = 6;
+    pub const NO_FLAG: u16 = 0b0000_0000_0000_0000;
+    pub const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
+    pub const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
+    pub const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
+    pub const PIECE_SHIFT: usize = 14;
+}
+
+impl Lookup {
+    /// Initialises the tables of [`LOOKUPS`].
+    pub fn init() {
+        unsafe {
+            LOOKUPS.init_pawn_attacks();
+            LOOKUPS.init_knight_attacks();
+            LOOKUPS.init_king_attacks();
+            LOOKUPS.init_magics();
+        };
+    }
+}
+
+impl Move {
+    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
+    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
+    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
+    /// additional parameter. See [`new_promo`](Move::new_promo) for a new promotion [`Move`].
+    pub fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
+        debug_assert!(FLAG != Move::PROMOTION_FLAG);
+        Self {
+            mv: (start as u16) << Self::START_SHIFT | (end as u16) << Self::END_SHIFT | FLAG,
+        }
+    }
+
+    /// Creates a promotion [`Move`] to the given piece.
+    pub fn new_promo<const PIECE: Piece>(start: Square, end: Square) -> Move {
+        debug_assert!(PIECE != Pieces::PAWN);
+        debug_assert!(PIECE != Pieces::KING);
+        Self {
+            mv: (start as u16) << Self::START_SHIFT
+                | (end as u16) << Self::END_SHIFT
+                | Self::PROMOTION_FLAG
+                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
+        }
+    }
+
+    /// Creates a null [`Move`].
+    pub fn null() -> Move {
+        Self { mv: 0 }
+    }
+}
+
+impl Moves {
+    /// Creates an empty [`Moves`] object.
+    pub fn new() -> Self {
+        Self {
+            moves: [Move::null(); MAX_LEGAL_MOVES],
+            first_empty: 0,
+        }
+    }
+}
+
+impl Lookup {
+    /// Returns a [`Lookup`] with empty tables.
+    // used to initialise a static `Lookup` variable
+    const fn empty() -> Self {
+        Self {
+            pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
+            knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
+            king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
+            bishop_magic_table: [Bitboards::EMPTY; BISHOP_SIZE],
+            rook_magic_table: [Bitboards::EMPTY; ROOK_SIZE],
+            bishop_magics: [Magic::default(); Nums::SQUARES],
+            rook_magics: [Magic::default(); Nums::SQUARES],
+        }
+    }
+}
 
 impl Board {
     /// Generates all legal moves for the current position and puts them in
-    /// `ml`.
-    pub fn generate_moves(&self, ml: &mut Movelist) {
+    /// `moves`.
+    pub fn generate_moves(&self, moves: &mut Moves) {
         if self.side_to_move() == Sides::WHITE {
-            self.generate_pawn_moves::<true>(ml);
-            self.generate_non_sliding_moves::<true>(ml);
-            self.generate_sliding_moves::<true>(ml);
+            self.generate_pawn_moves::<true>(moves);
+            self.generate_non_sliding_moves::<true>(moves);
+            self.generate_sliding_moves::<true>(moves);
         } else {
-            self.generate_pawn_moves::<false>(ml);
-            self.generate_non_sliding_moves::<false>(ml);
-            self.generate_sliding_moves::<false>(ml);
+            self.generate_pawn_moves::<false>(moves);
+            self.generate_non_sliding_moves::<false>(moves);
+            self.generate_sliding_moves::<false>(moves);
         }
     }
 
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move.
     pub fn make_move(&mut self, mv: Move) {
-        self.played_moves.push_move(mv);
-        let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
-        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
-        self.side_to_move ^= 1;
+        let (start, end, _is_castling, _is_en_passant, is_promotion, promotion_piece) =
+            mv.decompose();
+        let piece = self.piece_on(start);
+        let captured = self.piece_on(end);
+        let us = self.side_to_move();
+        let them = us ^ 1;
+
+        let start_bb = as_bitboard(start);
+        let end_bb = as_bitboard(end);
+
+        // update the bitboards
+        self.pieces[piece] ^= start_bb | end_bb;
+        self.sides[us] ^= start_bb | end_bb;
+        if captured != Pieces::NONE {
+            // if we're capturing a piece, unset the bitboard of the captured
+            // piece.
+            // By a happy accident, we don't need to check if we're capturing
+            // the same piece as we are currently - the bit would have been
+            // (wrongly) unset earlier, so this would (wrongly) re-set it.
+            // Looks like two wrongs do make a right in binary.
+            self.pieces[captured] ^= end_bb;
+            self.sides[them] ^= end_bb;
+        }
+
+        // update the board array
+        self.piece_board[start] = Pieces::NONE;
+        if is_promotion {
+            self.piece_board[end] = promotion_piece;
+            // unset the pawn on the promotion square...
+            self.pieces[Pieces::PAWN] ^= end_bb;
+            // ...and set the promotion piece on that square
+            self.pieces[promotion_piece] ^= end_bb;
+        } else {
+            self.piece_board[end] = piece;
+        }
+
+        self.flip_side();
+
+        self.played_moves.push_move(mv, piece, captured);
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.
     pub fn unmake_move(&mut self) {
-        let mv = self.played_moves.pop_move().unwrap();
-        let (start, end, piece, side) = decompose_move(mv);
-        self.pieces[piece] ^= as_bitboard(start) | as_bitboard(end);
-        self.sides[side] ^= as_bitboard(start) | as_bitboard(end);
-        self.side_to_move ^= 1;
+        let (
+            start,
+            end,
+            _is_castling,
+            _is_en_passant,
+            is_promotion,
+            promotion_piece,
+            piece,
+            captured,
+        ) = self.played_moves.pop_move().decompose();
+        self.flip_side();
+        let us = self.side_to_move();
+        let them = us ^ 1;
+
+        let start_bb = as_bitboard(start);
+        let end_bb = as_bitboard(end);
+
+        // update the bitboards
+        self.pieces[piece] ^= start_bb | end_bb;
+        self.sides[us] ^= start_bb | end_bb;
+        if captured != Pieces::NONE {
+            self.pieces[captured] ^= end_bb;
+            self.sides[them] ^= end_bb;
+        }
+        if is_promotion {
+            // the pawn would have been wrongly set earlier, so unset it now
+            self.pieces[Pieces::PAWN] ^= end_bb;
+            self.pieces[promotion_piece] ^= end_bb;
+        }
+
+        // update the board array
+        self.piece_board[end] = captured;
+        self.piece_board[start] = piece;
+    }
+}
+
+impl Move {
+    /// Turns a [`Move`] into its components: start square, end square, is
+    /// castling, is promotion, is en passant and piece (only set if
+    /// `is_promotion`), in that order.
+    pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
+        let start = (self.mv & Self::START_MASK) >> Self::START_SHIFT;
+        let end = (self.mv & Self::END_MASK) >> Self::END_SHIFT;
+        let is_promotion = self.is_promotion();
+        let is_castling = self.is_castling();
+        let is_en_passant = self.is_en_passant();
+        let piece = (self.mv >> Self::PIECE_SHIFT) + 1;
+        (
+            start as Square,
+            end as Square,
+            is_castling,
+            is_en_passant,
+            is_promotion,
+            piece as Piece,
+        )
+    }
+
+    /// Checks if the move is castling.
+    pub fn is_castling(&self) -> bool {
+        self.mv & Self::CASTLING_FLAG == 0 && !self.is_promotion()
+    }
+
+    /// Checks if the move is en passant.
+    pub fn is_en_passant(&self) -> bool {
+        self.mv & Self::EN_PASSANT_FLAG != 0 && !self.is_promotion()
+    }
+
+    /// Checks if the move is a promotion.
+    pub fn is_promotion(&self) -> bool {
+        self.mv & Self::PROMOTION_FLAG == Self::PROMOTION_FLAG
+    }
+
+    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
+    /// only return a value from 1 to 4.
+    pub fn promotion_piece(&self) -> Piece {
+        (self.mv >> Self::PIECE_SHIFT) as Piece + 1
+    }
+}
+
+impl Moves {
+    /// Returns the number of stored moves.
+    pub fn moves(&self) -> usize {
+        self.first_empty
+    }
+
+    /// Pops a [`Move`] from the array. Returns `Some(move)` if there are `> 0`
+    /// moves, otherwise returns `None`.
+    pub fn pop_move(&mut self) -> Option<Move> {
+        (self.first_empty > 0).then(|| {
+            self.first_empty -= 1;
+            self.moves[self.first_empty]
+        })
+    }
+
+    /// Pushes `mv` onto itself. Assumes `self` is not full.
+    pub fn push_move(&mut self, mv: Move) {
+        self.moves[self.first_empty] = mv;
+        self.first_empty += 1;
     }
 }
 
 impl Board {
     /// Generates all legal knight and king moves for `board` and puts them in
-    /// `ml`.
-    fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, ml: &mut Movelist) {
+    /// `moves`.
+    fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.sides::<IS_WHITE>();
 
         let knights = BitIter::new(self.pieces::<{ Pieces::KNIGHT }>() & us_bb);
         for knight in knights {
             let targets = BitIter::new(unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb);
             for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::KNIGHT }>(knight, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(knight, target));
             }
         }
 
@@ -98,13 +324,13 @@ impl Board {
         for king in kings {
             let targets = BitIter::new(unsafe { LOOKUPS.king_attacks(king) } & !us_bb);
             for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::KING }>(king, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(king, target));
             }
         }
     }
 
-    /// Generates all legal pawn moves for `board` and puts them in `ml`.
-    fn generate_pawn_moves<const IS_WHITE: bool>(&self, ml: &mut Movelist) {
+    /// Generates all legal pawn moves for `board` and puts them in `moves`.
+    fn generate_pawn_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.sides::<IS_WHITE>();
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
@@ -129,20 +355,20 @@ impl Board {
                 targets & (Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8]);
             let normal_targets = targets ^ promotion_targets;
             for target in BitIter::new(normal_targets) {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::PAWN }>(pawn_sq, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(pawn_sq, target));
             }
             for target in BitIter::new(promotion_targets) {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::KNIGHT }>(pawn_sq, target));
-                ml.push_move(create_move::<IS_WHITE, { Pieces::BISHOP }>(pawn_sq, target));
-                ml.push_move(create_move::<IS_WHITE, { Pieces::ROOK }>(pawn_sq, target));
-                ml.push_move(create_move::<IS_WHITE, { Pieces::QUEEN }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Pieces::KNIGHT }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Pieces::BISHOP }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Pieces::ROOK }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Pieces::QUEEN }>(pawn_sq, target));
             }
         }
     }
 
     /// Generates all legal bishop, rook and queen moves for `board` and puts
-    /// them in `ml`.
-    fn generate_sliding_moves<const IS_WHITE: bool>(&self, ml: &mut Movelist) {
+    /// them in `moves`.
+    fn generate_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.sides::<IS_WHITE>();
         let occupancies = self.occupancies();
 
@@ -151,7 +377,7 @@ impl Board {
             let targets =
                 BitIter::new(unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb);
             for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::BISHOP }>(bishop, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(bishop, target));
             }
         }
 
@@ -159,7 +385,7 @@ impl Board {
         for rook in rooks {
             let targets = BitIter::new(unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb);
             for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::ROOK }>(rook, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(rook, target));
             }
         }
 
@@ -168,34 +394,8 @@ impl Board {
             let targets =
                 BitIter::new(unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb);
             for target in targets {
-                ml.push_move(create_move::<IS_WHITE, { Pieces::QUEEN }>(queen, target));
+                moves.push_move(Move::new::<{ Move::NO_FLAG }>(queen, target));
             }
-        }
-    }
-}
-
-impl Lookup {
-    /// Initialises the tables of [`LOOKUPS`].
-    pub fn init() {
-        unsafe {
-            LOOKUPS.init_pawn_attacks();
-            LOOKUPS.init_knight_attacks();
-            LOOKUPS.init_king_attacks();
-            LOOKUPS.init_magics();
-        };
-    }
-
-    /// Returns a [`Lookup`] with empty tables.
-    // used to initialise a static `Lookup` variable
-    pub const fn empty() -> Self {
-        Self {
-            pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
-            knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
-            king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
-            bishop_magic_table: [Bitboards::EMPTY; BISHOP_SIZE],
-            rook_magic_table: [Bitboards::EMPTY; ROOK_SIZE],
-            bishop_magics: [Magic::default(); Nums::SQUARES],
-            rook_magics: [Magic::default(); Nums::SQUARES],
         }
     }
 }
@@ -330,20 +530,25 @@ impl Lookup {
     }
 }
 
+impl Iterator for Moves {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pop_move()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Board;
+    use super::{Board, Move};
 
-    use crate::{
-        board::movegen::util::create_move,
-        defs::{Pieces, Sides, Squares},
-    };
+    use crate::defs::{Pieces, Sides, Squares};
 
     #[test]
     fn make_and_unmake() {
         let mut board = Board::new();
 
-        let mv = create_move::<true, { Pieces::ROOK }>(Squares::A1, Squares::A3);
+        let mv = Move::new::<{ Move::NO_FLAG }>(Squares::A1, Squares::A3);
         board.make_move(mv);
         assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
         assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
