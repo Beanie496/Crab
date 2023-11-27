@@ -92,7 +92,8 @@ impl Move {
     /// Creates a [`Move`] given a start square and end square. `FLAG` can be
     /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
     /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
-    /// additional parameter. See [`new_promo`](Move::new_promo) for a new promotion [`Move`].
+    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
+    /// promotion [`Move`].
     pub fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
         debug_assert!(FLAG != Move::PROMOTION_FLAG);
         Self {
