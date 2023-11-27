@@ -105,8 +105,10 @@ impl Pieces {
 
 impl Ranks {
     pub const RANK1: Rank = 0;
+    pub const RANK2: Rank = 1;
     pub const RANK4: Rank = 3;
     pub const RANK5: Rank = 4;
+    pub const RANK7: Rank = 6;
     pub const RANK8: Rank = 7;
 }
 
@@ -131,4 +133,5 @@ impl Squares {
     pub const A7: Square = 48;
     pub const A8: Square = 56;
     pub const H8: Square = 63;
+    pub const NONE: Square = 64;
 }

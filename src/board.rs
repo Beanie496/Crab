@@ -1,8 +1,9 @@
 use crate::{
     defs::{
-        Bitboard, File, Files, Nums, Piece, Pieces, Rank, Ranks, Side, Sides, Square, PIECE_CHARS,
+        Bitboard, Bitboards, File, Files, Nums, Piece, Pieces, Rank, Ranks, Side, Sides, Square,
+        Squares, PIECE_CHARS,
     },
-    util::bitboard_from_pos,
+    util::{as_bitboard, bitboard_from_pos},
 };
 use movegen::{Lookup, Move};
 
@@ -25,6 +26,7 @@ pub struct Board {
     // and end square.
     // `piece_board[SQUARE] == piece on that square`.
     piece_board: [Piece; Nums::SQUARES],
+    ep_square: Square,
     side_to_move: Side,
 }
 
@@ -34,6 +36,7 @@ struct ChessMove {
     mv: Move,
     piece: Piece,
     captured: Piece,
+    ep_square: Square,
 }
 
 /// The history of the board.
@@ -55,6 +58,7 @@ impl Board {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
+            ep_square: Squares::NONE,
             side_to_move: Self::default_side(),
         }
     }
@@ -62,11 +66,22 @@ impl Board {
 
 impl ChessMove {
     /// Creates a [`ChessMove`] with the data set to the parameters given.
-    pub fn new(mv: Move, piece: Piece, captured: Piece) -> Self {
+    pub fn new(mv: Move, piece: Piece, captured: Piece, ep_square: Square) -> Self {
         Self {
-            captured,
             mv,
             piece,
+            captured,
+            ep_square,
+        }
+    }
+
+    pub fn null() -> Self {
+        Self {
+            mv: Move::null(),
+            piece: Pieces::NONE,
+            captured: Pieces::NONE,
+            // A1 is 0
+            ep_square: Squares::A1,
         }
     }
 }
@@ -75,7 +90,7 @@ impl Movelist {
     /// Creates an empty [`Movelist`].
     pub fn new() -> Self {
         Self {
-            moves: [ChessMove::new(Move::null(), Pieces::NONE, Pieces::NONE); MAX_GAME_MOVES],
+            moves: [ChessMove::null(); MAX_GAME_MOVES],
             first_empty: 0,
         }
     }
@@ -142,6 +157,22 @@ impl Board {
     fn default_side() -> Side {
         Sides::WHITE
     }
+
+    /// Checks if the move is a double pawn push.
+    fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
+        if piece != Pieces::PAWN {
+            return false;
+        }
+        let start_bb = as_bitboard(start);
+        let end_bb = as_bitboard(end);
+        if start_bb & (Bitboards::RANK_BB[Ranks::RANK2] | Bitboards::RANK_BB[Ranks::RANK7]) == 0 {
+            return false;
+        }
+        if end_bb & (Bitboards::RANK_BB[Ranks::RANK4] | Bitboards::RANK_BB[Ranks::RANK5]) == 0 {
+            return false;
+        }
+        true
+    }
 }
 
 impl Board {
@@ -169,8 +200,20 @@ impl Board {
 impl ChessMove {
     /// Seperates a [`ChessMove`] into a [`Move`] with its metadata:
     /// [all the fields of [`Move::decompose`]], piece being moved, piece
-    /// being captured, in that order.
-    pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece, Piece, Piece) {
+    /// being captured, and en passant, in that order.
+    pub fn decompose(
+        &self,
+    ) -> (
+        Square,
+        Square,
+        bool,
+        bool,
+        bool,
+        Piece,
+        Piece,
+        Piece,
+        Square,
+    ) {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             self.mv.decompose();
         (
@@ -182,6 +225,7 @@ impl ChessMove {
             promotion_piece,
             self.piece,
             self.captured,
+            self.ep_square,
         )
     }
 }
@@ -196,8 +240,8 @@ impl Movelist {
 
     /// Pushes a move with metadata onto the list. Assumes that `self` will not
     /// overflow.
-    pub fn push_move(&mut self, mv: Move, piece: Piece, captured: Piece) {
-        self.moves[self.first_empty] = ChessMove::new(mv, piece, captured);
+    pub fn push_move(&mut self, mv: Move, piece: Piece, captured: Piece, ep_square: Square) {
+        self.moves[self.first_empty] = ChessMove::new(mv, piece, captured, ep_square);
         self.first_empty += 1;
     }
 }
@@ -216,6 +260,21 @@ impl Board {
             }
         }
         '0'
+    }
+
+    /// Sets the en passant square to [`Squares::NONE`].
+    fn clear_ep_square(&mut self) {
+        self.ep_square = Squares::NONE;
+    }
+
+    /// Sets the piece on `square` in the piece array to [`Squares::NONE`].
+    fn clear_piece(&mut self, square: Square) {
+        self.piece_board[square] = Pieces::NONE;
+    }
+
+    /// Returns the en passant square, which might be [`Squares::NONE`].
+    fn ep_square(&self) -> Square {
+        self.ep_square
     }
 
     /// Flip the side to move.
@@ -238,6 +297,16 @@ impl Board {
         self.pieces[PIECE]
     }
 
+    /// Sets the en passant square to `square`.
+    fn set_ep_square(&mut self, square: Square) {
+        self.ep_square = square;
+    }
+
+    /// Sets the piece on `square` in the piece array to `piece`.
+    fn set_piece(&mut self, square: Square, piece: Piece) {
+        self.piece_board[square] = piece;
+    }
+
     /// Returns the side to move.
     fn side_to_move(&self) -> Side {
         self.side_to_move
@@ -250,5 +319,15 @@ impl Board {
         } else {
             self.sides[Sides::BLACK]
         }
+    }
+
+    /// Toggles the bits set in `bb` of the bitboard of `piece`.
+    fn toggle_piece_bb(&mut self, piece: Piece, bb: Bitboard) {
+        self.pieces[piece] ^= bb;
+    }
+
+    /// Toggles the bits set in `bb` of the bitbiard of `side`.
+    fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
+        self.sides[side] ^= bb;
     }
 }

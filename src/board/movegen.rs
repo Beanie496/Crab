@@ -1,6 +1,6 @@
 use super::Board;
 use crate::{
-    defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks, Sides, Square},
+    defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks, Sides, Square, Squares},
     util::{as_bitboard, file_of, pop_lsb, rank_of, to_square, BitIter},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
@@ -163,8 +163,11 @@ impl Board {
 
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move.
+    // NOTE: I'm keeping the piece array and bitboard separate for performance
+    // reasons. TODO: make clear_piece etc. update the bitboards too and see if
+    // there's a performance hit.
     pub fn make_move(&mut self, mv: Move) {
-        let (start, end, _is_castling, _is_en_passant, is_promotion, promotion_piece) =
+        let (start, end, _is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
         let piece = self.piece_on(start);
         let captured = self.piece_on(end);
@@ -174,9 +177,15 @@ impl Board {
         let start_bb = as_bitboard(start);
         let end_bb = as_bitboard(end);
 
-        // update the bitboards
-        self.pieces[piece] ^= start_bb | end_bb;
-        self.sides[us] ^= start_bb | end_bb;
+        // save the current state before we modify it
+        self.played_moves
+            .push_move(mv, piece, captured, self.ep_square());
+
+        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_side_bb(us, start_bb | end_bb);
+        self.clear_piece(start);
+        self.clear_ep_square();
+
         if captured != Pieces::NONE {
             // if we're capturing a piece, unset the bitboard of the captured
             // piece.
@@ -184,62 +193,84 @@ impl Board {
             // the same piece as we are currently - the bit would have been
             // (wrongly) unset earlier, so this would (wrongly) re-set it.
             // Looks like two wrongs do make a right in binary.
-            self.pieces[captured] ^= end_bb;
-            self.sides[them] ^= end_bb;
+            self.toggle_piece_bb(captured, end_bb);
+            self.toggle_side_bb(them, end_bb);
+        // capturing, double pawn pushes and ep are all mutually exclusive
+        } else if Self::is_double_pawn_push(start, end, piece) {
+            self.set_ep_square((start + end) >> 1);
+        } else if is_en_passant {
+            let dest = if self.side_to_move() == Sides::WHITE {
+                end - 8
+            } else {
+                end + 8
+            };
+            self.clear_piece(dest);
+            self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
         }
 
-        // update the board array
-        self.piece_board[start] = Pieces::NONE;
+        // if it's a promotion, put the promotion piece on the end square.
+        // Otherwise, just put the piece there.
         if is_promotion {
-            self.piece_board[end] = promotion_piece;
+            self.set_piece(end, promotion_piece);
             // unset the pawn on the promotion square...
-            self.pieces[Pieces::PAWN] ^= end_bb;
+            self.toggle_piece_bb(Pieces::PAWN, end_bb);
             // ...and set the promotion piece on that square
-            self.pieces[promotion_piece] ^= end_bb;
+            self.toggle_piece_bb(promotion_piece, end_bb);
         } else {
-            self.piece_board[end] = piece;
+            self.set_piece(end, piece);
         }
 
         self.flip_side();
-
-        self.played_moves.push_move(mv, piece, captured);
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.
+    // NOTE: See note of `make_move()`.
     pub fn unmake_move(&mut self) {
         let (
             start,
             end,
             _is_castling,
-            _is_en_passant,
+            is_en_passant,
             is_promotion,
             promotion_piece,
             piece,
             captured,
+            ep_square,
         ) = self.played_moves.pop_move().decompose();
+
         self.flip_side();
+
         let us = self.side_to_move();
         let them = us ^ 1;
 
         let start_bb = as_bitboard(start);
         let end_bb = as_bitboard(end);
 
-        // update the bitboards
-        self.pieces[piece] ^= start_bb | end_bb;
-        self.sides[us] ^= start_bb | end_bb;
+        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_side_bb(us, start_bb | end_bb);
+        self.set_piece(end, captured);
+        self.set_piece(start, piece);
+        self.clear_ep_square();
+
         if captured != Pieces::NONE {
-            self.pieces[captured] ^= end_bb;
-            self.sides[them] ^= end_bb;
-        }
-        if is_promotion {
-            // the pawn would have been wrongly set earlier, so unset it now
-            self.pieces[Pieces::PAWN] ^= end_bb;
-            self.pieces[promotion_piece] ^= end_bb;
+            self.toggle_piece_bb(captured, end_bb);
+            self.toggle_side_bb(them, end_bb);
+        } else if is_en_passant {
+            let dest = if self.side_to_move() == Sides::WHITE {
+                end - 8
+            } else {
+                end + 8
+            };
+            self.set_piece(dest, Pieces::PAWN);
+            self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
+            self.set_ep_square(ep_square);
         }
 
-        // update the board array
-        self.piece_board[end] = captured;
-        self.piece_board[start] = piece;
+        if is_promotion {
+            // the pawn would have been wrongly set earlier, so unset it now
+            self.toggle_piece_bb(Pieces::PAWN, end_bb);
+            self.toggle_piece_bb(promotion_piece, end_bb);
+        }
     }
 }
 
@@ -336,13 +367,20 @@ impl Board {
         let us_bb = self.sides::<IS_WHITE>();
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
+        let ep_square_bb = if self.ep_square() == Squares::NONE {
+            0
+        } else {
+            as_bitboard(self.ep_square())
+        };
         let empty = !occupancies;
 
         let mut pawns = self.pieces::<{ Pieces::PAWN }>() & us_bb;
         while pawns != 0 {
             let pawn = pop_lsb(&mut pawns);
             let pawn_sq = to_square(pawn);
+
             let single_push = pawn_push::<IS_WHITE>(pawn) & empty;
+
             let double_push_rank = if IS_WHITE {
                 Bitboards::RANK_BB[Ranks::RANK4]
             } else {
@@ -350,12 +388,15 @@ impl Board {
             };
             let double_push = pawn_push::<IS_WHITE>(single_push) & empty & double_push_rank;
 
-            let captures = unsafe { LOOKUPS.pawn_attacks::<IS_WHITE>(pawn_sq) } & them_bb;
+            let all_captures = unsafe { LOOKUPS.pawn_attacks::<IS_WHITE>(pawn_sq) };
+            let normal_captures = all_captures & them_bb;
+            let ep_captures = all_captures & ep_square_bb;
 
-            let targets = single_push | double_push | captures;
+            let targets = single_push | normal_captures | double_push;
             let promotion_targets =
                 targets & (Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8]);
             let normal_targets = targets ^ promotion_targets;
+
             for target in BitIter::new(normal_targets) {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(pawn_sq, target));
             }
@@ -364,6 +405,9 @@ impl Board {
                 moves.push_move(Move::new_promo::<{ Pieces::BISHOP }>(pawn_sq, target));
                 moves.push_move(Move::new_promo::<{ Pieces::ROOK }>(pawn_sq, target));
                 moves.push_move(Move::new_promo::<{ Pieces::QUEEN }>(pawn_sq, target));
+            }
+            for target in BitIter::new(ep_captures) {
+                moves.push_move(Move::new::<{ Move::EN_PASSANT_FLAG }>(pawn_sq, target));
             }
         }
     }
