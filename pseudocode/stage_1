@@ -1,14 +1,17 @@
 /* data structures (lookup tables & structs) */
 STRUCT Board:
-    u64 white,
-    u64 black,
-    u64 pawns,
-    u64 knights,
-    u64 bishops,
-    u64 rooks,
-    u64 queens,
-    u64 kings,
+    Movelist played_moves,
+    u64 pieces[6],
+    u64 sides[2],
+    usize piece_array[64],
+    bool side_to_move,
 ENDSTRUCT
+
+STRUCT GameMove:
+    usize captured,
+    Move move,
+    usize piece,
+ENDSTRUCt
 
 STRUCT Magic:
     u64 magic,
@@ -17,10 +20,23 @@ STRUCT Magic:
     u32 offset,
 ENDSTRUCT
 
+STRUCT Move:
+    u16 move,
+ENDSTRUCT
+
 STRUCT Movelist:
-    u16 moves[250],
+    GameMove moves[250],
     usize first_empty,
 ENDSTRUCT
+
+u64 pawn_attacks[2][64]
+u64 knight_attacks[64]
+u64 king_attacks[64]
+Magic bishop_magics[64]
+Magic rook_magics[64]
+// C++-style number deliminators
+u64 bishop_magic_lookup[5'248]
+u64 rook_magic_lookup[102'400]
 
 /* algorithms */
 FUNC main():
@@ -90,17 +106,131 @@ METHOD Board.char_piece_from_pos(rank, file):
 ENDMETHOD
 
 METHOD Board.make_move(move):
-    (start, end, piece, side) = decompose_move(mv)
-    self.pieces[piece] ^= 1 << start | 1 << end
-    self.sides[side] ^= 1 << start | 1 << end
+    (start, end, _is_castling, _is_en_passant, is_promotion, promotion_piece) =
+        decompose_move(move)
+    piece = self.piece_on(start)
+    captured = self.piece_on(end)
+    us = self.side_to_move
+    them = us ^ 1
+
+    start_bb = as_bitboard(start)
+    end_bb = as_bitboard(end)
+
+    self.pieces[piece] ^= start_bb | end_bb;
+    self.sides[us] ^= start_bb | end_bb;
+    NO_PIECE = 6
+    IF captured != NO_PIECE:
+        self.pieces[captured] ^= end_bb
+        self.sides[them] ^= end_bb
+    ENDIF
+
+    self.piece_board[start] = NO_PIECE
+    IF is_promotion:
+        self.piece_board[end] = promotion_piece
+        self.pieces[0] ^= end_bb
+        self.pieces[promotion_piece] ^= end_bb
+    ELSE
+        self.piece_board[end] = piece
+    ENDIF
+
     self.side_to_move ^= 1
+
+    self.played_moves.push_move(move, piece, captured)
 ENDMETHOD
 
-METHOD Board.unmake_move(move):
-    (start, end, piece, side) = decompose_move(mv)
-    self.pieces[piece] ^= 1 << start | 1 << end
-    self.sides[side] ^= 1 << start | 1 << end
+METHOD Board.unmake_move():
+    (
+        start,
+        end,
+        _is_castling,
+        _is_en_passant,
+        is_promotion,
+        promotion_piece,
+        piece,
+        captured,
+    ) = self.played_moves.pop_move().decompose()
     self.side_to_move ^= 1
+    us = self.side_to_move
+    them = us ^ 1
+
+    start_bb = as_bitboard(start)
+    end_bb = as_bitboard(end)
+
+    self.pieces[piece] ^= start_bb | end_bb;
+    self.sides[us] ^= start_bb | end_bb;
+    NO_PIECE = 6
+    IF captured != NO_PIECE:
+        self.pieces[captured] ^= end_bb
+        self.sides[them] ^= end_bb
+    ENDIF
+    IF is_promotion:
+        self.pieces[0] ^= end_bb
+        self.pieces[promotion_piece] ^= end_bb
+    ENDIF
+
+    self.piece_board[end] = captured
+    self.piece_board[start] = piece
+ENDMETHOD
+
+METHOD GameMove.decompose():
+    (start, end, is_castling, is_en_passant, is_promotion, promotion_piece)
+        = self.move.decompose()
+    (
+        start,
+        end,
+        is_castling,
+        is_en_passant,
+        is_promotion,
+        promotion_piece,
+        self.piece,
+        self.captured,
+    )
+ENDMETHOD
+
+FUNC GameMove.new(move, piece, captured):
+    Self:
+        captured,
+        move,
+        piece,
+ENDFUNC
+
+METHOD Move.decompose():
+    start = self.move & 0x3f
+    end = (self.move & 0xfc0) >> 6
+    is_promotion = self.is_promotion()
+    is_castling = self.is_castling()
+    is_en_passant = self.is_en_passant()
+    piece = (self.move >> 14) + 1
+    (
+        start,
+        end,
+        is_castling,
+        is_en_passant,
+        is_promotion,
+        piece,
+    )
+ENDMETHOD
+
+METHOD Move.is_promotion():
+    self.move & 0x3000 == 0x3000
+ENDMETHOD
+
+METHOD Move.is_en_passant():
+    self.move & 0x2000 != 0 && !self.is_promotion()
+ENDMETHOD
+
+METHOD Move.is_castling():
+    self.move & 0x1000 != 0 && !self.is_promotion()
+ENDMETHOD
+
+METHOD Movelist.push_move(move, piece, captures):
+    self.moves[self.first_empty] = GameMove::new(move, piece, captures)
+    first_empty += 1
+ENDMETHOD
+
+METHOD Movelist.pop_move():
+    self.first_empty -= 1
+    RETURN self.moves[self.first_empty]
 ENDMETHOD
 
 FUNC perft(depth):
