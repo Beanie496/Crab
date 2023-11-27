@@ -62,7 +62,8 @@ use a::b::z as a_z;
 
 Never leave trailing whitespace. Ever.
 Avoid excessive indentation. If you can see a refactor that removes at least one level of indentation, do it.
-There is no hard line length limit but there is a soft limit of 80. Avoid long lines because they are ugly.
+There is a hard line length limit of 100, enforced by rustfmt.
+Keep both comments and doc comments to 80 lines.
 
 ### 4. Newlines
 
