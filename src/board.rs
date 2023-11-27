@@ -14,10 +14,6 @@ pub mod movegen;
 /// Stores information about the current state of the board.
 pub struct Board {
     played_moves: Movelist,
-    // An array of piece values, used for seeing which pieces are on the start
-    // and end square.
-    // `piece_board[SQUARE] == piece on that square`.
-    piece_board: [Piece; Nums::SQUARES],
     // `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     // is the knights, and so on, as according to the order set by
     // [`Pieces`].
@@ -25,15 +21,19 @@ pub struct Board {
     // `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     // is is the intersection of all Black piece bitboards.
     sides: [Bitboard; Nums::SIDES],
+    // An array of piece values, used for seeing which pieces are on the start
+    // and end square.
+    // `piece_board[SQUARE] == piece on that square`.
+    piece_board: [Piece; Nums::SQUARES],
     side_to_move: Side,
 }
 
 /// A [`Move`] with metadata used for quickly unmaking moves.
 #[derive(Clone, Copy)]
 struct ChessMove {
-    captured: Piece,
     mv: Move,
     piece: Piece,
+    captured: Piece,
 }
 
 /// The history of the board.

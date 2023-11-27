@@ -82,35 +82,24 @@ fn fun() {
 }
 ```
 
-### 5. Curly brackets
-
-K&R-style. Opening curly brackets should almost always be on the same line as the expression that necessitates them.
-```
-if thing {
-    statement;
-    statement-2;
-}
-```
-
-### 6. Spaces
+### 5. Spaces
 
 Operators should generally be preceded and followed by a space.
 However, unary operators (`&`, `*`, `-`, `!`) should be attached to whatever they affect.
 
-### 7. Names
+### 6. Names
 
 The length of variable names should be proportional to their scope. A for loop counter might be called `i`; calling a global variable `i` is criminal.
 Names should *always* be descriptive, whatever it's naming. If a variable name requires a comment, you are naming it wrong.
 
-### 8. Functions and methods
+### 7. Functions and methods
 
 Functions shouldn't be as small as possible for the sake of being small.
 If a function is doing several separate things, fence the separate things into their own braced blocks. If a block needs to be called elsewhere, turn it into a function.
-If a function returns nothing, it should *always* have side effects. If a function returns a value, it should *never* have side effects.
 There should be up to four `impl` blocks for each struct. In order, they are for public associated functions, private associated functions, public methods and private methods. Any of the blocks can be omitted.
 Functions/methods within `impl` blocks should be sorted alphabetically.
 
-### 9. Comments
+### 8. Comments
 
 Comments are an unfortunate necessity. Write your code such that the code itself explains what it's doing. Sometimes comments are needed, but they shouldn't be needed often.
 If a comment is a single sentence, the first letter should not be capitalised and the full stop should be omitted; 'shortened' grammar is also fine.
@@ -121,6 +110,6 @@ If a comment is a single sentence, the first letter should not be capitalised an
 // do this
 ```
 
-### 10. Assembly
+### 9. Assembly
 
 Don't use it.

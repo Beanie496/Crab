@@ -9,17 +9,17 @@ use crate::{
 /// Stores magic information for a square:
 #[derive(Clone, Copy)]
 pub struct Magic {
-    /// The magic number.
-    magic: u64,
     /// The relevant attacked squares, excluding the edge.
     mask: Bitboard,
-    /// Where in the table the lookups are.
-    // u16 (0-65535) is slightly too small for the rook table (102,400)
-    offset: u32,
+    /// The magic number.
+    magic: u64,
     /// The bits required to index into the lookup table - it's the number of
     /// permutations of blockers, excluding the edge (since it makes no
     /// difference whether or not there is a piece on the edge).
     shift: u32,
+    /// Where in the table the lookups are.
+    // u16 (0-65535) is slightly too small for the rook table (102,400)
+    offset: u32,
 }
 
 pub const BISHOP_MAGICS: [Bitboard; Nums::SQUARES] = [
