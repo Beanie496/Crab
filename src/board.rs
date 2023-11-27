@@ -30,7 +30,7 @@ pub struct Board {
 
 /// A [`Move`] with metadata used for quickly unmaking moves.
 #[derive(Clone, Copy)]
-struct GameMove {
+struct ChessMove {
     captured: Piece,
     mv: Move,
     piece: Piece,
@@ -38,7 +38,7 @@ struct GameMove {
 
 /// The history of the board.
 struct Movelist {
-    moves: [GameMove; MAX_GAME_MOVES],
+    moves: [ChessMove; MAX_GAME_MOVES],
     first_empty: usize,
 }
 
@@ -60,8 +60,8 @@ impl Board {
     }
 }
 
-impl GameMove {
-    /// Creates a [`GameMove`] with the data set to the parameters given.
+impl ChessMove {
+    /// Creates a [`ChessMove`] with the data set to the parameters given.
     pub fn new(mv: Move, piece: Piece, captured: Piece) -> Self {
         Self {
             captured,
@@ -75,7 +75,7 @@ impl Movelist {
     /// Creates an empty [`Movelist`].
     pub fn new() -> Self {
         Self {
-            moves: [GameMove::new(Move::null(), Pieces::NONE, Pieces::NONE); MAX_GAME_MOVES],
+            moves: [ChessMove::new(Move::null(), Pieces::NONE, Pieces::NONE); MAX_GAME_MOVES],
             first_empty: 0,
         }
     }
@@ -166,8 +166,8 @@ impl Board {
     }
 }
 
-impl GameMove {
-    /// Seperates a [`GameMove`] into a [`Move`] with its metadata:
+impl ChessMove {
+    /// Seperates a [`ChessMove`] into a [`Move`] with its metadata:
     /// [all the fields of [`Move::decompose`]], piece being moved, piece
     /// being captured, in that order.
     pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece, Piece, Piece) {
@@ -189,7 +189,7 @@ impl GameMove {
 impl Movelist {
     /// Pops a [`Move`] with its metadata from the list. Assumes that `self`
     /// contains at least one element.
-    pub fn pop_move(&mut self) -> GameMove {
+    pub fn pop_move(&mut self) -> ChessMove {
         self.first_empty -= 1;
         self.moves[self.first_empty]
     }
@@ -197,7 +197,7 @@ impl Movelist {
     /// Pushes a move with metadata onto the list. Assumes that `self` will not
     /// overflow.
     pub fn push_move(&mut self, mv: Move, piece: Piece, captured: Piece) {
-        self.moves[self.first_empty] = GameMove::new(mv, piece, captured);
+        self.moves[self.first_empty] = ChessMove::new(mv, piece, captured);
         self.first_empty += 1;
     }
 }
