@@ -2,6 +2,8 @@
 
 use crate::uci::Uci;
 
+/// Module for testing.
+mod bench;
 /// Items related to the board. Mainly [`Board`](board::Board).
 mod board;
 /// Definitions and enumerations.

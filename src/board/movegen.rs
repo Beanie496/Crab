@@ -73,6 +73,7 @@ impl Move {
     pub const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
     pub const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
     pub const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
+    pub const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
     pub const PIECE_SHIFT: usize = 14;
 }
 
@@ -265,17 +266,17 @@ impl Move {
 
     /// Checks if the move is castling.
     pub fn is_castling(&self) -> bool {
-        self.mv & Self::CASTLING_FLAG == 0 && !self.is_promotion()
+        self.mv & Self::FLAG_MASK == Self::CASTLING_FLAG
     }
 
     /// Checks if the move is en passant.
     pub fn is_en_passant(&self) -> bool {
-        self.mv & Self::EN_PASSANT_FLAG != 0 && !self.is_promotion()
+        self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
     }
 
     /// Checks if the move is a promotion.
     pub fn is_promotion(&self) -> bool {
-        self.mv & Self::PROMOTION_FLAG == Self::PROMOTION_FLAG
+        self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
     }
 
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can

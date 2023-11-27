@@ -21,10 +21,13 @@ impl Uci {
 }
 
 impl Uci {
-    /// Given an iterator over a FEN string, convert it to a position and
-    /// modify the board state of `engine` to reflect that.
-    fn handle_fen_string(_line: &Split<'_, char>, _engine: &mut Engine) {
-        todo!()
+    /// Given an iterator over the remaining tokens of a `position` command,
+    /// collect the tokens up to but not including "moves", then collect the
+    /// remaining tokens and pass both strings to `engine`.
+    fn handle_position(line: &mut Split<'_, char>, engine: &mut Engine) {
+        let fen: String = line.take_while(|token| *token != "moves").collect();
+        let moves: String = line.collect();
+        engine.set_pos_to_fen(&fen, &moves);
     }
 
     /// Dissects `line` according to the UCI protocol.
@@ -93,7 +96,7 @@ impl Uci {
                     if let Some(string) = line.next() {
                         match string {
                             "fen" => {
-                                Self::handle_fen_string(&line, engine);
+                                Self::handle_position(&mut line, engine);
                             }
                             "startpos" => engine.set_startpos(),
                             _ => (),

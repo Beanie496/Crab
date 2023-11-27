@@ -9,6 +9,10 @@ edition = "2021"
 oorandom = "11.1.3"
 
 [profile.release]
-codegen-units = 1
-lto = "fat"
 strip = true
+lto = "fat"
+codegen-units = 1
+
+[profile.test]
+# needed to pass the perft tests in a reasonable time
+opt-level = 1
