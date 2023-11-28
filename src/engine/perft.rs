@@ -9,8 +9,20 @@ impl Engine {
     /// If `IS_ROOT`, it also prints each move followed by the number of leaf
     /// nodes reached from that move, or just "1" if `depth == 0`, and
     /// prints total node count, time and NPS at the end.
-    pub fn perft<const IS_ROOT: bool>(&mut self, depth: u8) -> u64 {
-        if IS_ROOT {
+    pub fn perft<const PRINT_MOVES: bool, const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
+        if IS_TIMED {
+            let time = Instant::now();
+            let result = self.perft::<PRINT_MOVES, false>(depth);
+            let elapsed_us = time.elapsed().as_micros() as u64;
+            println!(
+                "Time taken: {} ms; NPS: {}",
+                elapsed_us / 1_000,
+                1_000_000 * result / elapsed_us
+            );
+            return result;
+        }
+
+        if PRINT_MOVES {
             println!("Result:");
             if depth == 0 {
                 println!("1");
@@ -18,14 +30,13 @@ impl Engine {
             }
         }
 
-        let time = Instant::now();
         let mut moves = Moves::new();
         self.board.generate_moves(&mut moves);
 
         let mut total = 0;
         for mv in moves {
             let is_leaf = depth == 1;
-            let moves = if IS_ROOT && is_leaf {
+            let moves = if is_leaf {
                 1
             } else {
                 let next_depth = depth - 1;
@@ -36,25 +47,18 @@ impl Engine {
                     self.board.generate_moves(&mut next_moves);
                     next_moves.moves() as u64
                 } else {
-                    self.perft::<false>(next_depth)
+                    self.perft::<false, false>(next_depth)
                 };
                 self.board.unmake_move();
                 result
             };
             total += moves;
-            if IS_ROOT {
+            if PRINT_MOVES {
                 println!("{}: {moves}", mv.stringify());
             }
         }
-
-        if IS_ROOT {
-            let elapsed_us = time.elapsed().as_micros() as u64;
+        if PRINT_MOVES {
             println!("Total: {total}");
-            println!(
-                "Time taken: {:.0} ms; NPS: {}",
-                elapsed_us / 1_000,
-                1_000_000 * total / elapsed_us
-            );
         }
         total
     }

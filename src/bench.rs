@@ -64,8 +64,11 @@ impl<'a> TestPosition<'a> {
 impl TestPosition<'_> {
     fn run_test(&self, engine: &mut Engine) {
         engine.set_pos_to_fen(self.position, "");
-        eprintln!("Position: {}", self.position);
-        assert_eq!(engine.perft::<true>(self.perft_depth), self.perft_result);
+        println!("Position: {}", self.position);
+        assert_eq!(
+            engine.perft::<true, false>(self.perft_depth),
+            self.perft_result
+        );
     }
 }
 
