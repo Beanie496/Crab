@@ -282,6 +282,19 @@ impl Board {
         self.side_to_move ^= 1;
     }
 
+    /// Toggles the side and piece bitboard on both `start` and `end`, sets
+    /// `start` in the piece array to [`Squares::NONE`] and sets `end` in the
+    /// piece array to `piece`.
+    fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
+        let start_bb = as_bitboard(start);
+        let end_bb = as_bitboard(end);
+
+        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_side_bb(side, start_bb | end_bb);
+        self.clear_piece(start);
+        self.set_piece(end, piece);
+    }
+
     /// Returns all the occupied squares on the board.
     fn occupancies(&self) -> Bitboard {
         self.sides::<true>() | self.sides::<false>()
@@ -329,5 +342,25 @@ impl Board {
     /// Toggles the bits set in `bb` of the bitbiard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         self.sides[side] ^= bb;
+    }
+
+    /// Toggles the side and piece bitboard on both `start` and `end`, sets
+    /// `start` in the piece array to `piece` and sets `end` in the piece array
+    /// to `captured`.
+    fn unmove_piece(
+        &mut self,
+        start: Square,
+        end: Square,
+        side: Side,
+        piece: Piece,
+        captured: Piece,
+    ) {
+        let start_bb = as_bitboard(start);
+        let end_bb = as_bitboard(end);
+
+        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_side_bb(side, start_bb | end_bb);
+        self.set_piece(end, captured);
+        self.set_piece(start, piece);
     }
 }

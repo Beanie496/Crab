@@ -163,9 +163,6 @@ impl Board {
 
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move.
-    // NOTE: I'm keeping the piece array and bitboard separate for performance
-    // reasons. TODO: make clear_piece etc. update the bitboards too and see if
-    // there's a performance hit.
     pub fn make_move(&mut self, mv: Move) {
         let (start, end, _is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
@@ -174,16 +171,13 @@ impl Board {
         let us = self.side_to_move();
         let them = us ^ 1;
 
-        let start_bb = as_bitboard(start);
         let end_bb = as_bitboard(end);
 
         // save the current state before we modify it
         self.played_moves
             .push_move(mv, piece, captured, self.ep_square());
 
-        self.toggle_piece_bb(piece, start_bb | end_bb);
-        self.toggle_side_bb(us, start_bb | end_bb);
-        self.clear_piece(start);
+        self.move_piece(start, end, us, piece);
         self.clear_ep_square();
 
         if captured != Pieces::NONE {
@@ -195,8 +189,9 @@ impl Board {
             // Looks like two wrongs do make a right in binary.
             self.toggle_piece_bb(captured, end_bb);
             self.toggle_side_bb(them, end_bb);
-        // capturing, double pawn pushes and ep are all mutually exclusive
-        } else if Self::is_double_pawn_push(start, end, piece) {
+        }
+
+        if Self::is_double_pawn_push(start, end, piece) {
             self.set_ep_square((start + end) >> 1);
         } else if is_en_passant {
             let dest = if self.side_to_move() == Sides::WHITE {
@@ -206,25 +201,18 @@ impl Board {
             };
             self.clear_piece(dest);
             self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
-        }
-
-        // if it's a promotion, put the promotion piece on the end square.
-        // Otherwise, just put the piece there.
-        if is_promotion {
+        } else if is_promotion {
             self.set_piece(end, promotion_piece);
             // unset the pawn on the promotion square...
             self.toggle_piece_bb(Pieces::PAWN, end_bb);
             // ...and set the promotion piece on that square
             self.toggle_piece_bb(promotion_piece, end_bb);
-        } else {
-            self.set_piece(end, piece);
         }
 
         self.flip_side();
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.
-    // NOTE: See note of `make_move()`.
     pub fn unmake_move(&mut self) {
         let (
             start,
@@ -243,19 +231,17 @@ impl Board {
         let us = self.side_to_move();
         let them = us ^ 1;
 
-        let start_bb = as_bitboard(start);
         let end_bb = as_bitboard(end);
 
-        self.toggle_piece_bb(piece, start_bb | end_bb);
-        self.toggle_side_bb(us, start_bb | end_bb);
-        self.set_piece(end, captured);
-        self.set_piece(start, piece);
+        self.unmove_piece(start, end, us, piece, captured);
         self.clear_ep_square();
 
         if captured != Pieces::NONE {
             self.toggle_piece_bb(captured, end_bb);
             self.toggle_side_bb(them, end_bb);
-        } else if is_en_passant {
+        }
+
+        if is_en_passant {
             let dest = if self.side_to_move() == Sides::WHITE {
                 end - 8
             } else {
@@ -264,9 +250,7 @@ impl Board {
             self.set_piece(dest, Pieces::PAWN);
             self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
             self.set_ep_square(ep_square);
-        }
-
-        if is_promotion {
+        } else if is_promotion {
             // the pawn would have been wrongly set earlier, so unset it now
             self.toggle_piece_bb(Pieces::PAWN, end_bb);
             self.toggle_piece_bb(promotion_piece, end_bb);
