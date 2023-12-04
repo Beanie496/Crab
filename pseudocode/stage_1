@@ -5,6 +5,7 @@ STRUCT Board:
     u64 sides[2],
     usize piece_array[64],
     usize ep_square,
+    u64 castling_bb,
     bool side_to_move,
 ENDSTRUCT
 
@@ -138,29 +139,27 @@ METHOD Board.char_piece_from_pos(rank, file):
 ENDMETHOD
 
 METHOD Board.make_move(move):
-    (start, end, _is_castling, is_en_passant, is_promotion, promotion_piece) =
+    (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
         decompose_move(move)
     piece = self.piece_on(start)
     captured = self.piece_on(end)
     us = self.side_to_move
     them = us ^ 1
 
-    start_bb = as_bitboard(start)
     end_bb = as_bitboard(end)
 
-    self.played_moves.push_move(move, piece, captured)
+    self.played_moves.push_move(move, piece, captured, ep_square)
 
-    self.pieces[piece] ^= start_bb | end_bb
-    self.sides[us] ^= start_bb | end_bb
-    NO_SQUARE = 64
-    self.piece_board[start] = NO_SQUARE
+    self.move_piece(start, end, us, piece):
     self.ep_square = NO_SQUARE
 
     NO_PIECE = 6
     IF captured != NO_PIECE:
         self.pieces[captured] ^= end_bb
         self.sides[them] ^= end_bb
-    ELSE IF is_double_pawn_push(start, end, piece):
+    ENDIF
+
+    IF is_double_pawn_push(start, end, piece):
         self.ep_square = (start + end) >> 1
     ELSE IF is_en_passant:
         WHITE = 1
@@ -170,15 +169,24 @@ METHOD Board.make_move(move):
             dest = end + 8
         ENDIF
         self.piece_board[dest] = NO_PIECE
-        self.pieces[0] ^= 1 << dest
-    ENDIF
+        self.pieces[0] ^= as_bitboard(dest)
+    ELSE IF is_castling:
+        king_square = (start + end + 1) >> 1
+        rook_square = (start + king_square) >> 1
+        king_square_bb = as_bitboard(king_square)
+        rook_square_bb = as_bitboard(rook_square)
+        KING = 5
+        ROOK = 3
 
-    IF is_promotion:
-        self.piece_board[end] = promotion_piece
+        self.castling_bb ^= end_bb
+        self.move_piece(end, king_square, us, KING)
+        self.move_piece(end, rook_square, us, ROOK)
+        self.sides[us] ^= king_square_bb | rook_square_bb
+    ELSE IF is_promotion:
+        square_bb = as_bitboard(square)
+        self.pieces[piece] ^= square_bb
+        self.piece_board[square] = piece
         self.pieces[0] ^= end_bb
-        self.pieces[promotion_piece] ^= end_bb
-    ELSE
-        self.piece_board[end] = piece
     ENDIF
 
     self.side_to_move ^= 1
@@ -188,7 +196,7 @@ METHOD Board.unmake_move():
     (
         start,
         end,
-        _is_castling,
+        is_castling,
         is_en_passant,
         is_promotion,
         promotion_piece,
@@ -203,17 +211,15 @@ METHOD Board.unmake_move():
     start_bb = as_bitboard(start)
     end_bb = as_bitboard(end)
 
-    self.pieces[piece] ^= start_bb | end_bb;
-    self.sides[us] ^= start_bb | end_bb;
-    self.piece_board[end] = captured
-    self.piece_board[start] = piece
-    NO_PIECE = 6
+    self.unmove_piece(start, end, us, piece, captured):
     self.ep_square = NO_PIECE
 
     IF captured != NO_PIECE:
         self.pieces[captured] ^= end_bb
         self.sides[them] ^= end_bb
-    ELSE IF is_en_passant:
+    ENDIF
+
+    IF is_en_passant:
         WHITE = 1
         IF self.side_to_move = WHITE:
             dest = end - 8
@@ -224,12 +230,45 @@ METHOD Board.unmake_move():
         self.piece_board[dest] = PAWN
         self.pieces[PAWN] = 1 << dest
         self.ep_square = ep_square
-    ENDIF
+    ELSE IF is_castling:
+        king_square = (start + end + 1) >> 1
+        rook_square = (start + king_square) >> 1
+        king_square_bb = as_bitboard(king_square)
+        rook_square_bb = as_bitboard(rook_square)
+        KING = 5
+        ROOK = 3
 
-    IF is_promotion:
+        self.castling_bb ^= end_bb
+        self.piece_board[king_square] = NO_PIECE
+        self.piece_board[rook_square] = NO_PIECE
+        self.pieces[KING] ^= end_bb | king_square_bb
+        self.pieces[ROOK] ^= rook_square_bb
+        self.sides[us] ^= king_square_bb | rook_square_bb
+    ELSE IF is_promotion:
         self.pieces[0] ^= end_bb
         self.pieces[promotion_piece] ^= end_bb
     ENDIF
+ENDMETHOD
+
+METHOD Board.move_piece(start, end, side, piece):
+    start_bb = as_bitboard(start)
+    end_bb = as_bitboard(end)
+
+    self.pieces[piece] ^= start_bb | end_bb
+    self.sides[side] ^= start_bb | end_bb
+    NO_SQUARE = 64
+    self.piece_board[start] = NO_SQUARE
+    self.piece_board[end] = piece
+ENDMETHOD
+
+METHOD Board.unmove_piece(start, end, side, piece, captured):
+    start_bb = as_bitboard(start)
+    end_bb = as_bitboard(end)
+
+    self.pieces[piece] ^= start_bb | end_bb
+    self.sides[side] ^= start_bb | end_bb
+    self.piece_board[end] = captured
+    self.piece_board[start] = piece
 ENDMETHOD
 
 METHOD ChessMove.decompose():
@@ -423,13 +462,19 @@ FUNC find_magics(piece):
 ENDFUNC
 
 FUNC generate_moves(board, movelist):
-    generate_pawn_moves(board, movelist)
-    generate_non_sliding_moves(board, movelist)
-    generate_sliding_moves(board, movelist)
+    IF board.side_to_move = WHITE:
+        generate_pawn_moves<WHITE>(board, movelist)
+        generate_non_sliding_moves<WHITE>(board, movelist)
+        generate_sliding_moves<WHITE>(board, movelist)
+    ELSE
+        generate_pawn_moves<BLACK>(board, movelist)
+        generate_non_sliding_moves<BLACK>(board, movelist)
+        generate_sliding_moves<BLACK>(board, movelist)
+    ENDIF
 ENDFUNC
 
-FUNC generate_pawn_moves(board, movelist):
-    us_bb = board.sides::<IS_WHITE>
+FUNC generate_pawn_moves<IS_WHITE>(board, movelist):
+    us_bb = board.sides<IS_WHITE>()
     occupancies = board.occupancies()
     them_bb = occupancies ^ us_bb
     NO_SQUARE = 64
@@ -445,13 +490,13 @@ FUNC generate_pawn_moves(board, movelist):
         pawn = pop_lsb(&pawns)
         pawn_sq = to_square(pawn)
 
-        single_push = pawn_push::<IS_WHITE>(pawn)
+        single_push = pawn_push<IS_WHITE>(pawn)
         IF IS_WHITE:
             double_push_rank = 0x00000000ff000000
         ELSE:
             double_push_rank = 0x000000ff00000000
         ENDIF
-        double_push = pawn_push::<IS_WHITE>(single_push)
+        double_push = pawn_push<IS_WHITE>(single_push)
             & empty
             // 4 if we're White, 5 if we're Black
             & double_push_rank
@@ -470,19 +515,21 @@ FUNC generate_pawn_moves(board, movelist):
         ENDWHILE
         WHILE promotion_targets != 0:
             target = pop_next_square(&promotion_targets)
-            movelist.push_move(Move::new<KNIGHT>(pawn_sq, target))
-            movelist.push_move(Move::new<BISHOP>(pawn_sq, target))
-            movelist.push_move(Move::new<ROOK>(pawn_sq, target))
-            movelist.push_move(Move::new<QUEEN>(pawn_sq, target))
+            movelist.push_move(Move::new_promo<KNIGHT>(pawn_sq, target))
+            movelist.push_move(Move::new_promo<BISHOP>(pawn_sq, target))
+            movelist.push_move(Move::new_promo<ROOK>(pawn_sq, target))
+            movelist.push_move(Move::new_promo<QUEEN>(pawn_sq, target))
         ENDWHILE
         WHILE ep_captures != 0:
             target = pop_next_square(&ep_captures)
-            movelist.push_move(create_move::<IS_WHITE, 4>(pawn_sq, target))
+            movelist.push_move(Move::new<EN_PASSANT_FLAG>(pawn_sq, target))
     ENDWHILE
 ENDFUNC
 
-FUNC generate_non_sliding_moves(board, movelist):
+FUNC generate_non_sliding_moves<IS_WHITE>(board, movelist):
     us_bb = board.sides[board.side_to_move]
+    castling_bb = board.get_castling_bb<IS_WHITE>()
+    empty = ~(board.sides[0] | board.sides[1])
     knights = board.pieces[1]
 
     WHILE knights != 0:
@@ -490,16 +537,21 @@ FUNC generate_non_sliding_moves(board, movelist):
         targets = knight_attacks[knight] & ~us_bb
         WHILE targets != 0:
             target = pop_next_square(&targets)
-            movelist.push_move(Move::new<NO_FLAG>(knight, target)
+            movelist.push_move(Move::new<NO_FLAG>(knight, target))
         ENDWHILE
     ENDWHILE
 
     WHILE kings != 0:
         king = pop_lsb(&kings)
         targets = king_attacks[king] & ~us_bb
+        casling_targets = castling_bb & empty
         WHILE targets != 0:
             target = pop_next_square(&targets)
             movelist.push_move(Move::new<NO_FLAG>(king, target)
+        ENDWHILE
+        WHILE castling_targets != 0:
+            target = pop_next_square(&castling_targets)
+            movelist.push_move(Move::new<CASTLING_FLAG>(king, target))
         ENDWHILE
     ENDWHILE
 FUNC
