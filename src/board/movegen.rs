@@ -154,33 +154,50 @@ impl Board {
             self.generate_pawn_moves::<true>(moves);
             self.generate_non_sliding_moves::<true>(moves);
             self.generate_sliding_moves::<true>(moves);
+            self.generate_castling::<true>(moves);
         } else {
             self.generate_pawn_moves::<false>(moves);
             self.generate_non_sliding_moves::<false>(moves);
             self.generate_sliding_moves::<false>(moves);
+            self.generate_castling::<false>(moves);
         }
     }
 
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move.
     pub fn make_move(&mut self, mv: Move) {
-        let (start, end, _is_castling, is_en_passant, is_promotion, promotion_piece) =
+        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
         let piece = self.piece_on(start);
         let captured = self.piece_on(end);
         let us = self.side_to_move();
         let them = us ^ 1;
-
         let end_bb = as_bitboard(end);
 
         // save the current state before we modify it
-        self.played_moves
-            .push_move(mv, piece, captured, self.ep_square());
+        self.played_moves.push_move(
+            mv,
+            piece,
+            captured,
+            self.ep_square(),
+            self.castling_rights(),
+        );
 
         self.move_piece(start, end, us, piece);
         self.clear_ep_square();
 
-        if captured != Pieces::NONE {
+        // these two `if` statements have to be lumped together, annoyingly -
+        // otherwise the second one would trigger incorrectly (since the the
+        // target square, containing a rook, would count)
+        if is_castling {
+            let king_square = (start + end + 1) >> 1;
+            let rook_square = (start + king_square) >> 1;
+
+            self.move_piece(end, king_square, us, Pieces::KING);
+            self.move_piece(end, rook_square, us, Pieces::ROOK);
+
+            self.unset_castling_rights(us);
+        } else if captured != Pieces::NONE {
             // if we're capturing a piece, unset the bitboard of the captured
             // piece.
             // By a happy accident, we don't need to check if we're capturing
@@ -189,16 +206,19 @@ impl Board {
             // Looks like two wrongs do make a right in binary.
             self.toggle_piece_bb(captured, end_bb);
             self.toggle_side_bb(them, end_bb);
+            if captured == Pieces::ROOK {
+                // if the captured rook is actually valid
+                self.unset_castling_right(them, (end & 1) as u8 + 1);
+            }
+        }
+        if piece == Pieces::ROOK {
+            self.unset_castling_right(us, (end & 1) as u8 + 1);
         }
 
         if Self::is_double_pawn_push(start, end, piece) {
             self.set_ep_square((start + end) >> 1);
         } else if is_en_passant {
-            let dest = if self.side_to_move() == Sides::WHITE {
-                end - 8
-            } else {
-                end + 8
-            };
+            let dest = if us == Sides::WHITE { end - 8 } else { end + 8 };
             self.clear_piece(dest);
             self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
         } else if is_promotion {
@@ -217,13 +237,14 @@ impl Board {
         let (
             start,
             end,
-            _is_castling,
+            is_castling,
             is_en_passant,
             is_promotion,
             promotion_piece,
             piece,
             captured,
             ep_square,
+            castling_rights,
         ) = self.played_moves.pop_move().decompose();
 
         self.flip_side();
@@ -233,20 +254,26 @@ impl Board {
 
         let end_bb = as_bitboard(end);
 
-        self.unmove_piece(start, end, us, piece, captured);
         self.clear_ep_square();
 
-        if captured != Pieces::NONE {
-            self.toggle_piece_bb(captured, end_bb);
-            self.toggle_side_bb(them, end_bb);
+        if is_castling {
+            let king_square = (start + end + 1) >> 1;
+            let rook_square = (start + king_square) >> 1;
+
+            self.move_piece(king_square, start, us, Pieces::KING);
+            self.move_piece(rook_square, end, us, Pieces::ROOK);
+
+            self.set_castling_rights(us, castling_rights);
+        } else {
+            self.unmove_piece(start, end, us, piece, captured);
+            if captured != Pieces::NONE {
+                self.toggle_piece_bb(captured, end_bb);
+                self.toggle_side_bb(them, end_bb);
+            }
         }
 
         if is_en_passant {
-            let dest = if self.side_to_move() == Sides::WHITE {
-                end - 8
-            } else {
-                end + 8
-            };
+            let dest = if us == Sides::WHITE { end - 8 } else { end + 8 };
             self.set_piece(dest, Pieces::PAWN);
             self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
             self.set_ep_square(ep_square);
@@ -324,8 +351,48 @@ impl Moves {
 }
 
 impl Board {
-    /// Generates all legal knight and king moves for `board` and puts them in
-    /// `moves`.
+    /// Generates the castling moves for the given side.
+    fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
+        let occupancies = self.occupancies();
+
+        if IS_WHITE {
+            if self.can_castle_kingside::<true>() && occupancies & Bitboards::CASTLING_SPACE_WK == 0
+            {
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
+                    Squares::E1,
+                    Squares::H1,
+                ));
+            }
+            if self.can_castle_queenside::<true>()
+                && occupancies & Bitboards::CASTLING_SPACE_WQ == 0
+            {
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
+                    Squares::E1,
+                    Squares::A1,
+                ));
+            }
+        } else {
+            if self.can_castle_kingside::<false>()
+                && occupancies & Bitboards::CASTLING_SPACE_BK == 0
+            {
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
+                    Squares::E8,
+                    Squares::H8,
+                ));
+            }
+            if self.can_castle_queenside::<false>()
+                && occupancies & Bitboards::CASTLING_SPACE_BQ == 0
+            {
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
+                    Squares::E8,
+                    Squares::A8,
+                ));
+            }
+        }
+    }
+
+    /// Generates all legal knight and king moves (excluding castling) for
+    /// `board` and puts them in `moves`.
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.sides::<IS_WHITE>();
 

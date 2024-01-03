@@ -9,6 +9,9 @@ use movegen::{Lookup, Move};
 
 pub use movegen::magic::find_magics;
 
+/// 4 bits: KQkq.
+type CastlingRights = u8;
+
 /// Items related to move generation.
 pub mod movegen;
 
@@ -26,6 +29,9 @@ pub struct Board {
     // and end square.
     // `piece_board[SQUARE] == piece on that square`.
     piece_board: [Piece; Nums::SQUARES],
+    // castling rights. Encoded as KQkq. E.g. 0b1101 would be castling rights
+    // KQq.
+    castling_rights: CastlingRights,
     ep_square: Square,
     side_to_move: Side,
 }
@@ -37,6 +43,7 @@ struct ChessMove {
     piece: Piece,
     captured: Piece,
     ep_square: Square,
+    castling_rights: CastlingRights,
 }
 
 /// The history of the board.
@@ -48,6 +55,16 @@ struct Movelist {
 /// There is no basis to this number other than 'yeah that seems good enough`.
 const MAX_GAME_MOVES: usize = 250;
 
+#[allow(non_upper_case_globals)]
+impl Board {
+    pub const CASTLE_FLAGS_K: CastlingRights = 0b1000;
+    pub const CASTLE_FLAGS_Q: CastlingRights = 0b0100;
+    pub const CASTLE_FLAGS_k: CastlingRights = 0b0010;
+    pub const CASTLE_FLAGS_q: CastlingRights = 0b0001;
+    pub const CASTLE_FLAGS_KQkq: CastlingRights = 0b1111;
+    pub const CASTLE_FLAGS_NONE: CastlingRights = 0b0000;
+}
+
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
@@ -58,6 +75,7 @@ impl Board {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
+            castling_rights: Self::default_castling_rights(),
             ep_square: Squares::NONE,
             side_to_move: Self::default_side(),
         }
@@ -66,22 +84,30 @@ impl Board {
 
 impl ChessMove {
     /// Creates a [`ChessMove`] with the data set to the parameters given.
-    pub fn new(mv: Move, piece: Piece, captured: Piece, ep_square: Square) -> Self {
+    pub fn new(
+        mv: Move,
+        piece: Piece,
+        captured: Piece,
+        ep_square: Square,
+        castling_rights: CastlingRights,
+    ) -> Self {
         Self {
             mv,
             piece,
             captured,
             ep_square,
+            castling_rights,
         }
     }
 
+    /// Returns a 0-initialised [`ChessMove`].
     pub fn null() -> Self {
         Self {
             mv: Move::null(),
             piece: Pieces::NONE,
             captured: Pieces::NONE,
-            // A1 is 0
-            ep_square: Squares::A1,
+            ep_square: Squares::NULL,
+            castling_rights: Board::CASTLE_FLAGS_NONE,
         }
     }
 }
@@ -97,6 +123,11 @@ impl Movelist {
 }
 
 impl Board {
+    /// Returns the default castling rights: `KQkq`.
+    fn default_castling_rights() -> CastlingRights {
+        Self::CASTLE_FLAGS_KQkq
+    }
+
     /// Returns the piece board of the starting position.
     /// ```
     /// assert_eq!(default_piece_board()[Squares::A1], Pieces::ROOK);
@@ -213,6 +244,7 @@ impl ChessMove {
         Piece,
         Piece,
         Square,
+        CastlingRights,
     ) {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             self.mv.decompose();
@@ -226,6 +258,7 @@ impl ChessMove {
             self.piece,
             self.captured,
             self.ep_square,
+            self.castling_rights,
         )
     }
 }
@@ -240,13 +273,43 @@ impl Movelist {
 
     /// Pushes a move with metadata onto the list. Assumes that `self` will not
     /// overflow.
-    pub fn push_move(&mut self, mv: Move, piece: Piece, captured: Piece, ep_square: Square) {
-        self.moves[self.first_empty] = ChessMove::new(mv, piece, captured, ep_square);
+    pub fn push_move(
+        &mut self,
+        mv: Move,
+        piece: Piece,
+        captured: Piece,
+        ep_square: Square,
+        castling_rights: CastlingRights,
+    ) {
+        self.moves[self.first_empty] =
+            ChessMove::new(mv, piece, captured, ep_square, castling_rights);
         self.first_empty += 1;
     }
 }
 
 impl Board {
+    /// Calculates if the given side can castle kingside.
+    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+        if IS_WHITE {
+            self.castling_rights & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
+        } else {
+            self.castling_rights & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
+        }
+    }
+
+    /// Calculates if the given side can castle queenside.
+    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+        if IS_WHITE {
+            self.castling_rights & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
+        } else {
+            self.castling_rights & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
+        }
+    }
+    /// Returns castling rights.
+    fn castling_rights(&self) -> CastlingRights {
+        self.castling_rights
+    }
+
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
@@ -310,6 +373,12 @@ impl Board {
         self.pieces[PIECE]
     }
 
+    /// Sets the castling rights of `side` to `rights`. `rights` should be 2
+    /// bits in the format `kq`.
+    fn set_castling_rights(&mut self, side: Side, rights: CastlingRights) {
+        self.castling_rights |= rights << (side * 2);
+    }
+
     /// Sets the en passant square to `square`.
     fn set_ep_square(&mut self, square: Square) {
         self.ep_square = square;
@@ -362,5 +431,22 @@ impl Board {
         self.toggle_side_bb(side, start_bb | end_bb);
         self.set_piece(end, captured);
         self.set_piece(start, piece);
+    }
+
+    /// Unsets right `right` for side `side`. `right` is either `0b01` or
+    /// `0b10`.
+    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
+        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
+        // a mask for the bits for White or Black. `&`ing the rights with
+        // `!(0b11 << (side * 2))` will clear the bits on the given side.
+        self.castling_rights &= !(right << (side * 2));
+    }
+
+    /// Clears the castling rights for `side`.
+    fn unset_castling_rights(&mut self, side: Side) {
+        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
+        // a mask for the bits for White or Black. `&`ing the rights with
+        // `!(0b11 << (side * 2))` will clear the bits on the given side.
+        self.castling_rights &= !(0b11 << (side * 2));
     }
 }

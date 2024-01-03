@@ -37,6 +37,10 @@ pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
 
 impl Bitboards {
     pub const EMPTY: Bitboard = 0;
+    pub const CASTLING_SPACE_WK: Bitboard = 0x0000000000000060;
+    pub const CASTLING_SPACE_WQ: Bitboard = 0x00000000000000e0;
+    pub const CASTLING_SPACE_BK: Bitboard = 0x6000000000000000;
+    pub const CASTLING_SPACE_BQ: Bitboard = 0x0e00000000000000;
     /// ```
     /// assert_eq!(Bitboards::FILE_BB[Files::FILE1], 0x0101010101010101);
     /// assert_eq!(Bitboards::FILE_BB[Files::FILE2], 0x0202020202020202);
@@ -132,6 +136,9 @@ impl Squares {
     pub const E6: Square = 44;
     pub const A7: Square = 48;
     pub const A8: Square = 56;
+    pub const E8: Square = 60;
     pub const H8: Square = 63;
     pub const NONE: Square = 64;
+    /// Should only be used when the [`Square`] needs to be 0.
+    pub const NULL: Square = 0;
 }
