@@ -30,6 +30,10 @@ impl Engine {
             }
         }
 
+        if depth == 0 {
+            return 1;
+        }
+
         let mut moves = Moves::new();
         self.board.generate_moves(&mut moves);
 
@@ -39,16 +43,11 @@ impl Engine {
             let moves = if IS_ROOT && is_leaf {
                 1
             } else {
-                let next_depth = depth - 1;
-                let is_next_leaf = next_depth == 1;
-                self.board.make_move(mv);
-                let result = if is_next_leaf {
-                    let mut next_moves = Moves::new();
-                    self.board.generate_moves(&mut next_moves);
-                    next_moves.moves() as u64
-                } else {
-                    self.perft::<false, false>(next_depth)
-                };
+                if !self.board.make_move(mv) {
+                    self.board.unmake_move();
+                    continue;
+                }
+                let result = self.perft::<false, false>(depth - 1);
                 self.board.unmake_move();
                 result
             };

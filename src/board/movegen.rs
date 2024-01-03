@@ -62,7 +62,7 @@ const ROOK_SIZE: usize = 102_400;
 const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables used at runtime.
 // initialised at runtime
-static mut LOOKUPS: Lookup = Lookup::empty();
+pub static mut LOOKUPS: Lookup = Lookup::empty();
 
 impl Move {
     pub const START_MASK: u16 = 0b11_1111;
@@ -164,8 +164,11 @@ impl Board {
     }
 
     /// Makes the given move on the internal board. `mv` is assumed to be a
-    /// valid move.
-    pub fn make_move(&mut self, mv: Move) {
+    /// valid move. Returns `true` if the given move is legal, `false`
+    /// otherwise.
+    // FIXME: very inefficient to filter out illegal moves this way; fix after
+    // summer term
+    pub fn make_move(&mut self, mv: Move) -> bool {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
         let piece = self.piece_on(start);
@@ -173,6 +176,8 @@ impl Board {
         let us = self.side_to_move();
         let them = us ^ 1;
         let end_bb = as_bitboard(end);
+
+        let mut is_legal = true;
 
         // save the current state before we modify it
         self.played_moves.push_move(
@@ -193,6 +198,11 @@ impl Board {
             let king_square = (start + end + 1) >> 1;
             let rook_square = (start + king_square) >> 1;
 
+            // if the king is castling through check
+            if self.is_square_attacked(rook_square) {
+                is_legal = false;
+            }
+
             self.move_piece(end, king_square, us, Pieces::KING);
             self.move_piece(end, rook_square, us, Pieces::ROOK);
 
@@ -208,10 +218,13 @@ impl Board {
             self.toggle_side_bb(them, end_bb);
             if captured == Pieces::ROOK {
                 // if the captured rook is actually valid
+                // FIXME: actually this is completely wrong - the rook needs to
+                // be on the right square
                 self.unset_castling_right(them, (end & 1) as u8 + 1);
             }
         }
         if piece == Pieces::ROOK {
+            // FIXME: same thing
             self.unset_castling_right(us, (end & 1) as u8 + 1);
         }
 
@@ -229,7 +242,13 @@ impl Board {
             self.toggle_piece_bb(promotion_piece, end_bb);
         }
 
+        if self.is_square_attacked(self.king_square()) {
+            is_legal = false;
+        }
+
         self.flip_side();
+
+        is_legal
     }
 
     /// Unplays the most recent move. Assumes that a move has been played.
@@ -285,6 +304,42 @@ impl Board {
     }
 }
 
+impl Lookup {
+    /// Finds the bishop attacks from `square` with the given blockers.
+    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_magic_table[self.bishop_magics[square].get_table_index(blockers)]
+    }
+
+    /// Finds the king attacks from `square`.
+    pub fn king_attacks(&self, square: Square) -> Bitboard {
+        self.king_attacks[square]
+    }
+
+    /// Finds the knight attacks from `square`.
+    pub fn knight_attacks(&self, square: Square) -> Bitboard {
+        self.knight_attacks[square]
+    }
+
+    /// Finds the pawn attacks from `square`.
+    pub fn pawn_attacks<const IS_WHITE: bool>(&self, square: Square) -> Bitboard {
+        if IS_WHITE {
+            self.pawn_attacks[Sides::WHITE][square]
+        } else {
+            self.pawn_attacks[Sides::BLACK][square]
+        }
+    }
+
+    /// Finds the queen attacks from `square` with the given blockers.
+    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
+    }
+
+    /// Finds the rook attacks from `square` with the given blockers.
+    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.rook_magic_table[self.rook_magics[square].get_table_index(blockers)]
+    }
+}
+
 impl Move {
     /// Turns a [`Move`] into its components: start square, end square, is
     /// castling, is promotion, is en passant and piece (only set if
@@ -329,11 +384,6 @@ impl Move {
 }
 
 impl Moves {
-    /// Returns the number of stored moves.
-    pub fn moves(&self) -> usize {
-        self.first_empty
-    }
-
     /// Pops a [`Move`] from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     pub fn pop_move(&mut self) -> Option<Move> {
@@ -350,6 +400,7 @@ impl Moves {
     }
 }
 
+/// Generates pseudo-legal moves for all pieces.
 impl Board {
     /// Generates the castling moves for the given side.
     fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
@@ -394,7 +445,7 @@ impl Board {
     /// Generates all legal knight and king moves (excluding castling) for
     /// `board` and puts them in `moves`.
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
-        let us_bb = self.sides::<IS_WHITE>();
+        let us_bb = self.side::<IS_WHITE>();
 
         let knights = BitIter::new(self.pieces::<{ Pieces::KNIGHT }>() & us_bb);
         for knight in knights {
@@ -415,7 +466,7 @@ impl Board {
 
     /// Generates all legal pawn moves for `board` and puts them in `moves`.
     fn generate_pawn_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
-        let us_bb = self.sides::<IS_WHITE>();
+        let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
         let ep_square_bb = if self.ep_square() == Squares::NONE {
@@ -466,7 +517,7 @@ impl Board {
     /// Generates all legal bishop, rook and queen moves for `board` and puts
     /// them in `moves`.
     fn generate_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
-        let us_bb = self.sides::<IS_WHITE>();
+        let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
 
         let bishops = BitIter::new(self.pieces::<{ Pieces::BISHOP }>() & us_bb);
@@ -498,11 +549,6 @@ impl Board {
 }
 
 impl Lookup {
-    /// Finds the bishop attacks from `square` with the given blockers.
-    fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_magic_table[self.bishop_magics[square].get_table_index(blockers)]
-    }
-
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
@@ -595,35 +641,6 @@ impl Lookup {
                 *bb = east(pushed) | west(pushed);
             }
         }
-    }
-
-    /// Finds the king attacks from `square`.
-    fn king_attacks(&self, square: Square) -> Bitboard {
-        self.king_attacks[square]
-    }
-
-    /// Finds the knight attacks from `square`.
-    fn knight_attacks(&self, square: Square) -> Bitboard {
-        self.knight_attacks[square]
-    }
-
-    /// Finds the pawn attacks from `square`.
-    fn pawn_attacks<const IS_WHITE: bool>(&self, square: Square) -> Bitboard {
-        if IS_WHITE {
-            self.pawn_attacks[Sides::WHITE][square]
-        } else {
-            self.pawn_attacks[Sides::BLACK][square]
-        }
-    }
-
-    /// Finds the queen attacks from `square` with the given blockers.
-    fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
-    }
-
-    /// Finds the rook attacks from `square` with the given blockers.
-    fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.rook_magic_table[self.rook_magics[square].get_table_index(blockers)]
     }
 }
 

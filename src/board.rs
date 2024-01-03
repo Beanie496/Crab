@@ -3,9 +3,9 @@ use crate::{
         Bitboard, Bitboards, File, Files, Nums, Piece, Pieces, Rank, Ranks, Side, Sides, Square,
         Squares, PIECE_CHARS,
     },
-    util::{as_bitboard, bitboard_from_pos},
+    util::{as_bitboard, bitboard_from_pos, to_square},
 };
-use movegen::{Lookup, Move};
+use movegen::{Lookup, Move, LOOKUPS};
 
 pub use movegen::magic::find_magics;
 
@@ -345,6 +345,24 @@ impl Board {
         self.side_to_move ^= 1;
     }
 
+    /// Tests if `square` is attacked by an enemy piece.
+    fn is_square_attacked(&self, square: Square) -> bool {
+        let occupancies = self.occupancies();
+        let them_bb = self.sides[self.side_to_move() ^ 1];
+        let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
+        let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
+        let queens = self.pieces::<{ Pieces::QUEEN }>();
+        let rooks = self.pieces::<{ Pieces::ROOK }>();
+        let bishops = self.pieces::<{ Pieces::BISHOP }>();
+        (diagonal_attacks & (bishops | queens) | orthogonal_attacks & (rooks | queens)) & them_bb
+            != 0
+    }
+
+    /// Calculates the square the king is on.
+    fn king_square(&self) -> Square {
+        to_square(self.pieces::<{ Pieces::KING }>() & self.sides[self.side_to_move()])
+    }
+
     /// Toggles the side and piece bitboard on both `start` and `end`, sets
     /// `start` in the piece array to [`Squares::NONE`] and sets `end` in the
     /// piece array to `piece`.
@@ -360,7 +378,7 @@ impl Board {
 
     /// Returns all the occupied squares on the board.
     fn occupancies(&self) -> Bitboard {
-        self.sides::<true>() | self.sides::<false>()
+        self.side::<true>() | self.side::<false>()
     }
 
     /// Returns the piece on `square`.
@@ -395,7 +413,7 @@ impl Board {
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
-    fn sides<const IS_WHITE: bool>(&self) -> Bitboard {
+    fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
             self.sides[Sides::WHITE]
         } else {
