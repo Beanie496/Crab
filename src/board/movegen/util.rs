@@ -87,6 +87,19 @@ pub fn pawn_push<const IS_WHITE: bool>(bb: Bitboard) -> Bitboard {
     }
 }
 
+/// Converts the char `piece` into its internal numerical representation.
+pub fn piece_from_char(piece: char) -> Piece {
+    match piece {
+        'p' => Pieces::PAWN,
+        'n' => Pieces::KNIGHT,
+        'b' => Pieces::BISHOP,
+        'r' => Pieces::ROOK,
+        'q' => Pieces::QUEEN,
+        'k' => Pieces::KING,
+        i => panic!("Attempt to convert an invalid piece char \'{i}\' into a piece"),
+    }
+}
+
 /// Generates an attack from `square` in the given direction up to and
 /// including the first encountered bit set in `blockers`. `blockers` is
 /// assumed not to include `square` itself.

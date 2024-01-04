@@ -81,6 +81,39 @@ pub fn rank_of(square: Square) -> Rank {
     square >> 3
 }
 
+/// Converts a rank and file into a square.
+/// ```
+/// assert_eq!(square_from_pos(1, 0), 8);
+/// assert_eq!(square_from_pos(1, 1), 9);
+/// assert_eq!(square_from_pos(7, 0), 56);
+/// // etc.
+/// ```
+pub fn square_from_pos(rank: Rank, file: File) -> Square {
+    rank * 8 + file
+}
+
+/// Converts a square from string representation to the internal square number.
+/// Returns `Some(square)` if the square is valid, `None` otherwise.
+pub fn square_from_string(string: &str) -> Option<Square> {
+    let mut square = 0;
+    let mut iter = string.as_bytes().iter();
+
+    let file = iter.next()?;
+    if (b'a'..=b'h').contains(file) {
+        square += file - b'a';
+    } else {
+        return None;
+    }
+    let rank = iter.next()?;
+    if (b'1'..=b'8').contains(rank) {
+        square += (rank - b'1') * 8;
+    } else {
+        return None;
+    }
+
+    Some(square as Square)
+}
+
 /// Converts `sq` into its string representation.
 pub fn stringify_square(sq: Square) -> String {
     let mut ret = String::with_capacity(2);

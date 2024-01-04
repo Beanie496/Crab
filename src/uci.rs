@@ -21,13 +21,33 @@ impl Uci {
 }
 
 impl Uci {
-    /// Given an iterator over the remaining tokens of a `position` command,
-    /// collect the tokens up to but not including "moves", then collect the
-    /// remaining tokens and pass both strings to `engine`.
+    /// Given an iterator over the remaining space-deliminated tokens of a
+    /// `position` command, removes all empty strings and concatenate the
+    /// remaining tokens into a String for the FEN and moves each with a space
+    /// between each token.
     fn handle_position(line: &mut Split<'_, char>, engine: &mut Engine) {
-        let fen: String = line.take_while(|token| *token != "moves").collect();
-        let moves: String = line.collect();
-        engine.set_pos_to_fen(&fen, &moves);
+        let mut fen = String::new();
+        line.take_while(|token| *token != "moves")
+            .for_each(|token| {
+                if !token.is_empty() {
+                    fen.push_str(token);
+                    fen.push(' ');
+                }
+            });
+        // remove the trailing space
+        fen.pop();
+
+        let mut moves = String::new();
+        line.for_each(|token| {
+            if !token.is_empty() {
+                moves.push_str(token);
+                moves.push(' ');
+            }
+        });
+        // remove the trailing space
+        moves.pop();
+
+        engine.set_position(&fen, &moves);
     }
 
     /// Dissects `line` according to the UCI protocol.
@@ -36,6 +56,9 @@ impl Uci {
 
         // handle each UCI option
         if let Some(command) = line.next() {
+            if command.is_empty() {
+                return;
+            }
             match command {
                 // Ignored commands
                 "debug" | "ponderhit" => {

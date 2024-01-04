@@ -3,14 +3,14 @@ use crate::{
         Bitboard, Bitboards, File, Files, Nums, Piece, Pieces, Rank, Ranks, Side, Sides, Square,
         Squares, PIECE_CHARS,
     },
-    util::{as_bitboard, bitboard_from_pos, to_square},
+    util::{as_bitboard, bitboard_from_pos, square_from_pos, to_square},
 };
 use movegen::{Lookup, Move, LOOKUPS};
 
 pub use movegen::magic::find_magics;
 
 /// 4 bits: KQkq.
-type CastlingRights = u8;
+pub type CastlingRights = u8;
 
 /// Items related to move generation.
 pub mod movegen;
@@ -155,6 +155,7 @@ impl Board {
             r, n, b, q, k, b, n, r,
         ]
     }
+
     /// Returns the pieces of the starting position.
     /// ```
     /// assert_eq!(default_pieces()[Pieces::PAWN], 0x00ff00000000ff00);
@@ -189,6 +190,22 @@ impl Board {
         Sides::WHITE
     }
 
+    /// Returns an empty piece board.
+    #[rustfmt::skip]
+    fn empty_piece_board() -> [Piece; Nums::SQUARES] {
+        let e = Pieces::NONE;
+        [
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+        ]
+    }
+
     /// Checks if the move is a double pawn push.
     fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
         if piece != Pieces::PAWN {
@@ -204,9 +221,58 @@ impl Board {
         }
         true
     }
+
+    /// Returns empty castling rights.
+    fn no_castling_rights() -> CastlingRights {
+        Self::CASTLE_FLAGS_NONE
+    }
+
+    /// Returns the pieces of an empty board.
+    fn no_pieces() -> [Bitboard; Nums::PIECES] {
+        [
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+        ]
+    }
+
+    /// Returns the sides of an empty board.
+    #[rustfmt::skip]
+    fn no_sides() -> [Bitboard; Nums::SIDES] {
+        [
+            0x0000000000000000,
+            0x0000000000000000,
+        ]
+    }
+
+    /// Returns no side.
+    fn no_side() -> Side {
+        Sides::NONE
+    }
 }
 
 impl Board {
+    /// Adds a piece to square `square` for side `side`. Assumes there is no
+    /// piece on the square to be written to.
+    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
+        let square_bb = as_bitboard(square);
+        self.set_piece(square, piece);
+        self.toggle_piece_bb(piece, square_bb);
+        self.toggle_side_bb(side, square_bb);
+    }
+
+    pub fn clear_board(&mut self) {
+        self.played_moves.clear();
+        self.piece_board = Self::empty_piece_board();
+        self.pieces = Self::no_pieces();
+        self.sides = Self::no_sides();
+        self.side_to_move = Self::no_side();
+        self.castling_rights = Self::no_castling_rights();
+    }
+
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (Ranks::RANK1..=Ranks::RANK8).rev() {
@@ -220,11 +286,51 @@ impl Board {
         println!("    a b c d e f g h");
     }
 
+    /// Sets the castling rights of `side` to `rights`. `rights` should be 2
+    /// bits in the format `KQkq`, where the absence of a bit signifies the
+    /// lack of a right.
+    pub fn set_castling_rights(&mut self, rights: CastlingRights) {
+        self.castling_rights |= rights;
+    }
+
+    /// Sets the default castling rights.
+    pub fn set_default_castling_rights(&mut self) {
+        self.castling_rights = Self::default_castling_rights();
+    }
+
+    /// Sets the en passant square to `square`.
+    pub fn set_ep_square(&mut self, square: Square) {
+        self.ep_square = square;
+    }
+
+    /// Sets side to move to the default side.
+    pub fn set_default_side_to_move(&mut self) {
+        self.side_to_move = Self::default_side();
+    }
+
+    /// Sets fullmoves. Currently does nothing.
+    pub fn set_fullmoves(&mut self, _count: u32) {
+        /* unused */
+    }
+
+    /// Sets halfmoves. Currently does nothing.
+    pub fn set_halfmoves(&mut self, _count: u32) {
+        /* unused */
+    }
+
+    /// Sets side to move to `side`.
+    pub fn set_side_to_move(&mut self, side: Side) {
+        self.side_to_move = side;
+    }
+
     /// Resets the board.
     pub fn set_startpos(&mut self) {
+        self.played_moves.clear();
+        self.piece_board = Self::default_piece_board();
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
         self.side_to_move = Self::default_side();
+        self.castling_rights = Self::default_castling_rights();
     }
 }
 
@@ -264,6 +370,11 @@ impl ChessMove {
 }
 
 impl Movelist {
+    /// Clears the list. Note: this does not zero out the old data.
+    pub fn clear(&mut self) {
+        self.first_empty = 0;
+    }
+
     /// Pops a [`Move`] with its metadata from the list. Assumes that `self`
     /// contains at least one element.
     pub fn pop_move(&mut self) -> ChessMove {
@@ -315,14 +426,15 @@ impl Board {
     /// instead.
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let sq_bb = bitboard_from_pos(rank, file);
-        for (i, side_pieces) in PIECE_CHARS.iter().enumerate() {
-            for (j, piece) in side_pieces.iter().enumerate() {
-                if sq_bb & self.sides[i] & self.pieces[j] != 0 {
-                    return *piece;
-                }
-            }
+        let piece = self.piece_on(square_from_pos(rank, file));
+        if piece == Pieces::NONE {
+            return '0';
         }
-        '0'
+        if self.sides[Sides::WHITE] & sq_bb != 0 {
+            PIECE_CHARS[Sides::WHITE][piece]
+        } else {
+            PIECE_CHARS[Sides::BLACK][piece]
+        }
     }
 
     /// Sets the en passant square to [`Squares::NONE`].
@@ -391,17 +503,6 @@ impl Board {
         self.pieces[PIECE]
     }
 
-    /// Sets the castling rights of `side` to `rights`. `rights` should be 2
-    /// bits in the format `kq`.
-    fn set_castling_rights(&mut self, side: Side, rights: CastlingRights) {
-        self.castling_rights |= rights << (side * 2);
-    }
-
-    /// Sets the en passant square to `square`.
-    fn set_ep_square(&mut self, square: Square) {
-        self.ep_square = square;
-    }
-
     /// Sets the piece on `square` in the piece array to `piece`.
     fn set_piece(&mut self, square: Square, piece: Piece) {
         self.piece_board[square] = piece;
@@ -426,7 +527,7 @@ impl Board {
         self.pieces[piece] ^= bb;
     }
 
-    /// Toggles the bits set in `bb` of the bitbiard of `side`.
+    /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         self.sides[side] ^= bb;
     }

@@ -282,7 +282,7 @@ impl Board {
             self.move_piece(king_square, start, us, Pieces::KING);
             self.move_piece(rook_square, end, us, Pieces::ROOK);
 
-            self.set_castling_rights(us, castling_rights);
+            self.set_castling_rights(castling_rights);
         } else {
             self.unmove_piece(start, end, us, piece, captured);
             if captured != Pieces::NONE {

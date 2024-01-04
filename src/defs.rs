@@ -119,6 +119,7 @@ impl Ranks {
 impl Sides {
     pub const BLACK: Side = 0;
     pub const WHITE: Side = 1;
+    pub const NONE: Side = 2;
 }
 
 // Allowed dead code because unit tests use these.
