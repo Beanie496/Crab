@@ -237,6 +237,7 @@ impl Board {
             if self.is_square_attacked(self.king_square()) {
                 return false;
             }
+            self.toggle_side_bb(them, dest.to_bitboard());
             self.clear_piece(dest);
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
