@@ -1,19 +1,11 @@
 /* data structures (lookup tables & structs) */
 STRUCT Board:
-    Movelist played_moves,
     u64 pieces[6],
     u64 sides[2],
-    usize piece_array[64],
-    usize ep_square,
-    u64 castling_bb,
-    bool side_to_move,
-ENDSTRUCT
-
-STRUCT ChessMove:
-    Move move,
-    usize captured,
-    usize piece,
-    usize ep_square,
+    u8 piece_array[64],
+    u8 ep_square,
+    u8 castling_bb,
+    u8 side_to_move,
 ENDSTRUCT
 
 STRUCT Magic:
@@ -25,11 +17,6 @@ ENDSTRUCT
 
 STRUCT Move:
     u16 move,
-ENDSTRUCT
-
-STRUCT Movelist:
-    ChessMove moves[250],
-    usize first_empty,
 ENDSTRUCT
 
 u64 pawn_attacks[2][64]
@@ -192,109 +179,6 @@ METHOD Board.make_move(move):
     self.side_to_move ^= 1
 ENDMETHOD
 
-METHOD Board.unmake_move():
-    (
-        start,
-        end,
-        is_castling,
-        is_en_passant,
-        is_promotion,
-        promotion_piece,
-        piece,
-        captured,
-        ep_square,
-    ) = self.played_moves.pop_move().decompose()
-    self.side_to_move ^= 1
-    us = self.side_to_move
-    them = us ^ 1
-
-    start_bb = as_bitboard(start)
-    end_bb = as_bitboard(end)
-
-    self.unmove_piece(start, end, us, piece, captured):
-    self.ep_square = NO_PIECE
-
-    IF captured != NO_PIECE:
-        self.pieces[captured] ^= end_bb
-        self.sides[them] ^= end_bb
-    ENDIF
-
-    IF is_en_passant:
-        WHITE = 1
-        IF self.side_to_move = WHITE:
-            dest = end - 8
-        ELSE
-            dest = end + 8
-        ENDIF
-        PAWN = 0
-        self.piece_board[dest] = PAWN
-        self.pieces[PAWN] = 1 << dest
-        self.ep_square = ep_square
-    ELSE IF is_castling:
-        king_square = (start + end + 1) >> 1
-        rook_square = (start + king_square) >> 1
-        king_square_bb = as_bitboard(king_square)
-        rook_square_bb = as_bitboard(rook_square)
-        KING = 5
-        ROOK = 3
-
-        self.castling_bb ^= end_bb
-        self.piece_board[king_square] = NO_PIECE
-        self.piece_board[rook_square] = NO_PIECE
-        self.pieces[KING] ^= end_bb | king_square_bb
-        self.pieces[ROOK] ^= rook_square_bb
-        self.sides[us] ^= king_square_bb | rook_square_bb
-    ELSE IF is_promotion:
-        self.pieces[0] ^= end_bb
-        self.pieces[promotion_piece] ^= end_bb
-    ENDIF
-ENDMETHOD
-
-METHOD Board.move_piece(start, end, side, piece):
-    start_bb = as_bitboard(start)
-    end_bb = as_bitboard(end)
-
-    self.pieces[piece] ^= start_bb | end_bb
-    self.sides[side] ^= start_bb | end_bb
-    NO_SQUARE = 64
-    self.piece_board[start] = NO_SQUARE
-    self.piece_board[end] = piece
-ENDMETHOD
-
-METHOD Board.unmove_piece(start, end, side, piece, captured):
-    start_bb = as_bitboard(start)
-    end_bb = as_bitboard(end)
-
-    self.pieces[piece] ^= start_bb | end_bb
-    self.sides[side] ^= start_bb | end_bb
-    self.piece_board[end] = captured
-    self.piece_board[start] = piece
-ENDMETHOD
-
-METHOD ChessMove.decompose():
-    (start, end, is_castling, is_en_passant, is_promotion, promotion_piece)
-        = self.move.decompose()
-    (
-        start,
-        end,
-        is_castling,
-        is_en_passant,
-        is_promotion,
-        promotion_piece,
-        self.piece,
-        self.captured,
-        self.ep_square,
-    )
-ENDMETHOD
-
-FUNC ChessMove.new(move, piece, captured, ep_square):
-    RETURN Self:
-        move,
-        captured,
-        piece,
-        ep_square,
-ENDFUNC
-
 FUNC Move.new(flag, start, end):
     RETURN Self:
         mv: start | (end << 6) | flag
@@ -335,17 +219,7 @@ METHOD Move.is_castling():
     self.move & 0x1000 != 0 && !self.is_promotion()
 ENDMETHOD
 
-METHOD Movelist.push_move(move, piece, captures, ep_square):
-    self.moves[self.first_empty] = ChessMove::new(move, piece, captures, ep_square)
-    first_empty += 1
-ENDMETHOD
-
-METHOD Movelist.pop_move():
-    self.first_empty -= 1
-    RETURN self.moves[self.first_empty]
-ENDMETHOD
-
-FUNC perft(depth):
+FUNC perft(depth, board):
     IF depth == 0:
         RETURN 1
     ENDIF
@@ -354,9 +228,9 @@ FUNC perft(depth):
 
     total = 0
     FOR move IN movelist:
+        copy = board.copy()
         make_move()
-        total += perft(depth - 1)
-        unmake_move()
+        total += perft(depth - 1, copy)
     NEXT move
     RETURN total
 ENDFUNC
