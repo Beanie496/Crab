@@ -113,7 +113,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::FILE_BB[File::FILE2.to_index()], Self::new(0x0202020202020202));
     /// // etc.
     /// ```
-    pub const FILE_BB: [Bitboard; Nums::FILES] = [
+    const FILE_BB: [Bitboard; Nums::FILES] = [
         Self::new(0x0101010101010101),
         Self::new(0x0202020202020202),
         Self::new(0x0404040404040404),
@@ -128,7 +128,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::RANK_BB[Rank::RANK2.to_index()], Self::new(0x000000000000ff00));
     /// // etc.
     /// ```
-    pub const RANK_BB: [Bitboard; Nums::RANKS] = [
+    const RANK_BB: [Bitboard; Nums::RANKS] = [
         Self::new(0x00000000000000ff),
         Self::new(0x000000000000ff00),
         Self::new(0x0000000000ff0000),
@@ -218,6 +218,15 @@ impl Square {
 }
 
 impl Bitboard {
+    /// ```
+    /// assert_eq!(Bitboard::file_bb(File::FILE1), Self::new(0x0101010101010101));
+    /// assert_eq!(Bitboard::file_bb(File::FILE2), Self::new(0x0202020202020202));
+    /// // etc.
+    /// ```
+    pub fn file_bb(file: File) -> Self {
+        Self::FILE_BB[file.to_index()]
+    }
+
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
     /// given position set.
     pub fn from_pos(rank: Rank, file: File) -> Self {
@@ -227,6 +236,15 @@ impl Bitboard {
     /// Creates a new [`Bitboard`] with contents `bb`.
     pub const fn new(bb: u64) -> Self {
         Self { bb }
+    }
+
+    /// ```
+    /// assert_eq!(Bitboard::rank_bb(Rank::RANK1), Self::new(0x00000000000000ff));
+    /// assert_eq!(Bitboard::rank_bb(Rank::RANK2), Self::new(0x000000000000ff00));
+    /// // etc.
+    /// ```
+    pub fn rank_bb(rank: Rank) -> Self {
+        Self::RANK_BB[rank.to_index()]
     }
 }
 

@@ -219,12 +219,10 @@ pub fn find_magics<const PIECE: u8>() {
     for square in 0..Nums::SQUARES {
         let square = Square::new(square as u8);
         // FIXME: ew
-        let edges = ((Bitboard::FILE_BB[File::FILE1.to_index()]
-            | Bitboard::FILE_BB[File::FILE8.to_index()])
-            & !Bitboard::FILE_BB[square.file_of().to_index()])
-            | ((Bitboard::RANK_BB[Rank::RANK1.to_index()]
-                | Bitboard::RANK_BB[Rank::RANK8.to_index()])
-                & !Bitboard::RANK_BB[square.rank_of().to_index()]);
+        let edges = ((Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
+            & !Bitboard::file_bb(square.file_of()))
+            | ((Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
+                & !Bitboard::rank_bb(square.rank_of()));
         let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
         let mask_bits = mask.inner().count_ones();
         let perms = 2usize.pow(mask_bits);

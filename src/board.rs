@@ -207,16 +207,12 @@ impl Board {
         }
         let start_bb = start.to_bitboard();
         let end_bb = end.to_bitboard();
-        if start_bb
-            & (Bitboard::RANK_BB[Rank::RANK2.to_index()]
-                | Bitboard::RANK_BB[Rank::RANK7.to_index()])
+        if start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))
             == Bitboard::new(0)
         {
             return false;
         }
-        if end_bb
-            & (Bitboard::RANK_BB[Rank::RANK4.to_index()]
-                | Bitboard::RANK_BB[Rank::RANK5.to_index()])
+        if end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))
             == Bitboard::new(0)
         {
             return false;

@@ -476,9 +476,9 @@ impl Board {
             let single_push = pawn.pawn_push::<IS_WHITE>() & empty;
 
             let double_push_rank = if IS_WHITE {
-                Bitboard::RANK_BB[Rank::RANK4.to_index()]
+                Bitboard::rank_bb(Rank::RANK4)
             } else {
-                Bitboard::RANK_BB[Rank::RANK5.to_index()]
+                Bitboard::rank_bb(Rank::RANK5)
             };
             let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
@@ -487,9 +487,8 @@ impl Board {
             let ep_captures = all_captures & ep_square_bb;
 
             let targets = single_push | normal_captures | double_push;
-            let promotion_targets = targets
-                & (Bitboard::RANK_BB[Rank::RANK1.to_index()]
-                    | Bitboard::RANK_BB[Rank::RANK8.to_index()]);
+            let promotion_targets =
+                targets & (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8));
             let normal_targets = targets ^ promotion_targets;
 
             for target in BitIter::new(normal_targets) {
@@ -587,12 +586,10 @@ impl Lookup {
             let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
 
             // FIXME: ew
-            let edges = ((Bitboard::FILE_BB[File::FILE1.to_index()]
-                | Bitboard::FILE_BB[File::FILE8.to_index()])
-                & !Bitboard::FILE_BB[square.file_of().to_index()])
-                | ((Bitboard::RANK_BB[Rank::RANK1.to_index()]
-                    | Bitboard::RANK_BB[Rank::RANK8.to_index()])
-                    & !Bitboard::RANK_BB[square.rank_of().to_index()]);
+            let edges = ((Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
+                & !Bitboard::file_bb(square.file_of()))
+                | ((Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
+                    & !Bitboard::rank_bb(square.rank_of()));
             let b_mask =
                 sliding_attacks::<{ Piece::BISHOP.inner() }>(square, Bitboard::EMPTY) & !edges;
             let r_mask =
