@@ -168,8 +168,6 @@ impl Board {
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move. Returns `true` if the given move is legal, `false`
     /// otherwise.
-    // FIXME: very inefficient to filter out illegal moves this way; fix after
-    // summer term
     pub fn make_move(&mut self, mv: Move) -> bool {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
@@ -178,8 +176,6 @@ impl Board {
         let us = self.side_to_move();
         let them = us.flip();
         let end_bb = end.to_bitboard();
-
-        let mut is_legal = true;
 
         self.move_piece(start, end, us, piece);
         self.clear_ep_square();
@@ -193,27 +189,37 @@ impl Board {
 
             // if the king is castling through check
             if self.is_square_attacked(rook_square) {
-                is_legal = false;
+                return false;
+            }
+            // if the king is castling into check
+            if self.is_square_attacked(king_square) {
+                return false;
             }
 
             self.move_piece(end, king_square, us, Piece::KING);
             self.move_piece(end, rook_square, us, Piece::ROOK);
 
             self.unset_castling_rights(us);
-        } else if captured != Piece::NONE {
-            // if we're capturing a piece, unset the bitboard of the captured
-            // piece.
-            // By a happy accident, we don't need to check if we're capturing
-            // the same piece as we are currently - the bit would have been
-            // (wrongly) unset earlier, so this would (wrongly) re-set it.
-            // Looks like two wrongs do make a right in binary.
-            self.toggle_piece_bb(captured, end_bb);
-            self.toggle_side_bb(them, end_bb);
-            if captured == Piece::ROOK {
-                // if the captured rook is actually valid
-                // FIXME: actually this is completely wrong - the rook needs to
-                // be on the right square
-                self.unset_castling_right(us, (end.inner() & 1) + 1);
+        } else {
+            // this seems a little janky but i'll test later
+            if self.is_square_attacked(self.king_square()) {
+                return false;
+            }
+            if captured != Piece::NONE {
+                // if we're capturing a piece, unset the bitboard of the captured
+                // piece.
+                // By a happy accident, we don't need to check if we're capturing
+                // the same piece as we are currently - the bit would have been
+                // (wrongly) unset earlier, so this would (wrongly) re-set it.
+                // Looks like two wrongs do make a right in binary.
+                self.toggle_piece_bb(captured, end_bb);
+                self.toggle_side_bb(them, end_bb);
+                if captured == Piece::ROOK {
+                    // if the captured rook is actually valid
+                    // FIXME: actually this is completely wrong - the rook needs to
+                    // be on the right square
+                    self.unset_castling_right(us, (end.inner() & 1) + 1);
+                }
             }
         }
         if piece == Piece::ROOK {
@@ -229,8 +235,11 @@ impl Board {
             } else {
                 end.inner() + 8
             });
-            self.clear_piece(dest);
             self.toggle_piece_bb(Piece::PAWN, dest.to_bitboard());
+            if self.is_square_attacked(self.king_square()) {
+                return false;
+            }
+            self.clear_piece(dest);
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
             // unset the pawn on the promotion square...
@@ -239,13 +248,9 @@ impl Board {
             self.toggle_piece_bb(promotion_piece, end_bb);
         }
 
-        if self.is_square_attacked(self.king_square()) {
-            is_legal = false;
-        }
-
         self.flip_side();
 
-        is_legal
+        true
     }
 }
 
