@@ -7,7 +7,7 @@ impl Engine {
     /// Counts the number of leaf nodes `depth` moves in the future. It is used
     /// because copy-make requires an additional parameter, but I don't want to
     /// have that parameter in the API.
-    pub fn perft_inner(depth: u8, board: &Board) -> u64 {
+    fn perft_inner(depth: u8, board: &Board) -> u64 {
         if depth == 0 {
             return 1;
         }
