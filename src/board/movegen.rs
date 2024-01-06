@@ -200,27 +200,25 @@ impl Board {
             self.move_piece(end, rook_square, us, Piece::ROOK);
 
             self.unset_castling_rights(us);
-        } else {
-            // this seems a little janky but i'll test later
-            if self.is_square_attacked(self.king_square()) {
-                return false;
+        } else if captured != Piece::NONE {
+            // if we're capturing a piece, unset the bitboard of the captured
+            // piece.
+            // By a happy accident, we don't need to check if we're capturing
+            // the same piece as we are currently - the bit would have been
+            // (wrongly) unset earlier, so this would (wrongly) re-set it.
+            // Looks like two wrongs do make a right in binary.
+            self.toggle_piece_bb(captured, end_bb);
+            self.toggle_side_bb(them, end_bb);
+
+            if captured == Piece::ROOK {
+                // if the captured rook is actually valid
+                // FIXME: actually this is completely wrong - the rook needs to
+                // be on the right square
+                self.unset_castling_right(us, (end.inner() & 1) + 1);
             }
-            if captured != Piece::NONE {
-                // if we're capturing a piece, unset the bitboard of the captured
-                // piece.
-                // By a happy accident, we don't need to check if we're capturing
-                // the same piece as we are currently - the bit would have been
-                // (wrongly) unset earlier, so this would (wrongly) re-set it.
-                // Looks like two wrongs do make a right in binary.
-                self.toggle_piece_bb(captured, end_bb);
-                self.toggle_side_bb(them, end_bb);
-                if captured == Piece::ROOK {
-                    // if the captured rook is actually valid
-                    // FIXME: actually this is completely wrong - the rook needs to
-                    // be on the right square
-                    self.unset_castling_right(us, (end.inner() & 1) + 1);
-                }
-            }
+        }
+        if self.is_square_attacked(self.king_square()) {
+            return false;
         }
         if piece == Piece::ROOK {
             // FIXME: same thing
