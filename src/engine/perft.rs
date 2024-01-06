@@ -65,10 +65,7 @@ impl Engine {
 
         let mut total = 0;
         for mv in moves {
-            let is_leaf = depth == 1;
-            let moves = if IS_ROOT && is_leaf {
-                1
-            } else {
+            let moves = {
                 let mut copy = self.board.clone();
                 if !copy.make_move(mv) {
                     continue;
