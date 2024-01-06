@@ -27,11 +27,11 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     square: Square,
     attacks: &mut [Bitboard; crate::board::movegen::magic::MAX_BLOCKERS],
 ) {
-    // FIXME: jeez how many times is this code going to crop up
-    let edges = ((Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-        & !Bitboard::file_bb(square.file_of()))
-        | ((Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-            & !Bitboard::rank_bb(square.rank_of()));
+    let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
+        & !Bitboard::file_bb(square.file_of());
+    let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
+        & !Bitboard::rank_bb(square.rank_of());
+    let edges = excluded_ranks_bb | excluded_files_bb;
     let mask = sliding_attacks::<PIECE>(square, Bitboard::new(0)) & !edges;
 
     let mut blockers = mask;

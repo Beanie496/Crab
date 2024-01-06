@@ -584,12 +584,13 @@ impl Lookup {
         for square in 0..Nums::SQUARES {
             let square = Square::new(square as u8);
             let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
-
-            // FIXME: ew
-            let edges = ((Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-                & !Bitboard::file_bb(square.file_of()))
-                | ((Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-                    & !Bitboard::rank_bb(square.rank_of()));
+            let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1)
+                | Bitboard::file_bb(File::FILE8))
+                & !Bitboard::file_bb(square.file_of());
+            let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1)
+                | Bitboard::rank_bb(Rank::RANK8))
+                & !Bitboard::rank_bb(square.rank_of());
+            let edges = excluded_ranks_bb | excluded_files_bb;
             let b_mask =
                 sliding_attacks::<{ Piece::BISHOP.inner() }>(square, Bitboard::EMPTY) & !edges;
             let r_mask =
