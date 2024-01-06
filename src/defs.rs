@@ -108,36 +108,6 @@ impl Bitboard {
     pub const CASTLING_SPACE_WQ: Bitboard = Self::new(0x00000000000000e0);
     pub const CASTLING_SPACE_BK: Bitboard = Self::new(0x6000000000000000);
     pub const CASTLING_SPACE_BQ: Bitboard = Self::new(0x0e00000000000000);
-    /// ```
-    /// assert_eq!(Bitboard::FILE_BB[File::FILE1.to_index()], Self::new(0x0101010101010101));
-    /// assert_eq!(Bitboard::FILE_BB[File::FILE2.to_index()], Self::new(0x0202020202020202));
-    /// // etc.
-    /// ```
-    const FILE_BB: [Bitboard; Nums::FILES] = [
-        Self::new(0x0101010101010101),
-        Self::new(0x0202020202020202),
-        Self::new(0x0404040404040404),
-        Self::new(0x0808080808080808),
-        Self::new(0x1010101010101010),
-        Self::new(0x2020202020202020),
-        Self::new(0x4040404040404040),
-        Self::new(0x8080808080808080),
-    ];
-    /// ```
-    /// assert_eq!(Bitboard::RANK_BB[Rank::RANK1.to_index()], Self::new(0x00000000000000ff));
-    /// assert_eq!(Bitboard::RANK_BB[Rank::RANK2.to_index()], Self::new(0x000000000000ff00));
-    /// // etc.
-    /// ```
-    const RANK_BB: [Bitboard; Nums::RANKS] = [
-        Self::new(0x00000000000000ff),
-        Self::new(0x000000000000ff00),
-        Self::new(0x0000000000ff0000),
-        Self::new(0x00000000ff000000),
-        Self::new(0x000000ff00000000),
-        Self::new(0x0000ff0000000000),
-        Self::new(0x00ff000000000000),
-        Self::new(0xff00000000000000),
-    ];
 }
 
 /// The square difference in each of the 8 directions.
@@ -163,7 +133,6 @@ impl Nums {
     pub const SIDES: usize = 2;
     pub const SQUARES: usize = 64;
     pub const PIECES: usize = 6;
-    pub const RANKS: usize = 8;
 }
 
 /// Enumerates pieces.
@@ -224,7 +193,7 @@ impl Bitboard {
     /// // etc.
     /// ```
     pub fn file_bb(file: File) -> Self {
-        Self::FILE_BB[file.to_index()]
+        Bitboard::new(0x0101010101010101 << (file.inner() as u32))
     }
 
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
@@ -244,7 +213,7 @@ impl Bitboard {
     /// // etc.
     /// ```
     pub fn rank_bb(rank: Rank) -> Self {
-        Self::RANK_BB[rank.to_index()]
+        Bitboard::new(0xff << (rank.inner() as u32 * 8))
     }
 }
 
@@ -334,7 +303,7 @@ impl Square {
 impl Bitboard {
     /// Shifts `self` one square east without wrapping.
     pub fn east(self) -> Self {
-        Self::new(self.inner() << 1) & !Bitboard::FILE_BB[File::FILE1.to_index()]
+        Self::new(self.inner() << 1) & !Bitboard::file_bb(File::FILE1)
     }
 
     /// Returns the contents of `self`.
@@ -401,7 +370,7 @@ impl Bitboard {
 
     /// Shifts `self` one square west without wrapping.
     pub fn west(self) -> Bitboard {
-        Self::new(self.inner() >> 1) & !Bitboard::FILE_BB[File::FILE8.to_index()]
+        Self::new(self.inner() >> 1) & !Bitboard::file_bb(File::FILE8)
     }
 }
 
@@ -416,11 +385,6 @@ impl File {
     /// Returns the contents of `self`.
     pub fn inner(self) -> u8 {
         self.f
-    }
-
-    /// Returns the contents of `self` as a `usize`.
-    pub fn to_index(self) -> usize {
-        self.inner() as usize
     }
 }
 
@@ -440,11 +404,6 @@ impl Rank {
     /// Returns the contents of `self`.
     pub fn inner(self) -> u8 {
         self.r
-    }
-
-    /// Returns the contents of `self` as a `usize`.
-    pub fn to_index(self) -> usize {
-        self.inner() as usize
     }
 }
 
