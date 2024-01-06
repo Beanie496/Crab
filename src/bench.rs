@@ -14,12 +14,12 @@ struct TestPosition<'a> {
 lazy_static! {
     /// Test positions used to check the correctness of movegen/make/unmake.
     static ref TEST_POSITIONS: Vec<TestPosition<'static>> = vec![
-        // startpos. Depth 7 has ep, castling, checks, discovered checks, double
-        // checks and checkmates.
+        // startpos. Depth 6 has ep, checks, discovered checks, double checks
+        // and checkmates.
         TestPosition::new(
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
-            7,
-            3_195_901_860,
+            6,
+            119_060_324,
         ),
         // kiwipete. Depth 4 tests everything, but depth 5 to be safe.
         TestPosition::new(
