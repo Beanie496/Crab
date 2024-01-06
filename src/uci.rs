@@ -157,7 +157,7 @@ impl Uci {
                 "perft" => {
                     if let Some(depth) = line.next() {
                         match depth.parse::<u8>() {
-                            Ok(result) => _ = engine.perft::<true, true>(result),
+                            Ok(result) => _ = engine.perft::<true>(result),
                             Err(result) => println!("{}; must give 0-255", result),
                         }
                     }

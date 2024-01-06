@@ -35,10 +35,10 @@ impl Engine {
     /// If `IS_ROOT`, it also prints each move followed by the number of leaf
     /// nodes reached from that move, or just "1" if `depth == 0`, and
     /// prints total node count, time and NPS at the end.
-    pub fn perft<const IS_ROOT: bool, const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
+    pub fn perft<const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
         if IS_TIMED {
             let time = Instant::now();
-            let result = self.perft::<IS_ROOT, false>(depth);
+            let result = self.perft::<false>(depth);
             let elapsed_us = time.elapsed().as_micros() as u64;
             println!(
                 "Time taken: {} ms; NPS: {}",
@@ -48,15 +48,9 @@ impl Engine {
             return result;
         }
 
-        if IS_ROOT {
-            println!("Result:");
-            if depth == 0 {
-                println!("1");
-                return 1;
-            }
-        }
-
+        println!("Result:");
         if depth == 0 {
+            println!("1");
             return 1;
         }
 
@@ -73,13 +67,9 @@ impl Engine {
                 Self::perft_inner(depth - 1, &copy)
             };
             total += moves;
-            if IS_ROOT {
-                println!("{}: {moves}", mv.stringify());
-            }
+            println!("{}: {moves}", mv.stringify());
         }
-        if IS_ROOT {
-            println!("Total: {total}");
-        }
+        println!("Total: {total}");
         total
     }
 }

@@ -67,7 +67,7 @@ impl TestPosition<'_> {
         engine.set_pos_to_fen(self.position);
         println!("Position: {}", self.position);
         assert_eq!(
-            engine.perft::<true, false>(self.perft_depth),
+            engine.perft::<false>(self.perft_depth),
             self.perft_result
         );
     }
