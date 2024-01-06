@@ -271,12 +271,8 @@ impl Lookup {
     }
 
     /// Finds the pawn attacks from `square`.
-    pub fn pawn_attacks<const IS_WHITE: bool>(&self, square: Square) -> Bitboard {
-        if IS_WHITE {
-            self.pawn_attacks[Side::WHITE.to_index()][square.to_index()]
-        } else {
-            self.pawn_attacks[Side::BLACK.to_index()][square.to_index()]
-        }
+    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+        self.pawn_attacks[side.to_index()][square.to_index()]
     }
 
     /// Finds the queen attacks from `square` with the given blockers.
@@ -422,7 +418,13 @@ impl Board {
             };
             let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
-            let all_captures = unsafe { LOOKUPS.pawn_attacks::<IS_WHITE>(pawn_sq) };
+            let all_captures = unsafe {
+                if IS_WHITE {
+                    LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq)
+                } else {
+                    LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq)
+                }
+            };
             let normal_captures = all_captures & them_bb;
             let ep_captures = all_captures & ep_square_bb;
 

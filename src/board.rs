@@ -336,13 +336,34 @@ impl Board {
     /// Tests if `square` is attacked by an enemy piece.
     fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
-        let them_bb = self.sides[self.side_to_move().flip().to_index()];
+        let us = self.side_to_move();
+        let them_bb = self.sides[us.flip().to_index()];
+
+        let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
+        let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
         let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
         let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
-        let queens = self.pieces::<{ Piece::QUEEN.to_index() }>();
-        let rooks = self.pieces::<{ Piece::ROOK.to_index() }>();
+        let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
+
+        let pawns = self.pieces::<{ Piece::PAWN.to_index() }>();
+        let knights = self.pieces::<{ Piece::KNIGHT.to_index() }>();
         let bishops = self.pieces::<{ Piece::BISHOP.to_index() }>();
-        (diagonal_attacks & (bishops | queens) | orthogonal_attacks & (rooks | queens)) & them_bb
+        let rooks = self.pieces::<{ Piece::ROOK.to_index() }>();
+        let queens = self.pieces::<{ Piece::QUEEN.to_index() }>();
+        let kings = self.pieces::<{ Piece::KING.to_index() }>();
+
+        let is_attacked_by_pawns = pawn_attacks & pawns;
+        let is_attacked_by_knights = knight_attacks & knights;
+        let is_attacked_by_kings = king_attacks & kings;
+        let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
+        let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
+
+        (is_attacked_by_pawns
+            | is_attacked_by_knights
+            | is_attacked_by_kings
+            | is_attacked_diagonally
+            | is_attacked_orthogonally)
+            & them_bb
             != Bitboard::new(0)
     }
 
