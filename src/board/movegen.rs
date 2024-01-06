@@ -181,15 +181,6 @@ impl Board {
 
         let mut is_legal = true;
 
-        // save the current state before we modify it
-        self.played_moves.push_move(
-            mv,
-            piece,
-            captured,
-            self.ep_square(),
-            self.castling_rights(),
-        );
-
         self.move_piece(start, end, us, piece);
         self.clear_ep_square();
 
@@ -255,62 +246,6 @@ impl Board {
         self.flip_side();
 
         is_legal
-    }
-
-    /// Unplays the most recent move. Assumes that a move has been played.
-    pub fn unmake_move(&mut self) {
-        let (
-            start,
-            end,
-            is_castling,
-            is_en_passant,
-            is_promotion,
-            promotion_piece,
-            piece,
-            captured,
-            ep_square,
-            castling_rights,
-        ) = self.played_moves.pop_move().decompose();
-
-        self.flip_side();
-
-        let us = self.side_to_move();
-        let them = us.flip();
-
-        let end_bb = end.to_bitboard();
-
-        self.clear_ep_square();
-
-        if is_castling {
-            let king_square = Square::new((start.inner() + end.inner() + 1) >> 1);
-            let rook_square = Square::new((start.inner() + king_square.inner()) >> 1);
-
-            self.move_piece(king_square, start, us, Piece::KING);
-            self.move_piece(rook_square, end, us, Piece::ROOK);
-
-            self.set_castling_rights(castling_rights);
-        } else {
-            self.unmove_piece(start, end, us, piece, captured);
-            if captured != Piece::NONE {
-                self.toggle_piece_bb(captured, end_bb);
-                self.toggle_side_bb(them, end_bb);
-            }
-        }
-
-        if is_en_passant {
-            let dest = Square::new(if us == Side::WHITE {
-                end.inner() - 8
-            } else {
-                end.inner() + 8
-            });
-            self.set_piece(dest, Piece::PAWN);
-            self.toggle_piece_bb(Piece::PAWN, dest.to_bitboard());
-            self.set_ep_square(ep_square);
-        } else if is_promotion {
-            // the pawn would have been wrongly set earlier, so unset it now
-            self.toggle_piece_bb(Piece::PAWN, end_bb);
-            self.toggle_piece_bb(promotion_piece, end_bb);
-        }
     }
 }
 
@@ -662,37 +597,5 @@ impl Iterator for Moves {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop_move()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Board, Move};
-
-    use crate::defs::{Bitboard, Piece, Side, Square};
-
-    #[test]
-    fn make_and_unmake() {
-        let mut board = Board::new();
-
-        let mv = Move::new::<{ Move::NO_FLAG }>(Square::A1, Square::A3);
-        board.make_move(mv);
-        assert_eq!(
-            board.sides[Side::WHITE.to_index()],
-            Bitboard::new(0x000000000001fffe)
-        );
-        assert_eq!(
-            board.pieces[Piece::ROOK.to_index()],
-            Bitboard::new(0x8100000000010080)
-        );
-        board.unmake_move();
-        assert_eq!(
-            board.sides[Side::WHITE.to_index()],
-            Bitboard::new(0x000000000000ffff)
-        );
-        assert_eq!(
-            board.pieces[Piece::ROOK.to_index()],
-            Bitboard::new(0x8100000000000081)
-        );
     }
 }

@@ -1,7 +1,33 @@
 use std::time::Instant;
 
 use super::Engine;
-use crate::board::movegen::Moves;
+use crate::board::{movegen::Moves, Board};
+
+impl Engine {
+    /// Counts the number of leaf nodes `depth` moves in the future. It is used
+    /// because copy-make requires an additional parameter, but I don't want to
+    /// have that parameter in the API.
+    pub fn perft_inner(depth: u8, board: &Board) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut moves = Moves::new();
+        board.generate_moves(&mut moves);
+
+        let mut total = 0;
+        for mv in moves {
+            total += {
+                let mut copy = board.clone();
+                if !copy.make_move(mv) {
+                    continue;
+                }
+                Self::perft_inner(depth - 1, &copy)
+            };
+        }
+        total
+    }
+}
 
 impl Engine {
     /// Counts the number of leaf nodes `depth` moves in the future.
@@ -43,13 +69,11 @@ impl Engine {
             let moves = if IS_ROOT && is_leaf {
                 1
             } else {
-                if !self.board.make_move(mv) {
-                    self.board.unmake_move();
+                let mut copy = self.board.clone();
+                if !copy.make_move(mv) {
                     continue;
                 }
-                let result = self.perft::<false, false>(depth - 1);
-                self.board.unmake_move();
-                result
+                Self::perft_inner(depth - 1, &copy)
             };
             total += moves;
             if IS_ROOT {

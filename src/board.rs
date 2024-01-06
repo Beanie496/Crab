@@ -10,8 +10,8 @@ pub type CastlingRights = u8;
 pub mod movegen;
 
 /// Stores information about the current state of the board.
+#[derive(Clone)]
 pub struct Board {
-    played_moves: Movelist,
     // `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     // is the knights, and so on, as according to the order set by
     // [`Piece`].
@@ -30,25 +30,6 @@ pub struct Board {
     side_to_move: Side,
 }
 
-/// A [`Move`] with metadata used for quickly unmaking moves.
-#[derive(Clone, Copy)]
-struct ChessMove {
-    mv: Move,
-    piece: Piece,
-    captured: Piece,
-    ep_square: Square,
-    castling_rights: CastlingRights,
-}
-
-/// The history of the board.
-struct Movelist {
-    moves: [ChessMove; MAX_GAME_MOVES],
-    first_empty: usize,
-}
-
-/// There is no basis to this number other than 'yeah that seems good enough`.
-const MAX_GAME_MOVES: usize = 250;
-
 #[allow(non_upper_case_globals)]
 impl Board {
     pub const CASTLE_FLAGS_K: CastlingRights = 0b1000;
@@ -65,53 +46,12 @@ impl Board {
     pub fn new() -> Self {
         Lookup::init();
         Self {
-            played_moves: Movelist::new(),
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
             castling_rights: Self::default_castling_rights(),
             ep_square: Square::NONE,
             side_to_move: Self::default_side(),
-        }
-    }
-}
-
-impl ChessMove {
-    /// Creates a [`ChessMove`] with the data set to the parameters given.
-    pub fn new(
-        mv: Move,
-        piece: Piece,
-        captured: Piece,
-        ep_square: Square,
-        castling_rights: CastlingRights,
-    ) -> Self {
-        Self {
-            mv,
-            piece,
-            captured,
-            ep_square,
-            castling_rights,
-        }
-    }
-
-    /// Returns a 0-initialised [`ChessMove`].
-    pub fn null() -> Self {
-        Self {
-            mv: Move::null(),
-            piece: Piece::NONE,
-            captured: Piece::NONE,
-            ep_square: Square::NULL,
-            castling_rights: Board::CASTLE_FLAGS_NONE,
-        }
-    }
-}
-
-impl Movelist {
-    /// Creates an empty [`Movelist`].
-    pub fn new() -> Self {
-        Self {
-            moves: [ChessMove::null(); MAX_GAME_MOVES],
-            first_empty: 0,
         }
     }
 }
@@ -225,6 +165,11 @@ impl Board {
         Self::CASTLE_FLAGS_NONE
     }
 
+    /// Returns no ep square.
+    fn no_ep_square() -> Square {
+        Square::NONE
+    }
+
     /// Returns the pieces of an empty board.
     fn no_pieces() -> [Bitboard; Nums::PIECES] {
         [
@@ -262,13 +207,13 @@ impl Board {
         self.toggle_side_bb(side, square_bb);
     }
 
+    /// Sets `self` to its initial state.
     pub fn clear_board(&mut self) {
-        self.played_moves.clear();
         self.piece_board = Self::empty_piece_board();
         self.pieces = Self::no_pieces();
         self.sides = Self::no_sides();
         self.castling_rights = Self::no_castling_rights();
-        //self.ep_square = Self::no_ep_square();
+        self.ep_square = Self::no_ep_square();
         self.side_to_move = Self::no_side();
     }
 
@@ -324,77 +269,12 @@ impl Board {
 
     /// Resets the board.
     pub fn set_startpos(&mut self) {
-        self.played_moves.clear();
         self.piece_board = Self::default_piece_board();
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
         self.castling_rights = Self::default_castling_rights();
         //self.ep_square = Self::no_ep_square();
         self.side_to_move = Self::default_side();
-    }
-}
-
-impl ChessMove {
-    /// Seperates a [`ChessMove`] into a [`Move`] with its metadata:
-    /// [all the fields of [`Move::decompose`]], piece being moved, piece
-    /// being captured, and en passant, in that order.
-    pub fn decompose(
-        &self,
-    ) -> (
-        Square,
-        Square,
-        bool,
-        bool,
-        bool,
-        Piece,
-        Piece,
-        Piece,
-        Square,
-        CastlingRights,
-    ) {
-        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
-            self.mv.decompose();
-        (
-            start,
-            end,
-            is_castling,
-            is_en_passant,
-            is_promotion,
-            promotion_piece,
-            self.piece,
-            self.captured,
-            self.ep_square,
-            self.castling_rights,
-        )
-    }
-}
-
-impl Movelist {
-    /// Clears the list. Note: this does not zero out the old data.
-    pub fn clear(&mut self) {
-        self.first_empty = 0;
-    }
-
-    /// Pops a [`Move`] with its metadata from the list. Assumes that `self`
-    /// contains at least one element.
-    pub fn pop_move(&mut self) -> ChessMove {
-        self.first_empty -= 1;
-        self.moves[self.first_empty]
-    }
-
-    /// Pushes a move with metadata onto the list. Assumes that `self` will not
-    /// overflow.
-    pub fn push_move(
-        &mut self,
-        mv: Move,
-        piece: Piece,
-        captured: Piece,
-        ep_square: Square,
-        castling_rights: CastlingRights,
-    ) {
-        self.moves[self.first_empty] =
-            ChessMove::new(mv, piece, captured, ep_square, castling_rights);
-        self.first_empty += 1;
     }
 }
 
@@ -415,10 +295,6 @@ impl Board {
         } else {
             self.castling_rights & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
         }
-    }
-    /// Returns castling rights.
-    fn castling_rights(&self) -> CastlingRights {
-        self.castling_rights
     }
 
     /// Finds the piece on the given rank and file and converts it to its
@@ -531,26 +407,6 @@ impl Board {
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         self.sides[side.to_index()] ^= bb;
-    }
-
-    /// Toggles the side and piece bitboard on both `start` and `end`, sets
-    /// `start` in the piece array to `piece` and sets `end` in the piece array
-    /// to `captured`.
-    fn unmove_piece(
-        &mut self,
-        start: Square,
-        end: Square,
-        side: Side,
-        piece: Piece,
-        captured: Piece,
-    ) {
-        let start_bb = start.to_bitboard();
-        let end_bb = end.to_bitboard();
-
-        self.toggle_piece_bb(piece, start_bb | end_bb);
-        self.toggle_side_bb(side, start_bb | end_bb);
-        self.set_piece(end, captured);
-        self.set_piece(start, piece);
     }
 
     /// Unsets right `right` for side `side`. `right` is either `0b01` or
