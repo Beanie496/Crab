@@ -2,8 +2,8 @@ use oorandom::Rand64;
 
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
 use crate::{
-    defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks},
-    util::{file_of, gen_sparse_rand, rank_of},
+    defs::{Bitboard, File, Nums, Piece, Rank, Square},
+    util::gen_sparse_rand,
 };
 
 /// Stores magic information for a square:
@@ -22,7 +22,7 @@ pub struct Magic {
     offset: u32,
 }
 
-pub const BISHOP_MAGICS: [Bitboard; Nums::SQUARES] = [
+pub const BISHOP_MAGICS: [u64; Nums::SQUARES] = [
     18017181921083777,
     2459251561629761536,
     292753294555095040,
@@ -91,7 +91,7 @@ pub const BISHOP_MAGICS: [Bitboard; Nums::SQUARES] = [
 // 4096 is the largest number of blocker permutations from a single square: a
 // rook attacking from one of the corners
 pub const MAX_BLOCKERS: usize = 4096;
-pub const ROOK_MAGICS: [Bitboard; Nums::SQUARES] = [
+pub const ROOK_MAGICS: [u64; Nums::SQUARES] = [
     36033333578174594,
     10394312406808535040,
     144152572550217736,
@@ -173,7 +173,7 @@ impl Magic {
     pub const fn default() -> Self {
         Self {
             magic: 0,
-            mask: 0,
+            mask: Bitboard::new(0),
             offset: 0,
             shift: 0,
         }
@@ -185,26 +185,28 @@ impl Magic {
     /// <https://www.chessprogramming.org/Magic_Bitboards> for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;
+        let mut occupancies = occupancies.inner();
         occupancies = occupancies.wrapping_mul(self.magic);
         occupancies >>= self.shift;
-        (occupancies + self.offset as u64) as usize
+        occupancies as usize + self.offset as usize
     }
 }
 
 /// Finds magic numbers for all 64 squares for both the rook and bishop.
-pub fn find_magics<const PIECE: Piece>() {
-    let piece_str = if PIECE == Pieces::BISHOP {
+pub fn find_magics<const PIECE: u8>() {
+    let piece = Piece::new(PIECE);
+    let piece_str = if piece == Piece::BISHOP {
         "bishop"
-    } else if PIECE == Pieces::ROOK {
+    } else if piece == Piece::ROOK {
         "rook"
     } else {
         panic!("piece not a rook or bishop");
     };
 
     // this stores the attacks for each square
-    let mut attacks = [Bitboards::EMPTY; MAX_BLOCKERS];
+    let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
     // this is used to check if any collisions are destructive
-    let mut lookup_table = [Bitboards::EMPTY; MAX_BLOCKERS];
+    let mut lookup_table = [Bitboard::EMPTY; MAX_BLOCKERS];
     // this is used to store the latest iteration of each index
     let mut epoch = [0u32; MAX_BLOCKERS];
     let mut rand_gen: Rand64 = Rand64::new(
@@ -215,12 +217,16 @@ pub fn find_magics<const PIECE: Piece>() {
     );
 
     for square in 0..Nums::SQUARES {
-        let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
-            & !Bitboards::FILE_BB[file_of(square)])
-            | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
-                & !Bitboards::RANK_BB[rank_of(square)]);
-        let mask = sliding_attacks::<PIECE>(square, Bitboards::EMPTY) & !edges;
-        let mask_bits = mask.count_ones();
+        let square = Square::new(square as u8);
+        // FIXME: ew
+        let edges = ((Bitboard::FILE_BB[File::FILE1.to_index()]
+            | Bitboard::FILE_BB[File::FILE8.to_index()])
+            & !Bitboard::FILE_BB[square.file_of().to_index()])
+            | ((Bitboard::RANK_BB[Rank::RANK1.to_index()]
+                | Bitboard::RANK_BB[Rank::RANK8.to_index()])
+                & !Bitboard::RANK_BB[square.rank_of().to_index()]);
+        let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
+        let mask_bits = mask.inner().count_ones();
         let perms = 2usize.pow(mask_bits);
         let shift = 64 - mask_bits;
         gen_all_sliding_attacks::<PIECE>(square, &mut attacks);
@@ -235,7 +241,7 @@ pub fn find_magics<const PIECE: Piece>() {
             let mut found = true;
 
             for attack in attacks.iter().take(perms) {
-                let index = blockers.wrapping_mul(sparse_rand) >> shift;
+                let index = blockers.inner().wrapping_mul(sparse_rand) >> shift;
                 /* Each time an index is made, it's checked to see if it's
                  * collided with one of its previous indexes. If it hasn't
                  * (i.e. epoch[index] < count), the index is marked as
@@ -253,7 +259,7 @@ pub fn find_magics<const PIECE: Piece>() {
                     break;
                 }
                 // Carry-Rippler trick
-                blockers = blockers.wrapping_sub(1) & mask;
+                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & mask;
             }
             if found {
                 println!("Found magic for {piece_str}: {sparse_rand}");

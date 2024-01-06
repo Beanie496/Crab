@@ -1,7 +1,6 @@
 use crate::{
-    board::{find_magics, movegen::util::piece_from_char, Board, CastlingRights},
-    defs::{File, Piece, Rank, Side, Sides, Square, Squares},
-    util::{square_from_pos, square_from_string},
+    board::{find_magics, Board, CastlingRights},
+    defs::{File, Piece, Rank, Side, Square},
 };
 
 mod perft;
@@ -22,7 +21,7 @@ impl Engine {
     }
 
     /// Wrapper for [`find_magics`].
-    pub fn find_magics<const PIECE: Piece>() {
+    pub fn find_magics<const PIECE: u8>() {
         find_magics::<PIECE>();
     }
 }
@@ -34,7 +33,7 @@ impl Engine {
     }
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
-    /// return if any of the moves are incorrect.
+    /// return if any of the moves are incorrect. Not implemented yet.
     pub fn play_moves(&self, _moves: &str) {}
 
     /// Pretty-prints the current state of the board.
@@ -93,8 +92,8 @@ impl Engine {
         // 1. the board itself. 1 of each king isn't checked. Hey, garbage in,
         // garbage out!
         // split into 2 to check for overflow easily
-        let mut rank_idx: Rank = 8;
-        let mut file_idx: File = 0;
+        let mut rank_idx = 8u8;
+        let mut file_idx = 0;
         let ranks = board.split('/');
         for rank in ranks {
             // if the board has too many ranks, this would eventually underflow
@@ -103,13 +102,24 @@ impl Engine {
             for piece in rank.chars() {
                 // if it's a number, skip over that many files
                 if ('0'..='8').contains(&piece) {
-                    file_idx += piece.to_digit(10).unwrap() as File;
+                    file_idx += piece.to_digit(10).unwrap() as u8;
                 } else {
-                    let piece_num = piece_from_char(piece.to_ascii_lowercase());
+                    let piece_num = Piece::from_char(piece.to_ascii_lowercase());
+                    let piece_num = if let Some(pn) = piece_num {
+                        pn
+                    } else {
+                        self.set_startpos();
+                        return eprintln!("Error: \"{piece}\" is not a valid piece.");
+                    };
                     // 1 if White, 0 if Black
-                    let side = piece.is_ascii_uppercase() as Side;
-                    self.board
-                        .add_piece(side, square_from_pos(rank_idx, file_idx), piece_num);
+                    let side = Side::new(piece.is_ascii_uppercase() as u8);
+
+                    self.board.add_piece(
+                        side,
+                        Square::from_pos(Rank::new(rank_idx), File::new(file_idx)),
+                        piece_num,
+                    );
+
                     file_idx += 1;
                 }
             }
@@ -118,6 +128,7 @@ impl Engine {
                 self.set_startpos();
                 return eprintln!("Error: FEN is invalid");
             }
+
             file_idx = 0;
         }
         // if there are too many/few ranks in the board, reset and return
@@ -129,9 +140,9 @@ impl Engine {
         // 2. side to move
         if let Some(stm) = side_to_move {
             if stm == "w" {
-                self.set_side_to_move(Sides::WHITE);
+                self.set_side_to_move(Side::WHITE);
             } else if stm == "b" {
-                self.set_side_to_move(Sides::BLACK);
+                self.set_side_to_move(Side::BLACK);
             } else {
                 self.set_startpos();
                 return eprintln!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
@@ -166,15 +177,15 @@ impl Engine {
         // 4. en passant
         self.set_ep_square(if let Some(ep) = ep_square {
             if ep == "-" {
-                Squares::NONE
-            } else if let Some(square) = square_from_string(ep) {
+                Square::NONE
+            } else if let Some(square) = Square::from_string(ep) {
                 square
             } else {
                 self.set_startpos();
                 return eprintln!("Error: En passant square \"{ep}\" is not a valid square");
             }
         } else {
-            Squares::NONE
+            Square::NONE
         });
 
         // 5. halfmoves

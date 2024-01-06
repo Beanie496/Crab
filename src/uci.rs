@@ -1,6 +1,6 @@
 use std::{io, process::exit, str::Split};
 
-use crate::engine::Engine;
+use crate::{defs::Piece, engine::Engine};
 
 pub struct Uci;
 
@@ -146,8 +146,8 @@ impl Uci {
                 /* non-standard commands */
                 /* "f" - find magic numbers for each square for bishop and rook */
                 "f" => {
-                    Engine::find_magics::<{ crate::defs::Pieces::BISHOP }>();
-                    Engine::find_magics::<{ crate::defs::Pieces::ROOK }>();
+                    Engine::find_magics::<{ Piece::BISHOP.inner() }>();
+                    Engine::find_magics::<{ Piece::ROOK.inner() }>();
                 }
                 /* "p" - prints current position */
                 "p" => {

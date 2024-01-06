@@ -1,143 +1,89 @@
 use crate::{
     board::Move,
-    defs::{
-        Bitboard, Bitboards, Direction, Directions, Files, Piece, Pieces, Ranks, Sides, Square,
-        Squares, PIECE_CHARS,
-    },
-    util::{as_bitboard, file_of, rank_of, stringify_square},
+    defs::{Bitboard, Direction, File, Piece, Rank, Side, Square, PIECE_CHARS},
 };
 
 impl Move {
     /// Converts `mv` into its string representation.
     pub fn stringify(&self) -> String {
-        let start = (self.mv & Self::START_MASK) >> Self::START_SHIFT;
-        let end = (self.mv & Self::END_MASK) >> Self::END_SHIFT;
+        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let mut ret = String::with_capacity(5);
-        ret += &stringify_square(start as Square);
-        ret += &stringify_square(end as Square);
+        ret += &start.stringify();
+        ret += &end.stringify();
         if self.is_promotion() {
             // we want the lowercase letter here
-            ret.push(PIECE_CHARS[Sides::BLACK][self.promotion_piece()]);
+            ret.push(PIECE_CHARS[Side::BLACK.to_index()][self.promotion_piece().to_index()]);
         }
         ret
     }
-}
-
-/// Shifts `bb` one square east without wrapping.
-pub fn east(bb: Bitboard) -> Bitboard {
-    (bb << 1) & !Bitboards::FILE_BB[Files::FILE1]
 }
 
 /// Generates all combinations of attacks from `square` and puts them in
 /// `attacks`. It starts with a full blocker board that goes from the
 /// square to the edge exclusive and uses the Carry-Rippler trick to
 /// generate each subsequent attack.
-pub fn gen_all_sliding_attacks<const PIECE: Piece>(
+pub fn gen_all_sliding_attacks<const PIECE: u8>(
     square: Square,
     attacks: &mut [Bitboard; crate::board::movegen::magic::MAX_BLOCKERS],
 ) {
-    let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
-        & !Bitboards::FILE_BB[file_of(square)])
-        | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
-            & !Bitboards::RANK_BB[rank_of(square)]);
-    let mask = sliding_attacks::<PIECE>(square, 0) & !edges;
+    // FIXME: jeez how many times is this code going to crop up
+    let edges = ((Bitboard::FILE_BB[File::FILE1.to_index()]
+        | Bitboard::FILE_BB[File::FILE8.to_index()])
+        & !Bitboard::FILE_BB[square.file_of().to_index()])
+        | ((Bitboard::RANK_BB[Rank::RANK1.to_index()] | Bitboard::RANK_BB[Rank::RANK8.to_index()])
+            & !Bitboard::RANK_BB[square.rank_of().to_index()]);
+    let mask = sliding_attacks::<PIECE>(square, Bitboard::new(0)) & !edges;
 
     let mut blockers = mask;
     let mut first_empty = 0;
-    while blockers != 0 {
+    while blockers != Bitboard::new(0) {
         attacks[first_empty] = sliding_attacks::<PIECE>(square, blockers);
         first_empty += 1;
-        blockers = (blockers - 1) & mask;
+        blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & mask;
     }
-    attacks[first_empty] = sliding_attacks::<PIECE>(square, 0);
-}
-
-/// Finds the horizontal distance between `square_1` and `square_2`
-pub fn horizontal_distance(square_1: Square, square_2: Square) -> u8 {
-    (file_of(square_1) as i8 - file_of(square_2) as i8).unsigned_abs()
+    attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::new(0));
 }
 
 /// Checks if `square` can go in the given direction.
-pub fn is_valid<const DIRECTION: Direction>(square: Square) -> bool {
-    let dest = square.wrapping_add(DIRECTION as usize);
+pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
+    let dest = Square::new(square.inner().wrapping_add(DIRECTION as u8));
     // credit to Stockfish, as I didn't come up with this code.
     // It checks if `square` is still within the board, and if it is, it checks
     // if it hasn't wrapped (because if it has wrapped, the distance will be
     // larger than 2).
-    is_valid_square(dest) && horizontal_distance(square, dest) <= 1
-}
-
-/// Checks if `square` is within the board.
-pub fn is_valid_square(square: Square) -> bool {
-    // `square` is a usize so it can't be less than 0.
-    square <= Squares::H8
-}
-
-/// Shifts `bb` one square north without wrapping.
-pub fn north(bb: Bitboard) -> Bitboard {
-    bb << 8
-}
-
-/// Calculates the square one step forward, depending on the pawn side.
-pub fn pawn_push<const IS_WHITE: bool>(bb: Bitboard) -> Bitboard {
-    if IS_WHITE {
-        north(bb)
-    } else {
-        south(bb)
-    }
-}
-
-/// Converts the char `piece` into its internal numerical representation.
-pub fn piece_from_char(piece: char) -> Piece {
-    match piece {
-        'p' => Pieces::PAWN,
-        'n' => Pieces::KNIGHT,
-        'b' => Pieces::BISHOP,
-        'r' => Pieces::ROOK,
-        'q' => Pieces::QUEEN,
-        'k' => Pieces::KING,
-        i => panic!("Attempt to convert an invalid piece char \'{i}\' into a piece"),
-    }
+    dest.is_valid() && square.horizontal_distance(dest) <= 1
 }
 
 /// Generates an attack from `square` in the given direction up to and
 /// including the first encountered bit set in `blockers`. `blockers` is
 /// assumed not to include `square` itself.
-pub fn ray_attack<const DIRECTION: Direction>(mut square: Square, blockers: Bitboard) -> Bitboard {
-    let mut attacks = Bitboards::EMPTY;
+pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -> Bitboard {
+    let mut attacks = Bitboard::EMPTY;
     // checks if the next square is valid and if the piece can move from the
     // square
-    while is_valid::<DIRECTION>(square) && as_bitboard(square) & blockers == 0 {
-        square = square.wrapping_add(DIRECTION as usize);
-        attacks |= as_bitboard(square);
+    while is_valid::<DIRECTION>(square) && square.to_bitboard() & blockers == Bitboard::new(0) {
+        square = Square::new(square.inner().wrapping_add(DIRECTION as u8));
+        attacks |= square.to_bitboard();
     }
     attacks
 }
 
 /// Generates the attack set for `piece` on `square` up to and including the
 /// given blockers. Includes the edge.
-pub fn sliding_attacks<const PIECE: Piece>(square: Square, blockers: Bitboard) -> Bitboard {
-    let mut ray = Bitboards::EMPTY;
-    if PIECE == Pieces::BISHOP {
-        ray |= ray_attack::<{ Directions::NE }>(square, blockers);
-        ray |= ray_attack::<{ Directions::SE }>(square, blockers);
-        ray |= ray_attack::<{ Directions::SW }>(square, blockers);
-        ray |= ray_attack::<{ Directions::NW }>(square, blockers);
+pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
+    let piece = Piece::new(PIECE);
+    let mut ray = Bitboard::EMPTY;
+    if piece == Piece::BISHOP {
+        ray |= ray_attack::<{ Direction::NE.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::SE.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::SW.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::NW.inner() }>(square, blockers);
     } else {
-        ray |= ray_attack::<{ Directions::N }>(square, blockers);
-        ray |= ray_attack::<{ Directions::E }>(square, blockers);
-        ray |= ray_attack::<{ Directions::S }>(square, blockers);
-        ray |= ray_attack::<{ Directions::W }>(square, blockers);
+        ray |= ray_attack::<{ Direction::N.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::E.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::S.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::W.inner() }>(square, blockers);
     };
     ray
-}
-
-/// Shifts `bb` one square south without wrapping.
-pub fn south(bb: Bitboard) -> Bitboard {
-    bb >> 8
-}
-
-/// Shifts `bb` one square west without wrapping.
-pub fn west(bb: Bitboard) -> Bitboard {
-    (bb >> 1) & !Bitboards::FILE_BB[Files::FILE8]
 }

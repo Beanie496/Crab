@@ -1,10 +1,10 @@
 use super::Board;
 use crate::{
-    defs::{Bitboard, Bitboards, Files, Nums, Piece, Pieces, Ranks, Sides, Square, Squares},
-    util::{as_bitboard, file_of, pop_lsb, rank_of, to_square, BitIter},
+    defs::{Bitboard, File, Nums, Piece, Rank, Side, Square},
+    util::BitIter,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{east, gen_all_sliding_attacks, north, pawn_push, sliding_attacks, south, west};
+use util::{gen_all_sliding_attacks, sliding_attacks};
 
 /// Items related to magic bitboards.
 pub mod magic;
@@ -98,17 +98,19 @@ impl Move {
     pub fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
         debug_assert!(FLAG != Move::PROMOTION_FLAG);
         Self {
-            mv: (start as u16) << Self::START_SHIFT | (end as u16) << Self::END_SHIFT | FLAG,
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | FLAG,
         }
     }
 
     /// Creates a promotion [`Move`] to the given piece.
-    pub fn new_promo<const PIECE: Piece>(start: Square, end: Square) -> Move {
-        debug_assert!(PIECE != Pieces::PAWN);
-        debug_assert!(PIECE != Pieces::KING);
+    pub fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
+        debug_assert!(PIECE != Piece::PAWN.inner());
+        debug_assert!(PIECE != Piece::KING.inner());
         Self {
-            mv: (start as u16) << Self::START_SHIFT
-                | (end as u16) << Self::END_SHIFT
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
                 | Self::PROMOTION_FLAG
                 | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
         }
@@ -135,11 +137,11 @@ impl Lookup {
     // used to initialise a static `Lookup` variable
     const fn empty() -> Self {
         Self {
-            pawn_attacks: [[Bitboards::EMPTY; Nums::SQUARES]; Nums::SIDES],
-            knight_attacks: [Bitboards::EMPTY; Nums::SQUARES],
-            king_attacks: [Bitboards::EMPTY; Nums::SQUARES],
-            bishop_magic_table: [Bitboards::EMPTY; BISHOP_SIZE],
-            rook_magic_table: [Bitboards::EMPTY; ROOK_SIZE],
+            pawn_attacks: [[Bitboard::EMPTY; Nums::SQUARES]; Nums::SIDES],
+            knight_attacks: [Bitboard::EMPTY; Nums::SQUARES],
+            king_attacks: [Bitboard::EMPTY; Nums::SQUARES],
+            bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
+            rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
             bishop_magics: [Magic::default(); Nums::SQUARES],
             rook_magics: [Magic::default(); Nums::SQUARES],
         }
@@ -150,7 +152,7 @@ impl Board {
     /// Generates all legal moves for the current position and puts them in
     /// `moves`.
     pub fn generate_moves(&self, moves: &mut Moves) {
-        if self.side_to_move() == Sides::WHITE {
+        if self.side_to_move() == Side::WHITE {
             self.generate_pawn_moves::<true>(moves);
             self.generate_non_sliding_moves::<true>(moves);
             self.generate_sliding_moves::<true>(moves);
@@ -174,8 +176,8 @@ impl Board {
         let piece = self.piece_on(start);
         let captured = self.piece_on(end);
         let us = self.side_to_move();
-        let them = us ^ 1;
-        let end_bb = as_bitboard(end);
+        let them = us.flip();
+        let end_bb = end.to_bitboard();
 
         let mut is_legal = true;
 
@@ -195,19 +197,19 @@ impl Board {
         // otherwise the second one would trigger incorrectly (since the the
         // target square, containing a rook, would count)
         if is_castling {
-            let king_square = (start + end + 1) >> 1;
-            let rook_square = (start + king_square) >> 1;
+            let king_square = Square::new((start.inner() + end.inner() + 1) >> 1);
+            let rook_square = Square::new((start.inner() + king_square.inner()) >> 1);
 
             // if the king is castling through check
             if self.is_square_attacked(rook_square) {
                 is_legal = false;
             }
 
-            self.move_piece(end, king_square, us, Pieces::KING);
-            self.move_piece(end, rook_square, us, Pieces::ROOK);
+            self.move_piece(end, king_square, us, Piece::KING);
+            self.move_piece(end, rook_square, us, Piece::ROOK);
 
             self.unset_castling_rights(us);
-        } else if captured != Pieces::NONE {
+        } else if captured != Piece::NONE {
             // if we're capturing a piece, unset the bitboard of the captured
             // piece.
             // By a happy accident, we don't need to check if we're capturing
@@ -216,28 +218,32 @@ impl Board {
             // Looks like two wrongs do make a right in binary.
             self.toggle_piece_bb(captured, end_bb);
             self.toggle_side_bb(them, end_bb);
-            if captured == Pieces::ROOK {
+            if captured == Piece::ROOK {
                 // if the captured rook is actually valid
                 // FIXME: actually this is completely wrong - the rook needs to
                 // be on the right square
-                self.unset_castling_right(them, (end & 1) as u8 + 1);
+                self.unset_castling_right(us, (end.inner() & 1) + 1);
             }
         }
-        if piece == Pieces::ROOK {
+        if piece == Piece::ROOK {
             // FIXME: same thing
-            self.unset_castling_right(us, (end & 1) as u8 + 1);
+            self.unset_castling_right(us, (end.inner() & 1) + 1);
         }
 
         if Self::is_double_pawn_push(start, end, piece) {
-            self.set_ep_square((start + end) >> 1);
+            self.set_ep_square(Square::new((start.inner() + end.inner()) >> 1));
         } else if is_en_passant {
-            let dest = if us == Sides::WHITE { end - 8 } else { end + 8 };
+            let dest = Square::new(if us == Side::WHITE {
+                end.inner() - 8
+            } else {
+                end.inner() + 8
+            });
             self.clear_piece(dest);
-            self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
+            self.toggle_piece_bb(Piece::PAWN, dest.to_bitboard());
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
             // unset the pawn on the promotion square...
-            self.toggle_piece_bb(Pieces::PAWN, end_bb);
+            self.toggle_piece_bb(Piece::PAWN, end_bb);
             // ...and set the promotion piece on that square
             self.toggle_piece_bb(promotion_piece, end_bb);
         }
@@ -269,36 +275,40 @@ impl Board {
         self.flip_side();
 
         let us = self.side_to_move();
-        let them = us ^ 1;
+        let them = us.flip();
 
-        let end_bb = as_bitboard(end);
+        let end_bb = end.to_bitboard();
 
         self.clear_ep_square();
 
         if is_castling {
-            let king_square = (start + end + 1) >> 1;
-            let rook_square = (start + king_square) >> 1;
+            let king_square = Square::new((start.inner() + end.inner() + 1) >> 1);
+            let rook_square = Square::new((start.inner() + king_square.inner()) >> 1);
 
-            self.move_piece(king_square, start, us, Pieces::KING);
-            self.move_piece(rook_square, end, us, Pieces::ROOK);
+            self.move_piece(king_square, start, us, Piece::KING);
+            self.move_piece(rook_square, end, us, Piece::ROOK);
 
             self.set_castling_rights(castling_rights);
         } else {
             self.unmove_piece(start, end, us, piece, captured);
-            if captured != Pieces::NONE {
+            if captured != Piece::NONE {
                 self.toggle_piece_bb(captured, end_bb);
                 self.toggle_side_bb(them, end_bb);
             }
         }
 
         if is_en_passant {
-            let dest = if us == Sides::WHITE { end - 8 } else { end + 8 };
-            self.set_piece(dest, Pieces::PAWN);
-            self.toggle_piece_bb(Pieces::PAWN, as_bitboard(dest));
+            let dest = Square::new(if us == Side::WHITE {
+                end.inner() - 8
+            } else {
+                end.inner() + 8
+            });
+            self.set_piece(dest, Piece::PAWN);
+            self.toggle_piece_bb(Piece::PAWN, dest.to_bitboard());
             self.set_ep_square(ep_square);
         } else if is_promotion {
             // the pawn would have been wrongly set earlier, so unset it now
-            self.toggle_piece_bb(Pieces::PAWN, end_bb);
+            self.toggle_piece_bb(Piece::PAWN, end_bb);
             self.toggle_piece_bb(promotion_piece, end_bb);
         }
     }
@@ -307,25 +317,25 @@ impl Board {
 impl Lookup {
     /// Finds the bishop attacks from `square` with the given blockers.
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_magic_table[self.bishop_magics[square].get_table_index(blockers)]
+        self.bishop_magic_table[self.bishop_magics[square.to_index()].get_table_index(blockers)]
     }
 
     /// Finds the king attacks from `square`.
     pub fn king_attacks(&self, square: Square) -> Bitboard {
-        self.king_attacks[square]
+        self.king_attacks[square.to_index()]
     }
 
     /// Finds the knight attacks from `square`.
     pub fn knight_attacks(&self, square: Square) -> Bitboard {
-        self.knight_attacks[square]
+        self.knight_attacks[square.to_index()]
     }
 
     /// Finds the pawn attacks from `square`.
     pub fn pawn_attacks<const IS_WHITE: bool>(&self, square: Square) -> Bitboard {
         if IS_WHITE {
-            self.pawn_attacks[Sides::WHITE][square]
+            self.pawn_attacks[Side::WHITE.to_index()][square.to_index()]
         } else {
-            self.pawn_attacks[Sides::BLACK][square]
+            self.pawn_attacks[Side::BLACK.to_index()][square.to_index()]
         }
     }
 
@@ -336,7 +346,7 @@ impl Lookup {
 
     /// Finds the rook attacks from `square` with the given blockers.
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.rook_magic_table[self.rook_magics[square].get_table_index(blockers)]
+        self.rook_magic_table[self.rook_magics[square.to_index()].get_table_index(blockers)]
     }
 }
 
@@ -345,20 +355,13 @@ impl Move {
     /// castling, is promotion, is en passant and piece (only set if
     /// `is_promotion`), in that order.
     pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
-        let start = (self.mv & Self::START_MASK) >> Self::START_SHIFT;
-        let end = (self.mv & Self::END_MASK) >> Self::END_SHIFT;
+        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let is_promotion = self.is_promotion();
         let is_castling = self.is_castling();
         let is_en_passant = self.is_en_passant();
-        let piece = (self.mv >> Self::PIECE_SHIFT) + 1;
-        (
-            start as Square,
-            end as Square,
-            is_castling,
-            is_en_passant,
-            is_promotion,
-            piece as Piece,
-        )
+        let piece = Piece::new((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        (start, end, is_castling, is_en_passant, is_promotion, piece)
     }
 
     /// Checks if the move is castling.
@@ -379,7 +382,7 @@ impl Move {
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
     /// only return a value from 1 to 4.
     pub fn promotion_piece(&self) -> Piece {
-        (self.mv >> Self::PIECE_SHIFT) as Piece + 1
+        Piece::new((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
     }
 }
 
@@ -407,37 +410,26 @@ impl Board {
         let occupancies = self.occupancies();
 
         if IS_WHITE {
-            if self.can_castle_kingside::<true>() && occupancies & Bitboards::CASTLING_SPACE_WK == 0
+            if self.can_castle_kingside::<true>()
+                && occupancies & Bitboard::CASTLING_SPACE_WK == Bitboard::new(0)
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
-                    Squares::E1,
-                    Squares::H1,
-                ));
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::H1));
             }
             if self.can_castle_queenside::<true>()
-                && occupancies & Bitboards::CASTLING_SPACE_WQ == 0
+                && occupancies & Bitboard::CASTLING_SPACE_WQ == Bitboard::new(0)
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
-                    Squares::E1,
-                    Squares::A1,
-                ));
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::A1));
             }
         } else {
             if self.can_castle_kingside::<false>()
-                && occupancies & Bitboards::CASTLING_SPACE_BK == 0
+                && occupancies & Bitboard::CASTLING_SPACE_BK == Bitboard::new(0)
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
-                    Squares::E8,
-                    Squares::H8,
-                ));
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::H8));
             }
             if self.can_castle_queenside::<false>()
-                && occupancies & Bitboards::CASTLING_SPACE_BQ == 0
+                && occupancies & Bitboard::CASTLING_SPACE_BQ == Bitboard::new(0)
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(
-                    Squares::E8,
-                    Squares::A8,
-                ));
+                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::A8));
             }
         }
     }
@@ -447,7 +439,7 @@ impl Board {
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.side::<IS_WHITE>();
 
-        let knights = BitIter::new(self.pieces::<{ Pieces::KNIGHT }>() & us_bb);
+        let knights = BitIter::new(self.pieces::<{ Piece::KNIGHT.to_index() }>() & us_bb);
         for knight in knights {
             let targets = BitIter::new(unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb);
             for target in targets {
@@ -455,7 +447,7 @@ impl Board {
             }
         }
 
-        let kings = BitIter::new(self.pieces::<{ Pieces::KING }>() & us_bb);
+        let kings = BitIter::new(self.pieces::<{ Piece::KING.to_index() }>() & us_bb);
         for king in kings {
             let targets = BitIter::new(unsafe { LOOKUPS.king_attacks(king) } & !us_bb);
             for target in targets {
@@ -469,44 +461,49 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
-        let ep_square_bb = if self.ep_square() == Squares::NONE {
-            0
+        let ep_square_bb = if self.ep_square() == Square::NONE {
+            Bitboard::new(0)
         } else {
-            as_bitboard(self.ep_square())
+            self.ep_square().to_bitboard()
         };
         let empty = !occupancies;
 
-        let mut pawns = self.pieces::<{ Pieces::PAWN }>() & us_bb;
-        while pawns != 0 {
-            let pawn = pop_lsb(&mut pawns);
-            let pawn_sq = to_square(pawn);
+        let mut pawns = self.pieces::<{ Piece::PAWN.to_index() }>() & us_bb;
+        while pawns != Bitboard::new(0) {
+            let pawn = pawns.pop_lsb();
+            let pawn_sq = pawn.to_square();
 
-            let single_push = pawn_push::<IS_WHITE>(pawn) & empty;
+            let single_push = pawn.pawn_push::<IS_WHITE>() & empty;
 
             let double_push_rank = if IS_WHITE {
-                Bitboards::RANK_BB[Ranks::RANK4]
+                Bitboard::RANK_BB[Rank::RANK4.to_index()]
             } else {
-                Bitboards::RANK_BB[Ranks::RANK5]
+                Bitboard::RANK_BB[Rank::RANK5.to_index()]
             };
-            let double_push = pawn_push::<IS_WHITE>(single_push) & empty & double_push_rank;
+            let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
             let all_captures = unsafe { LOOKUPS.pawn_attacks::<IS_WHITE>(pawn_sq) };
             let normal_captures = all_captures & them_bb;
             let ep_captures = all_captures & ep_square_bb;
 
             let targets = single_push | normal_captures | double_push;
-            let promotion_targets =
-                targets & (Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8]);
+            let promotion_targets = targets
+                & (Bitboard::RANK_BB[Rank::RANK1.to_index()]
+                    | Bitboard::RANK_BB[Rank::RANK8.to_index()]);
             let normal_targets = targets ^ promotion_targets;
 
             for target in BitIter::new(normal_targets) {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(pawn_sq, target));
             }
             for target in BitIter::new(promotion_targets) {
-                moves.push_move(Move::new_promo::<{ Pieces::KNIGHT }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ Pieces::BISHOP }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ Pieces::ROOK }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ Pieces::QUEEN }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Piece::KNIGHT.inner() }>(
+                    pawn_sq, target,
+                ));
+                moves.push_move(Move::new_promo::<{ Piece::BISHOP.inner() }>(
+                    pawn_sq, target,
+                ));
+                moves.push_move(Move::new_promo::<{ Piece::ROOK.inner() }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ Piece::QUEEN.inner() }>(pawn_sq, target));
             }
             for target in BitIter::new(ep_captures) {
                 moves.push_move(Move::new::<{ Move::EN_PASSANT_FLAG }>(pawn_sq, target));
@@ -520,7 +517,7 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
 
-        let bishops = BitIter::new(self.pieces::<{ Pieces::BISHOP }>() & us_bb);
+        let bishops = BitIter::new(self.pieces::<{ Piece::BISHOP.to_index() }>() & us_bb);
         for bishop in bishops {
             let targets =
                 BitIter::new(unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb);
@@ -529,7 +526,7 @@ impl Board {
             }
         }
 
-        let rooks = BitIter::new(self.pieces::<{ Pieces::ROOK }>() & us_bb);
+        let rooks = BitIter::new(self.pieces::<{ Piece::ROOK.to_index() }>() & us_bb);
         for rook in rooks {
             let targets = BitIter::new(unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb);
             for target in targets {
@@ -537,7 +534,7 @@ impl Board {
             }
         }
 
-        let queens = BitIter::new(self.pieces::<{ Pieces::QUEEN }>() & us_bb);
+        let queens = BitIter::new(self.pieces::<{ Piece::QUEEN.to_index() }>() & us_bb);
         for queen in queens {
             let targets =
                 BitIter::new(unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb);
@@ -552,9 +549,10 @@ impl Lookup {
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
-            let king = as_bitboard(square);
-            let mut attacks = east(king) | west(king) | king;
-            attacks |= north(attacks) | south(attacks);
+            let square = Square::new(square as u8);
+            let king = square.to_bitboard();
+            let mut attacks = king.east() | king.west() | king;
+            attacks |= attacks.north() | attacks.south();
             attacks ^= king;
             *bb = attacks;
         }
@@ -563,16 +561,17 @@ impl Lookup {
     /// Initialises knight attack lookup table.
     fn init_knight_attacks(&mut self) {
         for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
-            let knight = as_bitboard(square);
+            let square = Square::new(square as u8);
+            let knight = square.to_bitboard();
             // shortened name to avoid collisions with the function
-            let mut e = east(knight);
-            let mut w = west(knight);
-            let mut attacks = north(north(e | w));
-            attacks |= south(south(e | w));
-            e = east(e);
-            w = west(w);
-            attacks |= north(e | w);
-            attacks |= south(e | w);
+            let mut e = knight.east();
+            let mut w = knight.west();
+            let mut attacks = (e | w).north().north();
+            attacks |= (e | w).south().south();
+            e = e.east();
+            w = w.west();
+            attacks |= (e | w).north();
+            attacks |= (e | w).south();
             *bb = attacks
         }
     }
@@ -584,39 +583,55 @@ impl Lookup {
         let mut r_offset = 0;
 
         for square in 0..Nums::SQUARES {
-            let mut attacks = [Bitboards::EMPTY; MAX_BLOCKERS];
+            let square = Square::new(square as u8);
+            let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
 
-            let edges = ((Bitboards::FILE_BB[Files::FILE1] | Bitboards::FILE_BB[Files::FILE8])
-                & !Bitboards::FILE_BB[file_of(square)])
-                | ((Bitboards::RANK_BB[Ranks::RANK1] | Bitboards::RANK_BB[Ranks::RANK8])
-                    & !Bitboards::RANK_BB[rank_of(square)]);
-            let b_mask = sliding_attacks::<{ Pieces::BISHOP }>(square, Bitboards::EMPTY) & !edges;
-            let r_mask = sliding_attacks::<{ Pieces::ROOK }>(square, Bitboards::EMPTY) & !edges;
-            let b_mask_bits = b_mask.count_ones();
-            let r_mask_bits = r_mask.count_ones();
+            // FIXME: ew
+            let edges = ((Bitboard::FILE_BB[File::FILE1.to_index()]
+                | Bitboard::FILE_BB[File::FILE8.to_index()])
+                & !Bitboard::FILE_BB[square.file_of().to_index()])
+                | ((Bitboard::RANK_BB[Rank::RANK1.to_index()]
+                    | Bitboard::RANK_BB[Rank::RANK8.to_index()])
+                    & !Bitboard::RANK_BB[square.rank_of().to_index()]);
+            let b_mask =
+                sliding_attacks::<{ Piece::BISHOP.inner() }>(square, Bitboard::EMPTY) & !edges;
+            let r_mask =
+                sliding_attacks::<{ Piece::ROOK.inner() }>(square, Bitboard::EMPTY) & !edges;
+            let b_mask_bits = b_mask.inner().count_ones();
+            let r_mask_bits = r_mask.inner().count_ones();
             let b_perms = 2usize.pow(b_mask_bits);
             let r_perms = 2usize.pow(r_mask_bits);
-            let b_magic = Magic::new(BISHOP_MAGICS[square], b_mask, b_offset, 64 - b_mask_bits);
-            let r_magic = Magic::new(ROOK_MAGICS[square], r_mask, r_offset, 64 - r_mask_bits);
+            let b_magic = Magic::new(
+                BISHOP_MAGICS[square.to_index()],
+                b_mask,
+                b_offset,
+                64 - b_mask_bits,
+            );
+            let r_magic = Magic::new(
+                ROOK_MAGICS[square.to_index()],
+                r_mask,
+                r_offset,
+                64 - r_mask_bits,
+            );
 
-            gen_all_sliding_attacks::<{ Pieces::BISHOP }>(square, &mut attacks);
+            gen_all_sliding_attacks::<{ Piece::BISHOP.inner() }>(square, &mut attacks);
             let mut blockers = b_mask;
             for attack in attacks.iter().take(b_perms) {
                 let index = b_magic.get_table_index(blockers);
                 self.bishop_magic_table[index] = *attack;
-                blockers = blockers.wrapping_sub(1) & b_mask;
+                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & b_mask;
             }
-            self.bishop_magics[square] = b_magic;
+            self.bishop_magics[square.to_index()] = b_magic;
             b_offset += b_perms;
 
-            gen_all_sliding_attacks::<{ Pieces::ROOK }>(square, &mut attacks);
+            gen_all_sliding_attacks::<{ Piece::ROOK.inner() }>(square, &mut attacks);
             let mut blockers = r_mask;
             for attack in attacks.iter().take(r_perms) {
                 let index = r_magic.get_table_index(blockers);
                 self.rook_magic_table[index] = *attack;
-                blockers = blockers.wrapping_sub(1) & r_mask;
+                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & r_mask;
             }
-            self.rook_magics[square] = r_magic;
+            self.rook_magics[square.to_index()] = r_magic;
             r_offset += r_perms;
         }
     }
@@ -637,8 +652,8 @@ impl Lookup {
                 .skip(Nums::FILES)
             {
                 // adds 8 if the side is White (1) or subtracts 8 if Black (0)
-                let pushed = as_bitboard(square - 8 + side * 16);
-                *bb = east(pushed) | west(pushed);
+                let pushed = Square::new((square - 8 + side * 16) as u8).to_bitboard();
+                *bb = pushed.east() | pushed.west();
             }
         }
     }
@@ -656,18 +671,30 @@ impl Iterator for Moves {
 mod tests {
     use super::{Board, Move};
 
-    use crate::defs::{Pieces, Sides, Squares};
+    use crate::defs::{Bitboard, Piece, Side, Square};
 
     #[test]
     fn make_and_unmake() {
         let mut board = Board::new();
 
-        let mv = Move::new::<{ Move::NO_FLAG }>(Squares::A1, Squares::A3);
+        let mv = Move::new::<{ Move::NO_FLAG }>(Square::A1, Square::A3);
         board.make_move(mv);
-        assert_eq!(board.sides[Sides::WHITE], 0x000000000001fffe);
-        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000010080);
+        assert_eq!(
+            board.sides[Side::WHITE.to_index()],
+            Bitboard::new(0x000000000001fffe)
+        );
+        assert_eq!(
+            board.pieces[Piece::ROOK.to_index()],
+            Bitboard::new(0x8100000000010080)
+        );
         board.unmake_move();
-        assert_eq!(board.sides[Sides::WHITE], 0x000000000000ffff);
-        assert_eq!(board.pieces[Pieces::ROOK], 0x8100000000000081);
+        assert_eq!(
+            board.sides[Side::WHITE.to_index()],
+            Bitboard::new(0x000000000000ffff)
+        );
+        assert_eq!(
+            board.pieces[Piece::ROOK.to_index()],
+            Bitboard::new(0x8100000000000081)
+        );
     }
 }
