@@ -273,7 +273,7 @@ impl Board {
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
         self.castling_rights = Self::default_castling_rights();
-        //self.ep_square = Self::no_ep_square();
+        self.ep_square = Self::no_ep_square();
         self.side_to_move = Self::default_side();
     }
 }
