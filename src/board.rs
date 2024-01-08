@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 
 use crate::defs::{Bitboard, File, Nums, Piece, Rank, Side, Square, PIECE_CHARS};
-use movegen::{Lookup, Move, LOOKUPS};
+use movegen::{Lookup, LOOKUPS};
 
 pub use movegen::magic::find_magics;
 

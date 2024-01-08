@@ -1,7 +1,7 @@
 use super::Board;
 use crate::{
     board::CastlingRights,
-    defs::{Bitboard, File, Nums, Piece, Rank, Side, Square},
+    defs::{Bitboard, File, Nums, Piece, Rank, Side, Square, PIECE_CHARS},
     util::BitIter,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
@@ -341,6 +341,20 @@ impl Move {
     /// only return a value from 1 to 4.
     pub fn promotion_piece(&self) -> Piece {
         Piece::new((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+    }
+
+    /// Converts `mv` into its string representation.
+    pub fn stringify(&self) -> String {
+        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let mut ret = String::with_capacity(5);
+        ret += &start.stringify();
+        ret += &end.stringify();
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            ret.push(PIECE_CHARS[Side::BLACK.to_index()][self.promotion_piece().to_index()]);
+        }
+        ret
     }
 }
 

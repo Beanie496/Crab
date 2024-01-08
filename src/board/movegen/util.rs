@@ -1,23 +1,4 @@
-use crate::{
-    board::Move,
-    defs::{Bitboard, Direction, File, Piece, Rank, Side, Square, PIECE_CHARS},
-};
-
-impl Move {
-    /// Converts `mv` into its string representation.
-    pub fn stringify(&self) -> String {
-        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let mut ret = String::with_capacity(5);
-        ret += &start.stringify();
-        ret += &end.stringify();
-        if self.is_promotion() {
-            // we want the lowercase letter here
-            ret.push(PIECE_CHARS[Side::BLACK.to_index()][self.promotion_piece().to_index()]);
-        }
-        ret
-    }
-}
+use crate::defs::{Bitboard, Direction, File, Piece, Rank, Square};
 
 /// Generates all combinations of attacks from `square` and puts them in
 /// `attacks`. It starts with a full blocker board that goes from the
