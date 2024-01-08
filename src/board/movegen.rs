@@ -1,5 +1,6 @@
 use super::Board;
 use crate::{
+    board::CastlingRights,
     defs::{Bitboard, File, Nums, Piece, Rank, Side, Square},
     util::BitIter,
 };
@@ -175,6 +176,7 @@ impl Board {
         let captured = self.piece_on(end);
         let us = self.side_to_move();
         let them = us.flip();
+        let start_bb = end.to_bitboard();
         let end_bb = end.to_bitboard();
 
         self.move_piece(start, end, us, piece);
@@ -210,19 +212,40 @@ impl Board {
             self.toggle_piece_bb(captured, end_bb);
             self.toggle_side_bb(them, end_bb);
 
+            // check if we need to unset the castling rights if we're capturing
+            // a rook
             if captured == Piece::ROOK {
-                // if the captured rook is actually valid
-                // FIXME: actually this is completely wrong - the rook needs to
-                // be on the right square
-                self.unset_castling_right(us, (end.inner() & 1) + 1);
+                let them_inner = them.inner();
+                // this will be 0x81 if we're White (0x81 << 0) and
+                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
+                // the starting position of our rooks.
+                let rook_squares = Bitboard::new(0x81) << (them_inner * 56);
+                if end_bb & rook_squares != Bitboard::new(0) {
+                    // 0 or 56 for queenside -> 0
+                    // 7 or 63 for kingside -> 1
+                    let is_kingside = end.inner() & 1;
+                    // queenside -> 0b01
+                    // kingside -> 0b10
+                    // this replies upon knowing the internal representation of
+                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
+                    let flag = is_kingside + 1;
+                    self.unset_castling_right(us, CastlingRights::from(flag));
+                }
             }
         }
         if self.is_square_attacked(self.king_square()) {
             return false;
         }
+        // this is basically the same as a few lines ago but with start square
+        // instead of end
         if piece == Piece::ROOK {
-            // FIXME: same thing
-            self.unset_castling_right(us, (end.inner() & 1) + 1);
+            let them_inner = them.inner();
+            let rook_squares = Bitboard::new(0x81) << (them_inner * 56);
+            if start_bb & rook_squares != Bitboard::new(0) {
+                let is_kingside = end.inner() & 1;
+                let flag = is_kingside + 1;
+                self.unset_castling_right(us, CastlingRights::from(flag));
+            }
         }
 
         if Self::is_double_pawn_push(start, end, piece) {

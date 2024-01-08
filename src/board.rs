@@ -1,10 +1,16 @@
+use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
+
 use crate::defs::{Bitboard, File, Nums, Piece, Rank, Side, Square, PIECE_CHARS};
 use movegen::{Lookup, Move, LOOKUPS};
 
 pub use movegen::magic::find_magics;
 
-/// 4 bits: KQkq.
-pub type CastlingRights = u8;
+/// Stores castling rights.
+#[derive(Clone, Copy, PartialEq)]
+pub struct CastlingRights {
+    // 4 bits: KQkq.
+    cr: u8,
+}
 
 /// Items related to move generation.
 pub mod movegen;
@@ -30,14 +36,50 @@ pub struct Board {
     side_to_move: Side,
 }
 
+impl BitAnd for CastlingRights {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self::from(self.inner() & rhs.inner())
+    }
+}
+
+impl BitAndAssign for CastlingRights {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.cr &= rhs.inner()
+    }
+}
+
+impl BitOrAssign for CastlingRights {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.cr |= rhs.inner()
+    }
+}
+
+impl Not for CastlingRights {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self::from(!self.inner())
+    }
+}
+
+impl Shl<u8> for CastlingRights {
+    type Output = Self;
+
+    fn shl(self, rhs: u8) -> Self::Output {
+        Self::from(self.inner() << rhs)
+    }
+}
+
 #[allow(non_upper_case_globals)]
-impl Board {
-    pub const CASTLE_FLAGS_K: CastlingRights = 0b1000;
-    pub const CASTLE_FLAGS_Q: CastlingRights = 0b0100;
-    pub const CASTLE_FLAGS_k: CastlingRights = 0b0010;
-    pub const CASTLE_FLAGS_q: CastlingRights = 0b0001;
-    pub const CASTLE_FLAGS_KQkq: CastlingRights = 0b1111;
-    pub const CASTLE_FLAGS_NONE: CastlingRights = 0b0000;
+impl CastlingRights {
+    pub const CASTLE_FLAGS_K: CastlingRights = Self::from(0b1000);
+    pub const CASTLE_FLAGS_Q: CastlingRights = Self::from(0b0100);
+    pub const CASTLE_FLAGS_k: CastlingRights = Self::from(0b0010);
+    pub const CASTLE_FLAGS_q: CastlingRights = Self::from(0b0001);
+    pub const CASTLE_FLAGS_KQkq: CastlingRights = Self::from(0b1111);
+    pub const CASTLE_FLAGS_NONE: CastlingRights = Self::from(0b0000);
 }
 
 impl Board {
@@ -49,19 +91,14 @@ impl Board {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
-            castling_rights: Self::default_castling_rights(),
-            ep_square: Square::NONE,
+            castling_rights: CastlingRights::new(),
+            ep_square: Self::no_ep_square(),
             side_to_move: Self::default_side(),
         }
     }
 }
 
 impl Board {
-    /// Returns the default castling rights: `KQkq`.
-    fn default_castling_rights() -> CastlingRights {
-        Self::CASTLE_FLAGS_KQkq
-    }
-
     /// Returns the piece board of the starting position.
     /// ```
     /// assert_eq!(default_piece_board()[Square::A1.to_index()], Piece::ROOK);
@@ -160,11 +197,6 @@ impl Board {
         true
     }
 
-    /// Returns empty castling rights.
-    fn no_castling_rights() -> CastlingRights {
-        Self::CASTLE_FLAGS_NONE
-    }
-
     /// Returns no ep square.
     fn no_ep_square() -> Square {
         Square::NONE
@@ -197,7 +229,29 @@ impl Board {
     }
 }
 
+impl CastlingRights {
+    /// Returns new [`CastlingRights`] with contents `cr`.
+    const fn from(cr: u8) -> Self {
+        Self { cr }
+    }
+
+    /// Returns new [`CastlingRights`] with the default castling rights.
+    fn new() -> Self {
+        Self::CASTLE_FLAGS_KQkq
+    }
+
+    /// Returns empty [`CastlingRights`].
+    fn none() -> CastlingRights {
+        Self::CASTLE_FLAGS_NONE
+    }
+}
+
 impl Board {
+    /// Adds the given right to the castling rights.
+    pub fn add_castling_right(&mut self, right: CastlingRights) {
+        self.castling_rights.add_right(right);
+    }
+
     /// Adds a piece to square `square` for side `side`. Assumes there is no
     /// piece on the square to be written to.
     pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
@@ -207,12 +261,12 @@ impl Board {
         self.toggle_side_bb(side, square_bb);
     }
 
-    /// Sets `self` to its initial state.
+    /// Clears `self`.
     pub fn clear_board(&mut self) {
         self.piece_board = Self::empty_piece_board();
         self.pieces = Self::no_pieces();
         self.sides = Self::no_sides();
-        self.castling_rights = Self::no_castling_rights();
+        self.castling_rights = CastlingRights::none();
         self.ep_square = Self::no_ep_square();
         self.side_to_move = Self::no_side();
     }
@@ -230,16 +284,9 @@ impl Board {
         println!("    a b c d e f g h");
     }
 
-    /// Sets the castling rights of `side` to `rights`. `rights` should be 2
-    /// bits in the format `KQkq`, where the absence of a bit signifies the
-    /// lack of a right.
-    pub fn set_castling_rights(&mut self, rights: CastlingRights) {
-        self.castling_rights |= rights;
-    }
-
     /// Sets the default castling rights.
     pub fn set_default_castling_rights(&mut self) {
-        self.castling_rights = Self::default_castling_rights();
+        self.castling_rights.set_to_default();
     }
 
     /// Sets the en passant square to `square`.
@@ -272,7 +319,7 @@ impl Board {
         self.piece_board = Self::default_piece_board();
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
-        self.castling_rights = Self::default_castling_rights();
+        self.castling_rights = CastlingRights::new();
         self.ep_square = Self::no_ep_square();
         self.side_to_move = Self::default_side();
     }
@@ -281,20 +328,12 @@ impl Board {
 impl Board {
     /// Calculates if the given side can castle kingside.
     fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
-        if IS_WHITE {
-            self.castling_rights & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
-        } else {
-            self.castling_rights & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
-        }
+        self.castling_rights.can_castle_kingside::<IS_WHITE>()
     }
 
     /// Calculates if the given side can castle queenside.
     fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
-        if IS_WHITE {
-            self.castling_rights & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
-        } else {
-            self.castling_rights & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
-        }
+        self.castling_rights.can_castle_queenside::<IS_WHITE>()
     }
 
     /// Finds the piece on the given rank and file and converts it to its
@@ -430,20 +469,66 @@ impl Board {
         self.sides[side.to_index()] ^= bb;
     }
 
-    /// Unsets right `right` for side `side`. `right` is either `0b01` or
-    /// `0b10`.
+    /// Unsets right `right` for side `side`.
     fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
-        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
-        // a mask for the bits for White or Black. `&`ing the rights with
-        // `!(0b11 << (side * 2))` will clear the bits on the given side.
-        self.castling_rights &= !(right << (side.inner() * 2));
+        self.castling_rights.remove_right(side, right);
     }
 
     /// Clears the castling rights for `side`.
     fn unset_castling_rights(&mut self, side: Side) {
+        self.castling_rights.clear_side(side)
+    }
+}
+
+impl CastlingRights {
+    /// Adds the given right to `self`.
+    fn add_right(&mut self, right: Self) {
+        *self |= right;
+    }
+
+    /// Calculates if the given side can castle kingside.
+    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+        if IS_WHITE {
+            *self & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
+        } else {
+            *self & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
+        }
+    }
+
+    /// Calculates if the given side can castle queenside.
+    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+        if IS_WHITE {
+            *self & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
+        } else {
+            *self & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
+        }
+    }
+
+    /// Clears the rights for `side`.
+    fn clear_side(&mut self, side: Side) {
+        debug_assert_eq!(Side::WHITE.inner(), 1);
         // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
         // a mask for the bits for White or Black. `&`ing the rights with
         // `!(0b11 << (side * 2))` will clear the bits on the given side.
-        self.castling_rights &= !(0b11 << (side.inner() * 2));
+        *self &= Self::from(!(0b11 << (side.inner() * 2)));
+    }
+
+    /// Returns the contents of `self`.
+    fn inner(self) -> u8 {
+        self.cr
+    }
+
+    /// Removes the given right from `self`. `right` does not already have to
+    /// be set to be removed.
+    fn remove_right(&mut self, side: Side, right: Self) {
+        // `side.inner() * 2` is 0 for Black and 2 for White. Thus, if `right`
+        // is `0brr`, `right << side.inner()` is `0brr00` for White and `0brr`
+        // for Black.
+        *self &= !(right << (side.inner() * 2));
+    }
+
+    /// Sets the rights of `self` to default.
+    fn set_to_default(&mut self) {
+        *self = Self::new();
     }
 }

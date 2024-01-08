@@ -41,9 +41,9 @@ impl Engine {
         self.board.pretty_print();
     }
 
-    /// Sets the castling right/s `right`. Assumes `right` is valid.
-    pub fn set_castling_rights(&mut self, right: CastlingRights) {
-        self.board.set_castling_rights(right);
+    /// Adds the given right to the castling rights of the board.
+    pub fn add_castling_right(&mut self, right: CastlingRights) {
+        self.board.add_castling_right(right);
     }
 
     /// Sets the default castling right/s `right`.
@@ -158,10 +158,10 @@ impl Engine {
         if let Some(cr) = castling_rights {
             for right in cr.chars() {
                 match right {
-                    'K' => self.set_castling_rights(Board::CASTLE_FLAGS_K),
-                    'Q' => self.set_castling_rights(Board::CASTLE_FLAGS_Q),
-                    'k' => self.set_castling_rights(Board::CASTLE_FLAGS_k),
-                    'q' => self.set_castling_rights(Board::CASTLE_FLAGS_q),
+                    'K' => self.add_castling_right(CastlingRights::CASTLE_FLAGS_K),
+                    'Q' => self.add_castling_right(CastlingRights::CASTLE_FLAGS_Q),
+                    'k' => self.add_castling_right(CastlingRights::CASTLE_FLAGS_k),
+                    'q' => self.add_castling_right(CastlingRights::CASTLE_FLAGS_q),
                     '-' => (),
                     _ => {
                         self.set_startpos();

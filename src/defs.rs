@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl};
 
 // the idea for wrapping these types in structs and implementing a tonne of
 // methids/associated functions is taken from viridithas, so thanks cosmo
@@ -98,6 +98,14 @@ impl Not for Bitboard {
 
     fn not(self) -> Self::Output {
         Self::new(!self.inner())
+    }
+}
+
+impl Shl<u8> for Bitboard {
+    type Output = Self;
+
+    fn shl(self, rhs: u8) -> Self::Output {
+        Self::new(self.inner() << rhs)
     }
 }
 
