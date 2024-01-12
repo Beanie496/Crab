@@ -186,6 +186,10 @@ impl Board {
         // otherwise the second one would trigger incorrectly (since the the
         // target square, containing a rook, would count)
         if is_castling {
+            // if the king is castling out of check
+            if self.is_square_attacked(start) {
+                return false;
+            }
             let king_square = Square::from((start.inner() + end.inner() + 1) >> 1);
             let rook_square = Square::from((start.inner() + king_square.inner()) >> 1);
 
