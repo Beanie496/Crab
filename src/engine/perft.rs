@@ -30,11 +30,10 @@ impl Engine {
 }
 
 impl Engine {
-    /// Counts the number of leaf nodes `depth` moves in the future.
+    /// Outputs and returns the number of leaf nodes `depth` moves in the
+    /// future.
     ///
-    /// If `IS_ROOT`, it also prints each move followed by the number of leaf
-    /// nodes reached from that move, or just "1" if `depth == 0`, and
-    /// prints total node count, time and NPS at the end.
+    /// If `IS_TIMED`, it will also output the time taken and the average NPS.
     pub fn perft<const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
         if IS_TIMED {
             let time = Instant::now();
