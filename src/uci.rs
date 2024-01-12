@@ -6,7 +6,8 @@ pub struct Uci;
 
 impl Uci {
     /// Repeatedly waits for a command and executes it according to the UCI
-    /// protocol. It is not yet concurrent.
+    /// protocol. It is not yet concurrent, i.e. it cannot process commands
+    /// while not idle.
     pub fn main_loop() {
         let mut engine = Engine::new();
         let mut input = String::new();
