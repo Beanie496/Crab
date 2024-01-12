@@ -7,32 +7,39 @@ use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, N
 pub struct Bitboard {
     bb: u64,
 }
+
 /// A wrapper for an `i8`, since a direction can go from -9 to 9.
 pub struct Direction {
     d: i8,
 }
+
 /// A wrapper for a `u8`, since a file can go from 0 to 7.
 #[derive(Clone, Copy)]
 pub struct File {
     f: u8,
 }
+
 /// Miscellaneous constants associated with chess (`SIDES == 2`, etc.)
 pub struct Nums;
+
 /// A wrapper for a `u8`, since a piece can go from 0 to 12.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Piece {
     p: u8,
 }
+
 /// A wrapper for a `u8`, since a rank can go from 0 to 7.
 #[derive(Clone, Copy)]
 pub struct Rank {
     r: u8,
 }
+
 /// A wrapper for a `u8`, since a side is just 0, 1 or 2.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Side {
     s: u8,
 }
+
 /// A wrapper for a `u8`, since a square can go from 0 to 64.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct Square {
