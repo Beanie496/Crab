@@ -1,6 +1,6 @@
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 
-use crate::defs::{Bitboard, File, Nums, Piece, Rank, Side, Square, PIECE_CHARS};
+use crate::defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square};
 use movegen::{Lookup, LOOKUPS};
 
 pub use movegen::magic::find_magics;
@@ -345,10 +345,10 @@ impl Board {
         if piece == Piece::NONE {
             return '0';
         }
-        if self.sides[Side::WHITE.to_index()] & sq_bb != Bitboard::new(0) {
-            PIECE_CHARS[Side::WHITE.to_index()][piece.to_index()]
+        if self.side::<{ Side::WHITE.to_bool() }>() & sq_bb != Bitboard::new(0) {
+            piece_to_char(Side::WHITE, piece)
         } else {
-            PIECE_CHARS[Side::BLACK.to_index()][piece.to_index()]
+            piece_to_char(Side::BLACK, piece)
         }
     }
 

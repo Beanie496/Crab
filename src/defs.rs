@@ -46,7 +46,7 @@ pub struct Square {
  * // etc.
  * ```
  */
-pub const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
+const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
     ['p', 'n', 'b', 'r', 'q', 'k'],
     ['P', 'N', 'B', 'R', 'Q', 'K'],
 ];
@@ -427,8 +427,14 @@ impl Side {
     }
 
     /// Returns the contents of `self`.
-    pub fn inner(self) -> u8 {
+    pub const fn inner(self) -> u8 {
         self.s
+    }
+
+    /// Returns the contents of `self` as a bool: White is `true`, Black is
+    /// `false`.
+    pub const fn to_bool(self) -> bool {
+        self.inner() != 0
     }
 
     /// Returns the contents of `self` as a `usize`.
@@ -482,4 +488,14 @@ impl Square {
     pub fn to_index(self) -> usize {
         self.inner() as usize
     }
+}
+
+/// Converts the piece `piece` on side `side` to a character.
+/// ```
+/// assert_eq!(piece_to_char(Side::WHITE, Piece::KNIGHT), 'N');
+/// assert_eq!(piece_to_char(Side::BLACK, Piece::QUEEN), 'q');
+/// // etc.
+/// ```
+pub fn piece_to_char(side: Side, piece: Piece) -> char {
+    PIECE_CHARS[side.to_index()][piece.to_index()]
 }

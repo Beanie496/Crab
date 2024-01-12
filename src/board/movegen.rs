@@ -1,7 +1,7 @@
 use super::Board;
 use crate::{
     board::CastlingRights,
-    defs::{Bitboard, File, Nums, Piece, Rank, Side, Square, PIECE_CHARS},
+    defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
     util::BitIter,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
@@ -352,7 +352,7 @@ impl Move {
         ret += &end.stringify();
         if self.is_promotion() {
             // we want the lowercase letter here
-            ret.push(PIECE_CHARS[Side::BLACK.to_index()][self.promotion_piece().to_index()]);
+            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
         }
         ret
     }
