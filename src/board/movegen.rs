@@ -246,7 +246,7 @@ impl Board {
             let them_inner = them.inner();
             let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
             if start_bb & rook_squares != Bitboard::from(0) {
-                let is_kingside = end.inner() & 1;
+                let is_kingside = start.inner() & 1;
                 let flag = is_kingside + 1;
                 self.unset_castling_right(us, CastlingRights::from(flag));
             }
