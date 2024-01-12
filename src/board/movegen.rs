@@ -264,10 +264,10 @@ impl Board {
                 end.inner() + 8
             });
             self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
+            self.toggle_side_bb(them, Bitboard::from_square(dest));
             if self.is_square_attacked(self.king_square()) {
                 return false;
             }
-            self.toggle_side_bb(them, Bitboard::from_square(dest));
             self.clear_piece(dest);
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
