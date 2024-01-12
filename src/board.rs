@@ -129,29 +129,29 @@ impl Board {
 
     /// Returns the pieces of the starting position.
     /// ```
-    /// assert_eq!(default_pieces()[Piece::PAWN.to_index()], Bitboard::new(0x00ff00000000ff00));
+    /// assert_eq!(default_pieces()[Piece::PAWN.to_index()], Bitboard::from(0x00ff00000000ff00));
     /// // etc.
     /// ```
     fn default_pieces() -> [Bitboard; Nums::PIECES] {
         [
-            Bitboard::new(0x00ff00000000ff00), // Pawns
-            Bitboard::new(0x4200000000000042), // Knights
-            Bitboard::new(0x2400000000000024), // Bishops
-            Bitboard::new(0x8100000000000081), // Rooks
-            Bitboard::new(0x0800000000000008), // Queens
-            Bitboard::new(0x1000000000000010), // Kings
+            Bitboard::from(0x00ff00000000ff00), // Pawns
+            Bitboard::from(0x4200000000000042), // Knights
+            Bitboard::from(0x2400000000000024), // Bishops
+            Bitboard::from(0x8100000000000081), // Rooks
+            Bitboard::from(0x0800000000000008), // Queens
+            Bitboard::from(0x1000000000000010), // Kings
         ]
     }
 
     /// Returns the sides of the starting position.
     /// ```
-    /// assert_eq!(default_pieces()[Side::WHITE.to_index()], Bitboard::new(0x000000000000ffff));
-    /// assert_eq!(default_pieces()[Side::BLACK.to_index()], Bitboard::new(0xffff000000000000));
+    /// assert_eq!(default_pieces()[Side::WHITE.to_index()], Bitboard::from(0x000000000000ffff));
+    /// assert_eq!(default_pieces()[Side::BLACK.to_index()], Bitboard::from(0xffff000000000000));
     /// ```
     fn default_sides() -> [Bitboard; Nums::SIDES] {
         [
-            Bitboard::new(0xffff000000000000), // Black
-            Bitboard::new(0x000000000000ffff), // White
+            Bitboard::from(0xffff000000000000), // Black
+            Bitboard::from(0x000000000000ffff), // White
         ]
     }
 
@@ -182,15 +182,15 @@ impl Board {
         if piece != Piece::PAWN {
             return false;
         }
-        let start_bb = start.to_bitboard();
-        let end_bb = end.to_bitboard();
+        let start_bb = Bitboard::from_square(start);
+        let end_bb = Bitboard::from_square(end);
         if start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))
-            == Bitboard::new(0)
+            == Bitboard::from(0)
         {
             return false;
         }
         if end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))
-            == Bitboard::new(0)
+            == Bitboard::from(0)
         {
             return false;
         }
@@ -205,12 +205,12 @@ impl Board {
     /// Returns the pieces of an empty board.
     fn no_pieces() -> [Bitboard; Nums::PIECES] {
         [
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
         ]
     }
 
@@ -218,8 +218,8 @@ impl Board {
     #[rustfmt::skip]
     fn no_sides() -> [Bitboard; Nums::SIDES] {
         [
-            Bitboard::new(0x0000000000000000),
-            Bitboard::new(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000000000000000),
         ]
     }
 
@@ -255,7 +255,7 @@ impl Board {
     /// Adds a piece to square `square` for side `side`. Assumes there is no
     /// piece on the square to be written to.
     pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
-        let square_bb = square.to_bitboard();
+        let square_bb = Bitboard::from_square(square);
         self.set_piece(square, piece);
         self.toggle_piece_bb(piece, square_bb);
         self.toggle_side_bb(side, square_bb);
@@ -276,7 +276,10 @@ impl Board {
         for r in (0..Nums::RANKS as u8).rev() {
             print!("{} | ", r + 1);
             for f in 0..Nums::FILES as u8 {
-                print!("{} ", self.char_piece_from_pos(Rank::new(r), File::new(f)));
+                print!(
+                    "{} ",
+                    self.char_piece_from_pos(Rank::from(r), File::from(f))
+                );
             }
             println!();
         }
@@ -345,7 +348,7 @@ impl Board {
         if piece == Piece::NONE {
             return '0';
         }
-        if self.side::<{ Side::WHITE.to_bool() }>() & sq_bb != Bitboard::new(0) {
+        if self.side::<{ Side::WHITE.to_bool() }>() & sq_bb != Bitboard::from(0) {
             piece_to_char(Side::WHITE, piece)
         } else {
             piece_to_char(Side::BLACK, piece)
@@ -403,7 +406,7 @@ impl Board {
             | is_attacked_diagonally
             | is_attacked_orthogonally)
             & them_bb
-            != Bitboard::new(0)
+            != Bitboard::from(0)
     }
 
     /// Calculates the square the king is on.
@@ -416,8 +419,8 @@ impl Board {
     /// `start` in the piece array to [`Square::NONE`] and sets `end` in the
     /// piece array to `piece`.
     fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
-        let start_bb = start.to_bitboard();
-        let end_bb = end.to_bitboard();
+        let start_bb = Bitboard::from_square(start);
+        let end_bb = Bitboard::from_square(end);
 
         self.toggle_piece_bb(piece, start_bb | end_bb);
         self.toggle_side_bb(side, start_bb | end_bb);

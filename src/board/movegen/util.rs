@@ -13,21 +13,21 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
         & !Bitboard::rank_bb(square.rank_of());
     let edges = excluded_ranks_bb | excluded_files_bb;
-    let mask = sliding_attacks::<PIECE>(square, Bitboard::new(0)) & !edges;
+    let mask = sliding_attacks::<PIECE>(square, Bitboard::from(0)) & !edges;
 
     let mut blockers = mask;
     let mut first_empty = 0;
-    while blockers != Bitboard::new(0) {
+    while blockers != Bitboard::from(0) {
         attacks[first_empty] = sliding_attacks::<PIECE>(square, blockers);
         first_empty += 1;
-        blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & mask;
+        blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & mask;
     }
-    attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::new(0));
+    attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::from(0));
 }
 
 /// Checks if `square` can go in the given direction.
 pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
-    let dest = Square::new(square.inner().wrapping_add(DIRECTION as u8));
+    let dest = Square::from(square.inner().wrapping_add(DIRECTION as u8));
     // credit to Stockfish, as I didn't come up with this code.
     // It checks if `square` is still within the board, and if it is, it checks
     // if it hasn't wrapped (because if it has wrapped, the distance will be
@@ -42,9 +42,11 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
     let mut attacks = Bitboard::EMPTY;
     // checks if the next square is valid and if the piece can move from the
     // square
-    while is_valid::<DIRECTION>(square) && square.to_bitboard() & blockers == Bitboard::new(0) {
-        square = Square::new(square.inner().wrapping_add(DIRECTION as u8));
-        attacks |= square.to_bitboard();
+    while is_valid::<DIRECTION>(square)
+        && Bitboard::from_square(square) & blockers == Bitboard::from(0)
+    {
+        square = Square::from(square.inner().wrapping_add(DIRECTION as u8));
+        attacks |= Bitboard::from_square(square);
     }
     attacks
 }
@@ -52,7 +54,7 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
 /// Generates the attack set for `piece` on `square` up to and including the
 /// given blockers. Includes the edge.
 pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
-    let piece = Piece::new(PIECE);
+    let piece = Piece::from(PIECE);
     let mut ray = Bitboard::EMPTY;
     if piece == Piece::BISHOP {
         ray |= ray_attack::<{ Direction::NE.inner() }>(square, blockers);

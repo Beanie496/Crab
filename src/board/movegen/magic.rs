@@ -173,7 +173,7 @@ impl Magic {
     pub const fn default() -> Self {
         Self {
             magic: 0,
-            mask: Bitboard::new(0),
+            mask: Bitboard::from(0),
             offset: 0,
             shift: 0,
         }
@@ -194,7 +194,7 @@ impl Magic {
 
 /// Finds magic numbers for all 64 squares for both the rook and bishop.
 pub fn find_magics<const PIECE: u8>() {
-    let piece = Piece::new(PIECE);
+    let piece = Piece::from(PIECE);
     let piece_str = if piece == Piece::BISHOP {
         "bishop"
     } else if piece == Piece::ROOK {
@@ -217,7 +217,7 @@ pub fn find_magics<const PIECE: u8>() {
     );
 
     for square in 0..Nums::SQUARES {
-        let square = Square::new(square as u8);
+        let square = Square::from(square as u8);
         let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
             & !Bitboard::file_bb(square.file_of());
         let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
@@ -257,7 +257,7 @@ pub fn find_magics<const PIECE: u8>() {
                     break;
                 }
                 // Carry-Rippler trick
-                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & mask;
+                blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & mask;
             }
             if found {
                 println!("Found magic for {piece_str}: {sparse_rand}");

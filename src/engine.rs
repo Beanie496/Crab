@@ -112,11 +112,11 @@ impl Engine {
                         return eprintln!("Error: \"{piece}\" is not a valid piece.");
                     };
                     // 1 if White, 0 if Black
-                    let side = Side::new(piece.is_ascii_uppercase() as u8);
+                    let side = Side::from(piece.is_ascii_uppercase() as u8);
 
                     self.board.add_piece(
                         side,
-                        Square::from_pos(Rank::new(rank_idx), File::new(file_idx)),
+                        Square::from_pos(Rank::from(rank_idx), File::from(file_idx)),
                         piece_num,
                     );
 

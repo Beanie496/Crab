@@ -176,8 +176,8 @@ impl Board {
         let captured = self.piece_on(end);
         let us = self.side_to_move();
         let them = us.flip();
-        let start_bb = end.to_bitboard();
-        let end_bb = end.to_bitboard();
+        let start_bb = Bitboard::from_square(start);
+        let end_bb = Bitboard::from_square(end);
 
         self.move_piece(start, end, us, piece);
         self.clear_ep_square();
@@ -186,8 +186,8 @@ impl Board {
         // otherwise the second one would trigger incorrectly (since the the
         // target square, containing a rook, would count)
         if is_castling {
-            let king_square = Square::new((start.inner() + end.inner() + 1) >> 1);
-            let rook_square = Square::new((start.inner() + king_square.inner()) >> 1);
+            let king_square = Square::from((start.inner() + end.inner() + 1) >> 1);
+            let rook_square = Square::from((start.inner() + king_square.inner()) >> 1);
 
             // if the king is castling through check
             if self.is_square_attacked(rook_square) {
@@ -219,8 +219,8 @@ impl Board {
                 // this will be 0x81 if we're White (0x81 << 0) and
                 // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
                 // the starting position of our rooks.
-                let rook_squares = Bitboard::new(0x81) << (them_inner * 56);
-                if end_bb & rook_squares != Bitboard::new(0) {
+                let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
+                if end_bb & rook_squares != Bitboard::from(0) {
                     // 0 or 56 for queenside -> 0
                     // 7 or 63 for kingside -> 1
                     let is_kingside = end.inner() & 1;
@@ -240,8 +240,8 @@ impl Board {
         // instead of end
         if piece == Piece::ROOK {
             let them_inner = them.inner();
-            let rook_squares = Bitboard::new(0x81) << (them_inner * 56);
-            if start_bb & rook_squares != Bitboard::new(0) {
+            let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
+            if start_bb & rook_squares != Bitboard::from(0) {
                 let is_kingside = end.inner() & 1;
                 let flag = is_kingside + 1;
                 self.unset_castling_right(us, CastlingRights::from(flag));
@@ -249,18 +249,18 @@ impl Board {
         }
 
         if Self::is_double_pawn_push(start, end, piece) {
-            self.set_ep_square(Square::new((start.inner() + end.inner()) >> 1));
+            self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
         } else if is_en_passant {
-            let dest = Square::new(if us == Side::WHITE {
+            let dest = Square::from(if us == Side::WHITE {
                 end.inner() - 8
             } else {
                 end.inner() + 8
             });
-            self.toggle_piece_bb(Piece::PAWN, dest.to_bitboard());
+            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
             if self.is_square_attacked(self.king_square()) {
                 return false;
             }
-            self.toggle_side_bb(them, dest.to_bitboard());
+            self.toggle_side_bb(them, Bitboard::from_square(dest));
             self.clear_piece(dest);
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
@@ -313,12 +313,12 @@ impl Move {
     /// castling, is promotion, is en passant and piece (only set if
     /// `is_promotion`), in that order.
     pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
-        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let is_promotion = self.is_promotion();
         let is_castling = self.is_castling();
         let is_en_passant = self.is_en_passant();
-        let piece = Piece::new((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
         (start, end, is_castling, is_en_passant, is_promotion, piece)
     }
 
@@ -340,13 +340,13 @@ impl Move {
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
     /// only return a value from 1 to 4.
     pub fn promotion_piece(&self) -> Piece {
-        Piece::new((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
     }
 
     /// Converts `mv` into its string representation.
     pub fn stringify(&self) -> String {
-        let start = Square::new(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::new(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let mut ret = String::with_capacity(5);
         ret += &start.stringify();
         ret += &end.stringify();
@@ -383,23 +383,23 @@ impl Board {
 
         if IS_WHITE {
             if self.can_castle_kingside::<true>()
-                && occupancies & Bitboard::CASTLING_SPACE_WK == Bitboard::new(0)
+                && occupancies & Bitboard::CASTLING_SPACE_WK == Bitboard::from(0)
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::H1));
             }
             if self.can_castle_queenside::<true>()
-                && occupancies & Bitboard::CASTLING_SPACE_WQ == Bitboard::new(0)
+                && occupancies & Bitboard::CASTLING_SPACE_WQ == Bitboard::from(0)
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::A1));
             }
         } else {
             if self.can_castle_kingside::<false>()
-                && occupancies & Bitboard::CASTLING_SPACE_BK == Bitboard::new(0)
+                && occupancies & Bitboard::CASTLING_SPACE_BK == Bitboard::from(0)
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::H8));
             }
             if self.can_castle_queenside::<false>()
-                && occupancies & Bitboard::CASTLING_SPACE_BQ == Bitboard::new(0)
+                && occupancies & Bitboard::CASTLING_SPACE_BQ == Bitboard::from(0)
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::A8));
             }
@@ -434,14 +434,14 @@ impl Board {
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
         let ep_square_bb = if self.ep_square() == Square::NONE {
-            Bitboard::new(0)
+            Bitboard::from(0)
         } else {
-            self.ep_square().to_bitboard()
+            Bitboard::from_square(self.ep_square())
         };
         let empty = !occupancies;
 
         let mut pawns = self.pieces::<{ Piece::PAWN.to_index() }>() & us_bb;
-        while pawns != Bitboard::new(0) {
+        while pawns != Bitboard::from(0) {
             let pawn = pawns.pop_lsb();
             let pawn_sq = pawn.to_square();
 
@@ -526,8 +526,8 @@ impl Lookup {
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
-            let square = Square::new(square as u8);
-            let king = square.to_bitboard();
+            let square = Square::from(square as u8);
+            let king = Bitboard::from_square(square);
             let mut attacks = king.east() | king.west() | king;
             attacks |= attacks.north() | attacks.south();
             attacks ^= king;
@@ -538,8 +538,8 @@ impl Lookup {
     /// Initialises knight attack lookup table.
     fn init_knight_attacks(&mut self) {
         for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
-            let square = Square::new(square as u8);
-            let knight = square.to_bitboard();
+            let square = Square::from(square as u8);
+            let knight = Bitboard::from_square(square);
             // shortened name to avoid collisions with the function
             let mut e = knight.east();
             let mut w = knight.west();
@@ -560,7 +560,7 @@ impl Lookup {
         let mut r_offset = 0;
 
         for square in 0..Nums::SQUARES {
-            let square = Square::new(square as u8);
+            let square = Square::from(square as u8);
             let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
             let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1)
                 | Bitboard::file_bb(File::FILE8))
@@ -595,7 +595,7 @@ impl Lookup {
             for attack in attacks.iter().take(b_perms) {
                 let index = b_magic.get_table_index(blockers);
                 self.bishop_magic_table[index] = *attack;
-                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & b_mask;
+                blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & b_mask;
             }
             self.bishop_magics[square.to_index()] = b_magic;
             b_offset += b_perms;
@@ -605,7 +605,7 @@ impl Lookup {
             for attack in attacks.iter().take(r_perms) {
                 let index = r_magic.get_table_index(blockers);
                 self.rook_magic_table[index] = *attack;
-                blockers = Bitboard::new(blockers.inner().wrapping_sub(1)) & r_mask;
+                blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & r_mask;
             }
             self.rook_magics[square.to_index()] = r_magic;
             r_offset += r_perms;
@@ -628,7 +628,7 @@ impl Lookup {
                 .skip(Nums::FILES)
             {
                 // adds 8 if the side is White (1) or subtracts 8 if Black (0)
-                let pushed = Square::new((square - 8 + side * 16) as u8).to_bitboard();
+                let pushed = Bitboard::from_square(Square::from((square - 8 + side * 16) as u8));
                 *bb = pushed.east() | pushed.west();
             }
         }

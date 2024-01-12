@@ -55,7 +55,7 @@ impl BitAnd for Bitboard {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self::new(self.inner() & rhs.inner())
+        Self::from(self.inner() & rhs.inner())
     }
 }
 
@@ -69,7 +69,7 @@ impl BitOr for Bitboard {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        Self::new(self.inner() | rhs.inner())
+        Self::from(self.inner() | rhs.inner())
     }
 }
 
@@ -83,7 +83,7 @@ impl BitXor for Bitboard {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        Self::new(self.inner() ^ rhs.inner())
+        Self::from(self.inner() ^ rhs.inner())
     }
 }
 
@@ -97,7 +97,7 @@ impl Not for Bitboard {
     type Output = Self;
 
     fn not(self) -> Self::Output {
-        Self::new(!self.inner())
+        Self::from(!self.inner())
     }
 }
 
@@ -105,35 +105,35 @@ impl Shl<u8> for Bitboard {
     type Output = Self;
 
     fn shl(self, rhs: u8) -> Self::Output {
-        Self::new(self.inner() << rhs)
+        Self::from(self.inner() << rhs)
     }
 }
 
 /// Pre-constructed bitboards.
 impl Bitboard {
-    pub const EMPTY: Bitboard = Self::new(0);
-    pub const CASTLING_SPACE_WK: Bitboard = Self::new(0x0000000000000060);
-    pub const CASTLING_SPACE_WQ: Bitboard = Self::new(0x00000000000000e0);
-    pub const CASTLING_SPACE_BK: Bitboard = Self::new(0x6000000000000000);
-    pub const CASTLING_SPACE_BQ: Bitboard = Self::new(0x0e00000000000000);
+    pub const EMPTY: Bitboard = Self::from(0);
+    pub const CASTLING_SPACE_WK: Bitboard = Self::from(0x0000000000000060);
+    pub const CASTLING_SPACE_WQ: Bitboard = Self::from(0x00000000000000e0);
+    pub const CASTLING_SPACE_BK: Bitboard = Self::from(0x6000000000000000);
+    pub const CASTLING_SPACE_BQ: Bitboard = Self::from(0x0e00000000000000);
 }
 
 /// The square difference in each of the 8 directions.
 impl Direction {
-    pub const N: Direction = Self::new(8);
-    pub const NE: Direction = Self::new(9);
-    pub const E: Direction = Self::new(1);
-    pub const SE: Direction = Self::new(-7);
-    pub const S: Direction = Self::new(-8);
-    pub const SW: Direction = Self::new(-9);
-    pub const W: Direction = Self::new(-1);
-    pub const NW: Direction = Self::new(7);
+    pub const N: Direction = Self::from(8);
+    pub const NE: Direction = Self::from(9);
+    pub const E: Direction = Self::from(1);
+    pub const SE: Direction = Self::from(-7);
+    pub const S: Direction = Self::from(-8);
+    pub const SW: Direction = Self::from(-9);
+    pub const W: Direction = Self::from(-1);
+    pub const NW: Direction = Self::from(7);
 }
 
 /// Enumerates files.
 impl File {
-    pub const FILE1: File = Self::new(0);
-    pub const FILE8: File = Self::new(7);
+    pub const FILE1: File = Self::from(0);
+    pub const FILE8: File = Self::from(7);
 }
 
 impl Nums {
@@ -146,96 +146,102 @@ impl Nums {
 
 /// Enumerates pieces.
 impl Piece {
-    pub const PAWN: Piece = Self::new(0);
-    pub const KNIGHT: Piece = Self::new(1);
-    pub const BISHOP: Piece = Self::new(2);
-    pub const ROOK: Piece = Self::new(3);
-    pub const QUEEN: Piece = Self::new(4);
-    pub const KING: Piece = Self::new(5);
-    pub const NONE: Piece = Self::new(6);
+    pub const PAWN: Piece = Self::from(0);
+    pub const KNIGHT: Piece = Self::from(1);
+    pub const BISHOP: Piece = Self::from(2);
+    pub const ROOK: Piece = Self::from(3);
+    pub const QUEEN: Piece = Self::from(4);
+    pub const KING: Piece = Self::from(5);
+    pub const NONE: Piece = Self::from(6);
 }
 
 /// Enumerates ranks.
 impl Rank {
-    pub const RANK1: Rank = Self::new(0);
-    pub const RANK2: Rank = Self::new(1);
-    pub const RANK4: Rank = Self::new(3);
-    pub const RANK5: Rank = Self::new(4);
-    pub const RANK7: Rank = Self::new(6);
-    pub const RANK8: Rank = Self::new(7);
+    pub const RANK1: Rank = Self::from(0);
+    pub const RANK2: Rank = Self::from(1);
+    pub const RANK4: Rank = Self::from(3);
+    pub const RANK5: Rank = Self::from(4);
+    pub const RANK7: Rank = Self::from(6);
+    pub const RANK8: Rank = Self::from(7);
 }
 
 /// Enumerates sides.
 impl Side {
-    pub const BLACK: Side = Self::new(0);
-    pub const WHITE: Side = Self::new(1);
-    pub const NONE: Side = Self::new(2);
+    pub const BLACK: Side = Self::from(0);
+    pub const WHITE: Side = Self::from(1);
+    pub const NONE: Side = Self::from(2);
 }
 
 /// Enumerates squares. This engine uses little-endian rank-file mapping.
 // Allowed dead code because unit tests use these.
 #[allow(dead_code)]
 impl Square {
-    pub const A1: Square = Self::new(0);
-    pub const C1: Square = Self::new(2);
-    pub const E1: Square = Self::new(4);
-    pub const G1: Square = Self::new(6);
-    pub const H1: Square = Self::new(7);
-    pub const A3: Square = Self::new(16);
-    pub const E4: Square = Self::new(28);
-    pub const D5: Square = Self::new(35);
-    pub const C6: Square = Self::new(42);
-    pub const E6: Square = Self::new(44);
-    pub const A7: Square = Self::new(48);
-    pub const A8: Square = Self::new(56);
-    pub const E8: Square = Self::new(60);
-    pub const H8: Square = Self::new(63);
-    pub const NONE: Square = Self::new(64);
+    pub const A1: Square = Self::from(0);
+    pub const C1: Square = Self::from(2);
+    pub const E1: Square = Self::from(4);
+    pub const G1: Square = Self::from(6);
+    pub const H1: Square = Self::from(7);
+    pub const A3: Square = Self::from(16);
+    pub const E4: Square = Self::from(28);
+    pub const D5: Square = Self::from(35);
+    pub const C6: Square = Self::from(42);
+    pub const E6: Square = Self::from(44);
+    pub const A7: Square = Self::from(48);
+    pub const A8: Square = Self::from(56);
+    pub const E8: Square = Self::from(60);
+    pub const H8: Square = Self::from(63);
+    pub const NONE: Square = Self::from(64);
     /// Should only be used when the [`Square`] needs to be 0.
-    pub const NULL: Square = Self::new(0);
+    pub const NULL: Square = Self::from(0);
 }
 
 impl Bitboard {
     /// ```
-    /// assert_eq!(Bitboard::file_bb(File::FILE1), Self::new(0x0101010101010101));
-    /// assert_eq!(Bitboard::file_bb(File::FILE2), Self::new(0x0202020202020202));
+    /// assert_eq!(Bitboard::file_bb(File::FILE1), Self::from(0x0101010101010101));
+    /// assert_eq!(Bitboard::file_bb(File::FILE2), Self::from(0x0202020202020202));
     /// // etc.
     /// ```
     pub fn file_bb(file: File) -> Self {
-        Bitboard::new(0x0101010101010101 << (file.inner() as u32))
+        Self::from(0x0101010101010101 << (file.inner() as u32))
+    }
+
+    /// Wraps a `u64` in a [`Bitboard`].
+    pub const fn from(bb: u64) -> Self {
+        Self { bb }
     }
 
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
     /// given position set.
     pub fn from_pos(rank: Rank, file: File) -> Self {
-        Self::new(1 << (rank.r * 8 + file.f))
+        Self::from(1 << (rank.inner() * 8 + file.inner()))
     }
 
-    /// Creates a new [`Bitboard`] with contents `bb`.
-    pub const fn new(bb: u64) -> Self {
-        Self { bb }
+    /// Converts a [`Square`] into a [`Bitboard`] with the bit in the given
+    /// position set.
+    pub fn from_square(square: Square) -> Self {
+        Self::from(1 << square.inner())
     }
 
     /// ```
-    /// assert_eq!(Bitboard::rank_bb(Rank::RANK1), Self::new(0x00000000000000ff));
-    /// assert_eq!(Bitboard::rank_bb(Rank::RANK2), Self::new(0x000000000000ff00));
+    /// assert_eq!(Bitboard::rank_bb(Rank::RANK1), Self::from(0x00000000000000ff));
+    /// assert_eq!(Bitboard::rank_bb(Rank::RANK2), Self::from(0x000000000000ff00));
     /// // etc.
     /// ```
     pub fn rank_bb(rank: Rank) -> Self {
-        Bitboard::new(0xff << (rank.inner() as u32 * 8))
+        Self::from(0xff << (rank.inner() as u32 * 8))
     }
 }
 
 impl Direction {
-    /// Creates a new [`Direction`] with contents `direction`.
-    pub const fn new(direction: i8) -> Self {
+    /// Wraps an `i8` in a [`Direction`].
+    pub const fn from(direction: i8) -> Self {
         Self { d: direction }
     }
 }
 
 impl File {
-    /// Creates a new [`File`] with contents `file`.
-    pub const fn new(file: u8) -> Self {
+    /// Wraps a `u8` in a [`File`].
+    pub const fn from(file: u8) -> Self {
         Self { f: file }
     }
 }
@@ -255,35 +261,35 @@ impl Piece {
         }
     }
 
-    /// Creates a new [`Piece`] with contents `piece`.
-    pub const fn new(piece: u8) -> Self {
+    /// Wraps a `u8` in a [`Piece`].
+    pub const fn from(piece: u8) -> Self {
         Self { p: piece }
     }
 }
 
 impl Rank {
-    /// Creates a new [`Rank`] with contents `rank`.
-    pub const fn new(rank: u8) -> Self {
+    /// Wraps a `u8` in a [`Rank`].
+    pub const fn from(rank: u8) -> Self {
         Self { r: rank }
     }
 }
 
 impl Side {
-    /// Creates a new [`Side`] with contents `side`.
-    pub const fn new(side: u8) -> Self {
+    /// Wraps a `u8` in a [`Side`].
+    pub const fn from(side: u8) -> Self {
         Self { s: side }
     }
 }
 
 impl Square {
-    /// Creates a new [`Square`] with contents `square`.
-    pub const fn new(square: u8) -> Self {
+    /// Wraps a `u8` in a [`Square`].
+    pub const fn from(square: u8) -> Self {
         Self { sq: square }
     }
 
     /// Converts `rank` and `file` into a [`Square`].
     pub fn from_pos(rank: Rank, file: File) -> Self {
-        Self::new(rank.r * 8 + file.f)
+        Self::from(rank.inner() * 8 + file.inner())
     }
 
     /// Converts a string representation of a square (e.g. "e4") into a
@@ -305,14 +311,14 @@ impl Square {
             return None;
         }
 
-        Some(Self::new(square))
+        Some(Self::from(square))
     }
 }
 
 impl Bitboard {
     /// Shifts `self` one square east without wrapping.
     pub fn east(self) -> Self {
-        Self::new(self.inner() << 1) & !Bitboard::file_bb(File::FILE1)
+        Self::from(self.inner() << 1) & !Bitboard::file_bb(File::FILE1)
     }
 
     /// Returns the contents of `self`.
@@ -322,7 +328,7 @@ impl Bitboard {
 
     /// Shifts `self` one square north without wrapping.
     pub fn north(self) -> Bitboard {
-        Self::new(self.inner() << 8)
+        Self::from(self.inner() << 8)
     }
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
@@ -339,7 +345,7 @@ impl Bitboard {
     pub fn pop_lsb(&mut self) -> Self {
         let popped_bit = self.inner() & self.inner().wrapping_neg();
         self.bb ^= popped_bit;
-        Self::new(popped_bit)
+        Self::from(popped_bit)
     }
 
     /// Clears the least significant bit of `self` and converts the position of
@@ -347,7 +353,7 @@ impl Bitboard {
     pub fn pop_next_square(&mut self) -> Square {
         let shift = self.inner().trailing_zeros();
         self.bb ^= 1 << shift;
-        Square::new(shift as u8)
+        Square::from(shift as u8)
     }
 
     /// Pretty prints `self`.
@@ -358,7 +364,7 @@ impl Bitboard {
             for f in File::FILE1.inner()..=File::FILE8.inner() {
                 print!(
                     "{} ",
-                    (self & Self::from_pos(Rank::new(r), File::new(f)) != Self::new(0)) as u32
+                    (self & Self::from_pos(Rank::from(r), File::from(f)) != Self::from(0)) as u32
                 );
             }
             println!();
@@ -368,18 +374,18 @@ impl Bitboard {
 
     /// Shifts `self` one square south without wrapping.
     pub fn south(self) -> Bitboard {
-        Self::new(self.inner() >> 8)
+        Self::from(self.inner() >> 8)
     }
 
     /// Converts the position of the least significant bit of `self` to a
     /// [`Square`].
     pub fn to_square(self) -> Square {
-        Square::new(self.inner().trailing_zeros() as u8)
+        Square::from(self.inner().trailing_zeros() as u8)
     }
 
     /// Shifts `self` one square west without wrapping.
     pub fn west(self) -> Bitboard {
-        Self::new(self.inner() >> 1) & !Bitboard::file_bb(File::FILE8)
+        Self::from(self.inner() >> 1) & !Bitboard::file_bb(File::FILE8)
     }
 }
 
@@ -424,7 +430,7 @@ impl Side {
     /// assert_eq(Sides::BLACK.flip(), Sides::WHITE);
     /// ```
     pub fn flip(self) -> Self {
-        Self::new(self.inner() ^ 1)
+        Self::from(self.inner() ^ 1)
     }
 
     /// Returns the contents of `self`.
@@ -445,15 +451,9 @@ impl Side {
 }
 
 impl Square {
-    /// Converts the contents of `self` into a [`Bitboard`] with the bit in the
-    /// given position set.
-    pub fn to_bitboard(self) -> Bitboard {
-        Bitboard::new(1 << self.inner())
-    }
-
     /// Calculates the file that `self` is on.
     pub fn file_of(self) -> File {
-        File::new(self.inner() & 7)
+        File::from(self.inner() & 7)
     }
 
     /// Finds the horizontal distance between `self` and `other_square`
@@ -474,7 +474,7 @@ impl Square {
 
     /// Calculates the rank that `self` is on.
     pub fn rank_of(self) -> Rank {
-        Rank::new(self.inner() >> 3)
+        Rank::from(self.inner() >> 3)
     }
 
     /// Converts `self` into its string representation.
