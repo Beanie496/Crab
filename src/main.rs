@@ -12,8 +12,6 @@ mod defs;
 mod engine;
 /// Handles UCI input
 mod uci;
-/// Miscellaneous useful functions.
-mod util;
 
 fn main() {
     Uci::main_loop();

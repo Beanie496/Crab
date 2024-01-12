@@ -2,10 +2,9 @@ use super::Board;
 use crate::{
     board::CastlingRights,
     defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
-    util::BitIter,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{gen_all_sliding_attacks, sliding_attacks};
+use util::{gen_all_sliding_attacks, sliding_attacks, BitIter};
 
 /// Items related to magic bitboards.
 pub mod magic;
