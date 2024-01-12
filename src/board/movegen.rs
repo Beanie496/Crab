@@ -251,6 +251,9 @@ impl Board {
                 self.unset_castling_right(us, CastlingRights::from(flag));
             }
         }
+        if piece == Piece::KING {
+            self.unset_castling_rights(us);
+        }
 
         if Self::is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
