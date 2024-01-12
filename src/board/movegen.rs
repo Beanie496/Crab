@@ -219,11 +219,11 @@ impl Board {
             // check if we need to unset the castling rights if we're capturing
             // a rook
             if captured == Piece::ROOK {
-                let them_inner = them.inner();
+                let us_inner = us.inner();
                 // this will be 0x81 if we're White (0x81 << 0) and
                 // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
                 // the starting position of our rooks.
-                let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
+                let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
                 if end_bb & rook_squares != Bitboard::from(0) {
                     // 0 or 56 for queenside -> 0
                     // 7 or 63 for kingside -> 1
@@ -233,7 +233,7 @@ impl Board {
                     // this replies upon knowing the internal representation of
                     // CastlingRights - 0b01 is queenside, 0b10 is kingside
                     let flag = is_kingside + 1;
-                    self.unset_castling_right(us, CastlingRights::from(flag));
+                    self.unset_castling_right(them, CastlingRights::from(flag));
                 }
             }
         }
