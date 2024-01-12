@@ -1,10 +1,7 @@
 use oorandom::Rand64;
 
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
-use crate::{
-    defs::{Bitboard, File, Nums, Piece, Rank, Square},
-    util::gen_sparse_rand,
-};
+use crate::defs::{Bitboard, File, Nums, Piece, Rank, Square};
 
 /// Stores magic information for a square:
 #[derive(Clone, Copy)]
@@ -234,7 +231,8 @@ pub fn find_magics<const PIECE: u8>() {
         // all different permutations. If the magic number works, it's
         // printed and the loop is exited.
         loop {
-            let sparse_rand = gen_sparse_rand(&mut rand_gen);
+            // 1/8 of bits set on average
+            let sparse_rand = rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64();
             let mut blockers = mask;
             let mut found = true;
 

@@ -1,5 +1,3 @@
-use oorandom::Rand64;
-
 use crate::defs::{Bitboard, Square};
 
 /// A thin wrapper over a [`Bitboard`] to allow iteration over it.
@@ -26,9 +24,4 @@ impl Iterator for BitIter {
             Some(self.board.pop_next_square())
         }
     }
-}
-
-/// Generates a random number with 1/8 of its bits set on average.
-pub fn gen_sparse_rand(rand_gen: &mut Rand64) -> u64 {
-    rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64()
 }
