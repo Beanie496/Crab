@@ -621,23 +621,21 @@ impl Lookup {
 
     /// Initialises pawn attack lookup table. First and last rank are ignored.
     fn init_pawn_attacks(&mut self) {
-        for (side, table) in self.pawn_attacks.iter_mut().enumerate() {
-            // take() ignores the last rank, since pawns can't advance past.
-            // enumerate() gives both tables a value (0 or 1).
-            // skip() ignores the first rank, since pawns can't start there.
-            // It's very important that the skip is done _after_ the enumerate,
-            // as otherwise the enumerate would give A2 value 0, B2 value 1,
-            // and so on.
-            for (square, bb) in table
-                .iter_mut()
-                .take(Nums::SQUARES - Nums::FILES)
-                .enumerate()
-                .skip(Nums::FILES)
-            {
-                // adds 8 if the side is White (1) or subtracts 8 if Black (0)
-                let pushed = Bitboard::from_square(Square::from((square - 8 + side * 16) as u8));
-                *bb = pushed.east() | pushed.west();
-            }
+        for (square, bb) in self.pawn_attacks[Side::WHITE.to_index()]
+            .iter_mut()
+            .enumerate()
+            .take(Nums::SQUARES - Nums::FILES)
+        {
+            let pushed = Bitboard::from_square(Square::from(square as u8 + 8));
+            *bb = pushed.east() | pushed.west();
+        }
+        for (square, bb) in self.pawn_attacks[Side::BLACK.to_index()]
+            .iter_mut()
+            .enumerate()
+            .skip(Nums::FILES)
+        {
+            let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
+            *bb = pushed.east() | pushed.west();
         }
     }
 }
