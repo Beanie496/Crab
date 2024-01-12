@@ -237,9 +237,30 @@ impl Board {
                 }
             }
         }
+
+        if is_en_passant {
+            let dest = Square::from(if us == Side::WHITE {
+                end.inner() - 8
+            } else {
+                end.inner() + 8
+            });
+            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
+            self.toggle_side_bb(them, Bitboard::from_square(dest));
+            self.clear_piece(dest);
+        } else if Self::is_double_pawn_push(start, end, piece) {
+            self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
+        } else if is_promotion {
+            self.set_piece(end, promotion_piece);
+            // unset the pawn on the promotion square...
+            self.toggle_piece_bb(Piece::PAWN, end_bb);
+            // ...and set the promotion piece on that square
+            self.toggle_piece_bb(promotion_piece, end_bb);
+        }
+
         if self.is_square_attacked(self.king_square()) {
             return false;
         }
+
         // this is basically the same as a few lines ago but with start square
         // instead of end
         if piece == Piece::ROOK {
@@ -253,28 +274,6 @@ impl Board {
         }
         if piece == Piece::KING {
             self.unset_castling_rights(us);
-        }
-
-        if Self::is_double_pawn_push(start, end, piece) {
-            self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
-        } else if is_en_passant {
-            let dest = Square::from(if us == Side::WHITE {
-                end.inner() - 8
-            } else {
-                end.inner() + 8
-            });
-            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
-            self.toggle_side_bb(them, Bitboard::from_square(dest));
-            if self.is_square_attacked(self.king_square()) {
-                return false;
-            }
-            self.clear_piece(dest);
-        } else if is_promotion {
-            self.set_piece(end, promotion_piece);
-            // unset the pawn on the promotion square...
-            self.toggle_piece_bb(Piece::PAWN, end_bb);
-            // ...and set the promotion piece on that square
-            self.toggle_piece_bb(promotion_piece, end_bb);
         }
 
         self.flip_side();
