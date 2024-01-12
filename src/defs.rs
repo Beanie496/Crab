@@ -113,7 +113,7 @@ impl Shl<u8> for Bitboard {
 impl Bitboard {
     pub const EMPTY: Bitboard = Self::from(0);
     pub const CASTLING_SPACE_WK: Bitboard = Self::from(0x0000000000000060);
-    pub const CASTLING_SPACE_WQ: Bitboard = Self::from(0x00000000000000e0);
+    pub const CASTLING_SPACE_WQ: Bitboard = Self::from(0x000000000000000e);
     pub const CASTLING_SPACE_BK: Bitboard = Self::from(0x6000000000000000);
     pub const CASTLING_SPACE_BQ: Bitboard = Self::from(0x0e00000000000000);
 }
