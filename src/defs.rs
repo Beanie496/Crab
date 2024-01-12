@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl};
 
 // the idea for wrapping these types in structs and implementing a tonne of
-// methids/associated functions is taken from viridithas, so thanks cosmo
+// methods/associated functions is taken from viridithas, so thanks cosmo
 /// A wrapper for a `u64`, since a bitboard is 64 bits.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bitboard {
