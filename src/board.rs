@@ -273,9 +273,9 @@ impl Board {
 
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
-        for r in (Rank::RANK1.inner()..=Rank::RANK8.inner()).rev() {
+        for r in (0..Nums::RANKS as u8).rev() {
             print!("{} | ", r + 1);
-            for f in File::FILE1.inner()..=File::FILE8.inner() {
+            for f in 0..Nums::FILES as u8 {
                 print!("{} ", self.char_piece_from_pos(Rank::new(r), File::new(f)));
             }
             println!();

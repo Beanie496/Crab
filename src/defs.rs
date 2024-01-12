@@ -141,6 +141,7 @@ impl Nums {
     pub const SIDES: usize = 2;
     pub const SQUARES: usize = 64;
     pub const PIECES: usize = 6;
+    pub const RANKS: usize = 8;
 }
 
 /// Enumerates pieces.
