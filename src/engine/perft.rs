@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use super::Engine;
-use crate::board::{Moves, Board};
+use crate::board::{Board, Moves};
 
 impl Engine {
     /// Counts the number of leaf nodes `depth` moves in the future. It is used

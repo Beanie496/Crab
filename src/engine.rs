@@ -137,10 +137,18 @@ impl Engine {
         if let Some(cr) = castling_rights {
             for right in cr.chars() {
                 match right {
-                    'K' => self.board.add_castling_right(CastlingRights::CASTLE_FLAGS_K),
-                    'Q' => self.board.add_castling_right(CastlingRights::CASTLE_FLAGS_Q),
-                    'k' => self.board.add_castling_right(CastlingRights::CASTLE_FLAGS_k),
-                    'q' => self.board.add_castling_right(CastlingRights::CASTLE_FLAGS_q),
+                    'K' => self
+                        .board
+                        .add_castling_right(CastlingRights::CASTLE_FLAGS_K),
+                    'Q' => self
+                        .board
+                        .add_castling_right(CastlingRights::CASTLE_FLAGS_Q),
+                    'k' => self
+                        .board
+                        .add_castling_right(CastlingRights::CASTLE_FLAGS_k),
+                    'q' => self
+                        .board
+                        .add_castling_right(CastlingRights::CASTLE_FLAGS_q),
                     '-' => (),
                     _ => {
                         self.set_startpos();

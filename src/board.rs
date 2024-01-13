@@ -3,7 +3,7 @@ use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 use crate::defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square};
 use movegen::{Lookup, LOOKUPS};
 
-pub use movegen::{Moves, magic::find_magics};
+pub use movegen::{magic::find_magics, Moves};
 
 /// Stores castling rights.
 #[derive(Clone, Copy, PartialEq)]
