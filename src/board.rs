@@ -3,7 +3,7 @@ use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 use crate::defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square};
 use movegen::{Lookup, LOOKUPS};
 
-pub use movegen::magic::find_magics;
+pub use movegen::{Moves, magic::find_magics};
 
 /// Stores castling rights.
 #[derive(Clone, Copy, PartialEq)]
@@ -13,7 +13,7 @@ pub struct CastlingRights {
 }
 
 /// Items related to move generation.
-pub mod movegen;
+mod movegen;
 
 /// Stores information about the current state of the board.
 #[derive(Clone)]
