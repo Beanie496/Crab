@@ -96,7 +96,36 @@ Names should *always* be descriptive, whatever it's naming. If a variable name r
 
 Functions shouldn't be as small as possible for the sake of being small.
 If a function is doing several separate things, fence the separate things into their own braced blocks. If a block needs to be called elsewhere, turn it into a function.
-There should be up to four `impl` blocks for each struct. In order, they are for public associated functions, private associated functions, public methods and private methods. Any of the blocks can be omitted.
+The `impl` blocks should be in this order for each struct:
+- Trait impls
+- Public constants
+- Private constants
+- Public associated functions
+- Public methods
+- Private associated functions
+- Private methods
+
+If two struct share the same type of `impl`, they should be grouped, in alphabetical order.
+```
+struct A;
+struct B;
+
+impl A {
+    pub fn foo() {}
+}
+
+impl B {
+    pub fn foo() {}
+}
+
+impl A {
+    fn bar() {}
+}
+
+impl B {
+    fn bar() {}
+}
+```
 Functions/methods within `impl` blocks should be sorted alphabetically.
 
 ### 8. Comments

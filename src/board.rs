@@ -99,6 +99,88 @@ impl Board {
 }
 
 impl Board {
+    /// Adds the given right to the castling rights.
+    pub fn add_castling_right(&mut self, right: CastlingRights) {
+        self.castling_rights.add_right(right);
+    }
+
+    /// Adds a piece to square `square` for side `side`. Assumes there is no
+    /// piece on the square to be written to.
+    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
+        let square_bb = Bitboard::from_square(square);
+        self.set_piece(square, piece);
+        self.toggle_piece_bb(piece, square_bb);
+        self.toggle_side_bb(side, square_bb);
+    }
+
+    /// Clears `self`.
+    pub fn clear_board(&mut self) {
+        self.piece_board = Self::empty_piece_board();
+        self.pieces = Self::no_pieces();
+        self.sides = Self::no_sides();
+        self.castling_rights = CastlingRights::none();
+        self.ep_square = Self::no_ep_square();
+        self.side_to_move = Self::no_side();
+    }
+
+    /// Pretty-prints the current state of the board.
+    pub fn pretty_print(&self) {
+        for r in (0..Nums::RANKS as u8).rev() {
+            print!("{} | ", r + 1);
+            for f in 0..Nums::FILES as u8 {
+                print!(
+                    "{} ",
+                    self.char_piece_from_pos(Rank::from(r), File::from(f))
+                );
+            }
+            println!();
+        }
+        println!("    ---------------");
+        println!("    a b c d e f g h");
+    }
+
+    /// Sets the default castling rights.
+    pub fn set_default_castling_rights(&mut self) {
+        self.castling_rights.set_to_default();
+    }
+
+    /// Sets the en passant square to `square`.
+    pub fn set_ep_square(&mut self, square: Square) {
+        self.ep_square = square;
+    }
+
+    /// Sets side to move to the default side.
+    pub fn set_default_side_to_move(&mut self) {
+        self.side_to_move = Self::default_side();
+    }
+
+    /// Sets fullmoves. Currently does nothing.
+    pub fn set_fullmoves(&mut self, _count: u32) {
+        /* unused */
+    }
+
+    /// Sets halfmoves. Currently does nothing.
+    pub fn set_halfmoves(&mut self, _count: u32) {
+        /* unused */
+    }
+
+    /// Sets side to move to `side`.
+    pub fn set_side_to_move(&mut self, side: Side) {
+        self.side_to_move = side;
+    }
+
+    /// Resets the board.
+    pub fn set_startpos(&mut self) {
+        self.piece_board = Self::default_piece_board();
+        self.pieces = Self::default_pieces();
+        self.sides = Self::default_sides();
+        self.castling_rights = CastlingRights::new();
+        self.ep_square = Self::no_ep_square();
+        self.side_to_move = Self::default_side();
+    }
+}
+
+impl Board {
     /// Returns the piece board of the starting position.
     /// ```
     /// assert_eq!(default_piece_board()[Square::A1.to_index()], Piece::ROOK);
@@ -243,88 +325,6 @@ impl CastlingRights {
     /// Returns empty [`CastlingRights`].
     fn none() -> CastlingRights {
         Self::CASTLE_FLAGS_NONE
-    }
-}
-
-impl Board {
-    /// Adds the given right to the castling rights.
-    pub fn add_castling_right(&mut self, right: CastlingRights) {
-        self.castling_rights.add_right(right);
-    }
-
-    /// Adds a piece to square `square` for side `side`. Assumes there is no
-    /// piece on the square to be written to.
-    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
-        let square_bb = Bitboard::from_square(square);
-        self.set_piece(square, piece);
-        self.toggle_piece_bb(piece, square_bb);
-        self.toggle_side_bb(side, square_bb);
-    }
-
-    /// Clears `self`.
-    pub fn clear_board(&mut self) {
-        self.piece_board = Self::empty_piece_board();
-        self.pieces = Self::no_pieces();
-        self.sides = Self::no_sides();
-        self.castling_rights = CastlingRights::none();
-        self.ep_square = Self::no_ep_square();
-        self.side_to_move = Self::no_side();
-    }
-
-    /// Pretty-prints the current state of the board.
-    pub fn pretty_print(&self) {
-        for r in (0..Nums::RANKS as u8).rev() {
-            print!("{} | ", r + 1);
-            for f in 0..Nums::FILES as u8 {
-                print!(
-                    "{} ",
-                    self.char_piece_from_pos(Rank::from(r), File::from(f))
-                );
-            }
-            println!();
-        }
-        println!("    ---------------");
-        println!("    a b c d e f g h");
-    }
-
-    /// Sets the default castling rights.
-    pub fn set_default_castling_rights(&mut self) {
-        self.castling_rights.set_to_default();
-    }
-
-    /// Sets the en passant square to `square`.
-    pub fn set_ep_square(&mut self, square: Square) {
-        self.ep_square = square;
-    }
-
-    /// Sets side to move to the default side.
-    pub fn set_default_side_to_move(&mut self) {
-        self.side_to_move = Self::default_side();
-    }
-
-    /// Sets fullmoves. Currently does nothing.
-    pub fn set_fullmoves(&mut self, _count: u32) {
-        /* unused */
-    }
-
-    /// Sets halfmoves. Currently does nothing.
-    pub fn set_halfmoves(&mut self, _count: u32) {
-        /* unused */
-    }
-
-    /// Sets side to move to `side`.
-    pub fn set_side_to_move(&mut self, side: Side) {
-        self.side_to_move = side;
-    }
-
-    /// Resets the board.
-    pub fn set_startpos(&mut self) {
-        self.piece_board = Self::default_piece_board();
-        self.pieces = Self::default_pieces();
-        self.sides = Self::default_sides();
-        self.castling_rights = CastlingRights::new();
-        self.ep_square = Self::no_ep_square();
-        self.side_to_move = Self::default_side();
     }
 }
 

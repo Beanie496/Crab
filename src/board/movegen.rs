@@ -64,6 +64,14 @@ const MAX_LEGAL_MOVES: usize = 218;
 // initialised at runtime
 pub static mut LOOKUPS: Lookup = Lookup::empty();
 
+impl Iterator for Moves {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pop_move()
+    }
+}
+
 impl Move {
     const START_MASK: u16 = 0b11_1111;
     const START_SHIFT: usize = 0;
@@ -96,55 +104,6 @@ impl Moves {
             moves: [Move::null(); MAX_LEGAL_MOVES],
             first_empty: 0,
         }
-    }
-}
-
-impl Lookup {
-    /// Returns a [`Lookup`] with empty tables.
-    // used to initialise a static `Lookup` variable
-    const fn empty() -> Self {
-        Self {
-            pawn_attacks: [[Bitboard::EMPTY; Nums::SQUARES]; Nums::SIDES],
-            knight_attacks: [Bitboard::EMPTY; Nums::SQUARES],
-            king_attacks: [Bitboard::EMPTY; Nums::SQUARES],
-            bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
-            rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
-            bishop_magics: [Magic::default(); Nums::SQUARES],
-            rook_magics: [Magic::default(); Nums::SQUARES],
-        }
-    }
-}
-
-impl Move {
-    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
-    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
-    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
-    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
-    /// promotion [`Move`].
-    fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
-        debug_assert!(FLAG != Move::PROMOTION_FLAG);
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | FLAG,
-        }
-    }
-
-    /// Creates a promotion [`Move`] to the given piece.
-    fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
-        debug_assert!(PIECE != Piece::PAWN.inner());
-        debug_assert!(PIECE != Piece::KING.inner());
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | Self::PROMOTION_FLAG
-                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
-        }
-    }
-
-    /// Creates a null [`Move`].
-    fn null() -> Move {
-        Self { mv: 0 }
     }
 }
 
@@ -313,6 +272,22 @@ impl Lookup {
     }
 }
 
+impl Move {
+    /// Converts `mv` into its string representation.
+    pub fn stringify(&self) -> String {
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let mut ret = String::with_capacity(5);
+        ret += &start.stringify();
+        ret += &end.stringify();
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
+        }
+        ret
+    }
+}
+
 impl Moves {
     /// Pops a [`Move`] from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
@@ -327,22 +302,6 @@ impl Moves {
     pub fn push_move(&mut self, mv: Move) {
         self.moves[self.first_empty] = mv;
         self.first_empty += 1;
-    }
-}
-
-impl Move {
-    /// Converts `mv` into its string representation.
-    pub fn stringify(&self) -> String {
-        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let mut ret = String::with_capacity(5);
-        ret += &start.stringify();
-        ret += &end.stringify();
-        if self.is_promotion() {
-            // we want the lowercase letter here
-            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
-        }
-        ret
     }
 }
 
@@ -494,6 +453,55 @@ impl Board {
 }
 
 impl Lookup {
+    /// Returns a [`Lookup`] with empty tables.
+    // used to initialise a static `Lookup` variable
+    const fn empty() -> Self {
+        Self {
+            pawn_attacks: [[Bitboard::EMPTY; Nums::SQUARES]; Nums::SIDES],
+            knight_attacks: [Bitboard::EMPTY; Nums::SQUARES],
+            king_attacks: [Bitboard::EMPTY; Nums::SQUARES],
+            bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
+            rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
+            bishop_magics: [Magic::default(); Nums::SQUARES],
+            rook_magics: [Magic::default(); Nums::SQUARES],
+        }
+    }
+}
+
+impl Move {
+    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
+    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
+    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
+    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
+    /// promotion [`Move`].
+    fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
+        debug_assert!(FLAG != Move::PROMOTION_FLAG);
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | FLAG,
+        }
+    }
+
+    /// Creates a promotion [`Move`] to the given piece.
+    fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
+        debug_assert!(PIECE != Piece::PAWN.inner());
+        debug_assert!(PIECE != Piece::KING.inner());
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | Self::PROMOTION_FLAG
+                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
+        }
+    }
+
+    /// Creates a null [`Move`].
+    fn null() -> Move {
+        Self { mv: 0 }
+    }
+}
+
+impl Lookup {
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
@@ -637,13 +645,5 @@ impl Move {
     /// only return a value from 1 to 4.
     fn promotion_piece(&self) -> Piece {
         Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
-    }
-}
-
-impl Iterator for Moves {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.pop_move()
     }
 }

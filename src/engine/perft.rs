@@ -4,32 +4,6 @@ use super::Engine;
 use crate::board::{Board, Moves};
 
 impl Engine {
-    /// Counts the number of leaf nodes `depth` moves in the future. It is used
-    /// because copy-make requires an additional parameter, but I don't want to
-    /// have that parameter in the API.
-    fn perft_inner(depth: u8, board: &Board) -> u64 {
-        if depth == 0 {
-            return 1;
-        }
-
-        let mut moves = Moves::new();
-        board.generate_moves(&mut moves);
-
-        let mut total = 0;
-        for mv in moves {
-            total += {
-                let mut copy = board.clone();
-                if !copy.make_move(mv) {
-                    continue;
-                }
-                Self::perft_inner(depth - 1, &copy)
-            };
-        }
-        total
-    }
-}
-
-impl Engine {
     /// Outputs and returns the number of leaf nodes `depth` moves in the
     /// future.
     ///
@@ -69,6 +43,32 @@ impl Engine {
             println!("{}: {moves}", mv.stringify());
         }
         println!("Total: {total}");
+        total
+    }
+}
+
+impl Engine {
+    /// Counts the number of leaf nodes `depth` moves in the future. It is used
+    /// because copy-make requires an additional parameter, but I don't want to
+    /// have that parameter in the API.
+    fn perft_inner(depth: u8, board: &Board) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut moves = Moves::new();
+        board.generate_moves(&mut moves);
+
+        let mut total = 0;
+        for mv in moves {
+            total += {
+                let mut copy = board.clone();
+                if !copy.make_move(mv) {
+                    continue;
+                }
+                Self::perft_inner(depth - 1, &copy)
+            };
+        }
         total
     }
 }
