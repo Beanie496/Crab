@@ -1,31 +1,5 @@
 use crate::defs::{Bitboard, Direction, File, Piece, Rank, Square};
 
-/// A thin wrapper over a [`Bitboard`] to allow iteration over it.
-pub struct BitIter {
-    board: Bitboard,
-}
-
-impl Iterator for BitIter {
-    type Item = Square;
-
-    /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
-    /// that bit. Returns [`None`] if there are no set bits.
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.board.inner() == 0 {
-            None
-        } else {
-            Some(self.board.pop_next_square())
-        }
-    }
-}
-
-impl BitIter {
-    /// Wraps a [`Bitboard`] in a [`BitIter`].
-    pub fn new(bb: Bitboard) -> BitIter {
-        Self { board: bb }
-    }
-}
-
 /// Generates all combinations of attacks from `square` and puts them in
 /// `attacks`. It starts with a full blocker board that goes from the
 /// square to the edge exclusive and uses the Carry-Rippler trick to

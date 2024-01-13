@@ -4,7 +4,7 @@ use crate::{
     defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{gen_all_sliding_attacks, sliding_attacks, BitIter};
+use util::{gen_all_sliding_attacks, sliding_attacks};
 
 /// Items related to magic bitboards.
 pub mod magic;
@@ -341,17 +341,17 @@ impl Board {
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.side::<IS_WHITE>();
 
-        let knights = BitIter::new(self.pieces::<{ Piece::KNIGHT.to_index() }>() & us_bb);
+        let knights = self.pieces::<{ Piece::KNIGHT.to_index() }>() & us_bb;
         for knight in knights {
-            let targets = BitIter::new(unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb);
+            let targets = unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(knight, target));
             }
         }
 
-        let kings = BitIter::new(self.pieces::<{ Piece::KING.to_index() }>() & us_bb);
+        let kings = self.pieces::<{ Piece::KING.to_index() }>() & us_bb;
         for king in kings {
-            let targets = BitIter::new(unsafe { LOOKUPS.king_attacks(king) } & !us_bb);
+            let targets = unsafe { LOOKUPS.king_attacks(king) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(king, target));
             }
@@ -399,10 +399,10 @@ impl Board {
                 targets & (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8));
             let normal_targets = targets ^ promotion_targets;
 
-            for target in BitIter::new(normal_targets) {
+            for target in normal_targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(pawn_sq, target));
             }
-            for target in BitIter::new(promotion_targets) {
+            for target in promotion_targets {
                 moves.push_move(Move::new_promo::<{ Piece::KNIGHT.inner() }>(
                     pawn_sq, target,
                 ));
@@ -412,7 +412,7 @@ impl Board {
                 moves.push_move(Move::new_promo::<{ Piece::ROOK.inner() }>(pawn_sq, target));
                 moves.push_move(Move::new_promo::<{ Piece::QUEEN.inner() }>(pawn_sq, target));
             }
-            for target in BitIter::new(ep_captures) {
+            for target in ep_captures {
                 moves.push_move(Move::new::<{ Move::EN_PASSANT_FLAG }>(pawn_sq, target));
             }
         }
@@ -424,27 +424,25 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
 
-        let bishops = BitIter::new(self.pieces::<{ Piece::BISHOP.to_index() }>() & us_bb);
+        let bishops = self.pieces::<{ Piece::BISHOP.to_index() }>() & us_bb;
         for bishop in bishops {
-            let targets =
-                BitIter::new(unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb);
+            let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(bishop, target));
             }
         }
 
-        let rooks = BitIter::new(self.pieces::<{ Piece::ROOK.to_index() }>() & us_bb);
+        let rooks = self.pieces::<{ Piece::ROOK.to_index() }>() & us_bb;
         for rook in rooks {
-            let targets = BitIter::new(unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb);
+            let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(rook, target));
             }
         }
 
-        let queens = BitIter::new(self.pieces::<{ Piece::QUEEN.to_index() }>() & us_bb);
+        let queens = self.pieces::<{ Piece::QUEEN.to_index() }>() & us_bb;
         for queen in queens {
-            let targets =
-                BitIter::new(unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb);
+            let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(queen, target));
             }

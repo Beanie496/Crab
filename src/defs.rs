@@ -100,6 +100,20 @@ impl BitXorAssign for Bitboard {
     }
 }
 
+impl Iterator for Bitboard {
+    type Item = Square;
+
+    /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
+    /// that bit. Returns [`None`] if there are no set bits.
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.inner() == 0 {
+            None
+        } else {
+            Some(self.pop_next_square())
+        }
+    }
+}
+
 impl Not for Bitboard {
     type Output = Self;
 
