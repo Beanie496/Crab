@@ -194,26 +194,14 @@ impl Side {
 }
 
 /// Enumerates squares. This engine uses little-endian rank-file mapping.
-// Allowed dead code because unit tests use these.
-#[allow(dead_code)]
 impl Square {
     pub const A1: Square = Self::from(0);
-    pub const C1: Square = Self::from(2);
     pub const E1: Square = Self::from(4);
-    pub const G1: Square = Self::from(6);
     pub const H1: Square = Self::from(7);
-    pub const A3: Square = Self::from(16);
-    pub const E4: Square = Self::from(28);
-    pub const D5: Square = Self::from(35);
-    pub const C6: Square = Self::from(42);
-    pub const E6: Square = Self::from(44);
-    pub const A7: Square = Self::from(48);
     pub const A8: Square = Self::from(56);
     pub const E8: Square = Self::from(60);
     pub const H8: Square = Self::from(63);
     pub const NONE: Square = Self::from(64);
-    /// Should only be used when the [`Square`] needs to be 0.
-    pub const NULL: Square = Self::from(0);
 }
 
 impl Bitboard {

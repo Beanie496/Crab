@@ -4,7 +4,7 @@ use crate::{
     defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
-use util::{gen_all_sliding_attacks, sliding_attacks};
+use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
 
 /// Items related to magic bitboards.
 pub mod magic;
@@ -204,8 +204,8 @@ impl Board {
             });
             self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
             self.toggle_side_bb(them, Bitboard::from_square(dest));
-            self.clear_piece(dest);
-        } else if Self::is_double_pawn_push(start, end, piece) {
+            self.unset_piece(dest);
+        } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
         } else if is_promotion {
             self.set_piece(end, promotion_piece);
@@ -307,6 +307,31 @@ impl Moves {
 
 /// Generates pseudo-legal moves for all pieces.
 impl Board {
+    /// Calculates if the given side can castle kingside.
+    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_kingside::<IS_WHITE>()
+    }
+
+    /// Calculates if the given side can castle queenside.
+    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_queenside::<IS_WHITE>()
+    }
+
+    /// Sets the en passant square to [`Square::NONE`].
+    fn clear_ep_square(&mut self) {
+        self.ep_square = Square::NONE;
+    }
+
+    /// Returns the en passant square, which might be [`Square::NONE`].
+    fn ep_square(&self) -> Square {
+        self.ep_square
+    }
+
+    /// Flip the side to move.
+    fn flip_side(&mut self) {
+        self.side_to_move = self.side_to_move.flip();
+    }
+
     /// Generates the castling moves for the given side.
     fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let occupancies = self.occupancies();
@@ -341,7 +366,7 @@ impl Board {
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.side::<IS_WHITE>();
 
-        let knights = self.pieces::<{ Piece::KNIGHT.to_index() }>() & us_bb;
+        let knights = self.piece::<{ Piece::KNIGHT.to_index() }>() & us_bb;
         for knight in knights {
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb;
             for target in targets {
@@ -349,7 +374,7 @@ impl Board {
             }
         }
 
-        let kings = self.pieces::<{ Piece::KING.to_index() }>() & us_bb;
+        let kings = self.piece::<{ Piece::KING.to_index() }>() & us_bb;
         for king in kings {
             let targets = unsafe { LOOKUPS.king_attacks(king) } & !us_bb;
             for target in targets {
@@ -370,7 +395,7 @@ impl Board {
         };
         let empty = !occupancies;
 
-        let mut pawns = self.pieces::<{ Piece::PAWN.to_index() }>() & us_bb;
+        let mut pawns = self.piece::<{ Piece::PAWN.to_index() }>() & us_bb;
         while pawns != Bitboard::from(0) {
             let pawn = pawns.pop_lsb();
             let pawn_sq = pawn.to_square();
@@ -424,7 +449,7 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
 
-        let bishops = self.pieces::<{ Piece::BISHOP.to_index() }>() & us_bb;
+        let bishops = self.piece::<{ Piece::BISHOP.to_index() }>() & us_bb;
         for bishop in bishops {
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb;
             for target in targets {
@@ -432,7 +457,7 @@ impl Board {
             }
         }
 
-        let rooks = self.pieces::<{ Piece::ROOK.to_index() }>() & us_bb;
+        let rooks = self.piece::<{ Piece::ROOK.to_index() }>() & us_bb;
         for rook in rooks {
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb;
             for target in targets {
@@ -440,13 +465,96 @@ impl Board {
             }
         }
 
-        let queens = self.pieces::<{ Piece::QUEEN.to_index() }>() & us_bb;
+        let queens = self.piece::<{ Piece::QUEEN.to_index() }>() & us_bb;
         for queen in queens {
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(queen, target));
             }
         }
+    }
+
+    /// Tests if `square` is attacked by an enemy piece.
+    fn is_square_attacked(&self, square: Square) -> bool {
+        let occupancies = self.occupancies();
+        let us = self.side_to_move();
+        let them_bb = self.sides[us.flip().to_index()];
+
+        let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
+        let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
+        let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
+        let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
+        let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
+
+        let pawns = self.piece::<{ Piece::PAWN.to_index() }>();
+        let knights = self.piece::<{ Piece::KNIGHT.to_index() }>();
+        let bishops = self.piece::<{ Piece::BISHOP.to_index() }>();
+        let rooks = self.piece::<{ Piece::ROOK.to_index() }>();
+        let queens = self.piece::<{ Piece::QUEEN.to_index() }>();
+        let kings = self.piece::<{ Piece::KING.to_index() }>();
+
+        let is_attacked_by_pawns = pawn_attacks & pawns;
+        let is_attacked_by_knights = knight_attacks & knights;
+        let is_attacked_by_kings = king_attacks & kings;
+        let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
+        let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
+
+        (is_attacked_by_pawns
+            | is_attacked_by_knights
+            | is_attacked_by_kings
+            | is_attacked_diagonally
+            | is_attacked_orthogonally)
+            & them_bb
+            != Bitboard::from(0)
+    }
+
+    /// Calculates the square the king is on.
+    fn king_square(&self) -> Square {
+        (self.piece::<{ Piece::KING.to_index() }>() & self.sides[self.side_to_move().to_index()])
+            .to_square()
+    }
+
+    /// Toggles the side and piece bitboard on both `start` and `end`, sets
+    /// `start` in the piece array to [`Square::NONE`] and sets `end` in the
+    /// piece array to `piece`.
+    fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
+        let start_bb = Bitboard::from_square(start);
+        let end_bb = Bitboard::from_square(end);
+
+        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_side_bb(side, start_bb | end_bb);
+        self.unset_piece(start);
+        self.set_piece(end, piece);
+    }
+
+    /// Returns all the occupied squares on the board.
+    fn occupancies(&self) -> Bitboard {
+        self.side::<true>() | self.side::<false>()
+    }
+
+    /// Returns the piece bitboard given by `piece`.
+    fn piece<const PIECE: usize>(&self) -> Bitboard {
+        self.pieces[PIECE]
+    }
+
+    /// Returns the side to move.
+    fn side_to_move(&self) -> Side {
+        self.side_to_move
+    }
+
+    /// Unsets right `right` for side `side`.
+    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
+        self.castling_rights.remove_right(side, right);
+    }
+
+    /// Clears the castling rights for `side`.
+    fn unset_castling_rights(&mut self, side: Side) {
+        self.castling_rights.clear_side(side)
+    }
+
+    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
+    fn unset_piece(&mut self, square: Square) {
+        self.piece_board[square.to_index()] = Piece::NONE;
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    board::{find_magics, Board, CastlingRights},
+    board::{Board, CastlingRights},
     defs::{File, Piece, Rank, Side, Square},
 };
 
@@ -18,11 +18,6 @@ impl Engine {
         Self {
             board: Board::new(),
         }
-    }
-
-    /// Wrapper for [`find_magics`].
-    pub fn find_magics<const PIECE: u8>() {
-        find_magics::<PIECE>();
     }
 }
 

@@ -25,6 +25,26 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::from(0));
 }
 
+/// Checks if the move is a double pawn push.
+pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
+    if piece != Piece::PAWN {
+        return false;
+    }
+    let start_bb = Bitboard::from_square(start);
+    let end_bb = Bitboard::from_square(end);
+    if start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))
+        == Bitboard::from(0)
+    {
+        return false;
+    }
+    if end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))
+        == Bitboard::from(0)
+    {
+        return false;
+    }
+    true
+}
+
 /// Checks if `square` can go in the given direction.
 pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
     let dest = Square::from(square.inner().wrapping_add(DIRECTION as u8));

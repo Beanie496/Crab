@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 
 use crate::defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square};
-use movegen::{Lookup, LOOKUPS};
+use movegen::Lookup;
 
 pub use movegen::{magic::find_magics, Moves};
 
@@ -92,7 +92,7 @@ impl Board {
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
             castling_rights: CastlingRights::new(),
-            ep_square: Self::no_ep_square(),
+            ep_square: Self::default_ep_square(),
             side_to_move: Self::default_side(),
         }
     }
@@ -119,8 +119,8 @@ impl Board {
         self.pieces = Self::no_pieces();
         self.sides = Self::no_sides();
         self.castling_rights = CastlingRights::none();
-        self.ep_square = Self::no_ep_square();
-        self.side_to_move = Self::no_side();
+        self.ep_square = Square::NONE;
+        self.side_to_move = Side::NONE;
     }
 
     /// Pretty-prints the current state of the board.
@@ -175,12 +175,17 @@ impl Board {
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
         self.castling_rights = CastlingRights::new();
-        self.ep_square = Self::no_ep_square();
+        self.ep_square = Self::default_ep_square();
         self.side_to_move = Self::default_side();
     }
 }
 
 impl Board {
+    /// Returns the default en passant square.
+    fn default_ep_square() -> Square {
+        Square::NONE
+    }
+
     /// Returns the piece board of the starting position.
     /// ```
     /// assert_eq!(default_piece_board()[Square::A1.to_index()], Piece::ROOK);
@@ -225,6 +230,12 @@ impl Board {
         ]
     }
 
+    /// Returns the side to move from the starting position. Unless chess 1.1
+    /// has been released, this will be [`Side::WHITE`].
+    fn default_side() -> Side {
+        Side::WHITE
+    }
+
     /// Returns the sides of the starting position.
     /// ```
     /// assert_eq!(default_pieces()[Side::WHITE.to_index()], Bitboard::from(0x000000000000ffff));
@@ -235,12 +246,6 @@ impl Board {
             Bitboard::from(0xffff000000000000), // Black
             Bitboard::from(0x000000000000ffff), // White
         ]
-    }
-
-    /// Returns the side to move from the starting position. Unless chess 1.1
-    /// has been released, this will be [`Side::WHITE`].
-    fn default_side() -> Side {
-        Side::WHITE
     }
 
     /// Returns an empty piece board.
@@ -257,31 +262,6 @@ impl Board {
             e, e, e, e, e, e, e, e,
             e, e, e, e, e, e, e, e,
         ]
-    }
-
-    /// Checks if the move is a double pawn push.
-    fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
-        if piece != Piece::PAWN {
-            return false;
-        }
-        let start_bb = Bitboard::from_square(start);
-        let end_bb = Bitboard::from_square(end);
-        if start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))
-            == Bitboard::from(0)
-        {
-            return false;
-        }
-        if end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))
-            == Bitboard::from(0)
-        {
-            return false;
-        }
-        true
-    }
-
-    /// Returns no ep square.
-    fn no_ep_square() -> Square {
-        Square::NONE
     }
 
     /// Returns the pieces of an empty board.
@@ -304,11 +284,6 @@ impl Board {
             Bitboard::from(0x0000000000000000),
         ]
     }
-
-    /// Returns no side.
-    fn no_side() -> Side {
-        Side::NONE
-    }
 }
 
 impl CastlingRights {
@@ -329,16 +304,6 @@ impl CastlingRights {
 }
 
 impl Board {
-    /// Calculates if the given side can castle kingside.
-    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_kingside::<IS_WHITE>()
-    }
-
-    /// Calculates if the given side can castle queenside.
-    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_queenside::<IS_WHITE>()
-    }
-
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
@@ -355,102 +320,14 @@ impl Board {
         }
     }
 
-    /// Sets the en passant square to [`Square::NONE`].
-    fn clear_ep_square(&mut self) {
-        self.ep_square = Square::NONE;
-    }
-
-    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
-    fn clear_piece(&mut self, square: Square) {
-        self.piece_board[square.to_index()] = Piece::NONE;
-    }
-
-    /// Returns the en passant square, which might be [`Square::NONE`].
-    fn ep_square(&self) -> Square {
-        self.ep_square
-    }
-
-    /// Flip the side to move.
-    fn flip_side(&mut self) {
-        self.side_to_move = self.side_to_move.flip();
-    }
-
-    /// Tests if `square` is attacked by an enemy piece.
-    fn is_square_attacked(&self, square: Square) -> bool {
-        let occupancies = self.occupancies();
-        let us = self.side_to_move();
-        let them_bb = self.sides[us.flip().to_index()];
-
-        let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
-        let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
-        let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
-        let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
-        let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
-
-        let pawns = self.pieces::<{ Piece::PAWN.to_index() }>();
-        let knights = self.pieces::<{ Piece::KNIGHT.to_index() }>();
-        let bishops = self.pieces::<{ Piece::BISHOP.to_index() }>();
-        let rooks = self.pieces::<{ Piece::ROOK.to_index() }>();
-        let queens = self.pieces::<{ Piece::QUEEN.to_index() }>();
-        let kings = self.pieces::<{ Piece::KING.to_index() }>();
-
-        let is_attacked_by_pawns = pawn_attacks & pawns;
-        let is_attacked_by_knights = knight_attacks & knights;
-        let is_attacked_by_kings = king_attacks & kings;
-        let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
-        let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
-
-        (is_attacked_by_pawns
-            | is_attacked_by_knights
-            | is_attacked_by_kings
-            | is_attacked_diagonally
-            | is_attacked_orthogonally)
-            & them_bb
-            != Bitboard::from(0)
-    }
-
-    /// Calculates the square the king is on.
-    fn king_square(&self) -> Square {
-        (self.pieces::<{ Piece::KING.to_index() }>() & self.sides[self.side_to_move().to_index()])
-            .to_square()
-    }
-
-    /// Toggles the side and piece bitboard on both `start` and `end`, sets
-    /// `start` in the piece array to [`Square::NONE`] and sets `end` in the
-    /// piece array to `piece`.
-    fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
-        let start_bb = Bitboard::from_square(start);
-        let end_bb = Bitboard::from_square(end);
-
-        self.toggle_piece_bb(piece, start_bb | end_bb);
-        self.toggle_side_bb(side, start_bb | end_bb);
-        self.clear_piece(start);
-        self.set_piece(end, piece);
-    }
-
-    /// Returns all the occupied squares on the board.
-    fn occupancies(&self) -> Bitboard {
-        self.side::<true>() | self.side::<false>()
-    }
-
     /// Returns the piece on `square`.
     fn piece_on(&self, square: Square) -> Piece {
         self.piece_board[square.to_index()]
     }
 
-    /// Returns the piece bitboard given by `piece`.
-    fn pieces<const PIECE: usize>(&self) -> Bitboard {
-        self.pieces[PIECE]
-    }
-
     /// Sets the piece on `square` in the piece array to `piece`.
     fn set_piece(&mut self, square: Square, piece: Piece) {
         self.piece_board[square.to_index()] = piece;
-    }
-
-    /// Returns the side to move.
-    fn side_to_move(&self) -> Side {
-        self.side_to_move
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
@@ -470,16 +347,6 @@ impl Board {
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         self.sides[side.to_index()] ^= bb;
-    }
-
-    /// Unsets right `right` for side `side`.
-    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
-        self.castling_rights.remove_right(side, right);
-    }
-
-    /// Clears the castling rights for `side`.
-    fn unset_castling_rights(&mut self, side: Side) {
-        self.castling_rights.clear_side(side)
     }
 }
 
