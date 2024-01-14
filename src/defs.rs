@@ -46,13 +46,10 @@ pub struct Square {
     sq: u8,
 }
 
-/** An array of character constants associated with each piece on both sides.
- * ```
- * assert_eq!(PIECE_CHARS[Side::WHITE][Piece::PAWN.to_index()], 'P');
- * assert_eq!(PIECE_CHARS[Side::BLACK][Piece::PAWN.to_index()], 'p');
- * // etc.
- * ```
- */
+/// An array of character constants associated with each piece on both sides.
+///
+/// e.g. `PIECE_CHARS[Side::WHITE][Piece::KNIGHT] == 'N'`;
+/// `PIECE_CHARS[Side::BLACK][Piece::KING] == 'k'`.
 const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
     ['p', 'n', 'b', 'r', 'q', 'k'],
     ['P', 'N', 'B', 'R', 'Q', 'K'],
@@ -205,13 +202,11 @@ impl Square {
 }
 
 impl Bitboard {
-    /// ```
-    /// assert_eq!(Bitboard::file_bb(File::FILE1), Self::from(0x0101010101010101));
-    /// assert_eq!(Bitboard::file_bb(File::FILE2), Self::from(0x0202020202020202));
-    /// // etc.
-    /// ```
+    /// Returns the given file represented on a bitboard.
+    ///
+    /// e.g. `file_bb(File::FILE2) == 0x0202020202020202`.
     pub fn file_bb(file: File) -> Self {
-        Self::from(0x0101010101010101 << (file.inner() as u32))
+        Self::from(0x0101010101010101 << file.inner())
     }
 
     /// Wraps a `u64` in a [`Bitboard`].
@@ -231,11 +226,9 @@ impl Bitboard {
         Self::from(1 << square.inner())
     }
 
-    /// ```
-    /// assert_eq!(Bitboard::rank_bb(Rank::RANK1), Self::from(0x00000000000000ff));
-    /// assert_eq!(Bitboard::rank_bb(Rank::RANK2), Self::from(0x000000000000ff00));
-    /// // etc.
-    /// ```
+    /// Returns the given rank represented on a bitboard.
+    ///
+    /// e.g. `rank_bb(Rank::RANK2) == 0x000000000000ff00`.
     pub fn rank_bb(rank: Rank) -> Self {
         Self::from(0xff << (rank.inner() as u32 * 8))
     }
@@ -432,12 +425,11 @@ impl Rank {
 }
 
 impl Side {
-    /// Flips the contents of `self`. The result is undefined if
-    /// `self == Sides::NONE`.
-    /// ```
-    /// assert_eq(Sides::WHITE.flip(), Sides::BLACK);
-    /// assert_eq(Sides::BLACK.flip(), Sides::WHITE);
-    /// ```
+    /// Flips the contents of `self`.
+    ///
+    /// e.g. `Side::WHITE.flip() == Side::BLACK`.
+    ///
+    /// The result is undefined if `self` isn't `Side::WHITE` or `Side::BLACK`.
     pub fn flip(self) -> Self {
         Self::from(self.inner() ^ 1)
     }
@@ -501,11 +493,9 @@ impl Square {
 }
 
 /// Converts the piece `piece` on side `side` to a character.
-/// ```
-/// assert_eq!(piece_to_char(Side::WHITE, Piece::KNIGHT), 'N');
-/// assert_eq!(piece_to_char(Side::BLACK, Piece::QUEEN), 'q');
-/// // etc.
-/// ```
+///
+/// e.g. `Side::WHITE, Piece::KNIGHT -> 'N'`;
+/// `Side::BLACK, Piece::KING -> 'k'`.
 pub fn piece_to_char(side: Side, piece: Piece) -> char {
     PIECE_CHARS[side.to_index()][piece.to_index()]
 }

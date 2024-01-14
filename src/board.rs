@@ -186,13 +186,7 @@ impl Board {
         Square::NONE
     }
 
-    /// Returns the piece board of the starting position.
-    /// ```
-    /// assert_eq!(default_piece_board()[Square::A1.to_index()], Piece::ROOK);
-    /// assert_eq!(default_piece_board()[Square::B1.to_index()], Piece::KNIGHT);
-    /// assert_eq!(default_piece_board()[Square::A8.to_index()], Piece::ROOK);
-    /// // etc.
-    /// ```
+    /// Returns the [`Piece`] board of the starting position.
     #[rustfmt::skip]
     fn default_piece_board() -> [Piece; Nums::SQUARES] {
         let p = Piece::PAWN;
@@ -214,11 +208,7 @@ impl Board {
         ]
     }
 
-    /// Returns the pieces of the starting position.
-    /// ```
-    /// assert_eq!(default_pieces()[Piece::PAWN.to_index()], Bitboard::from(0x00ff00000000ff00));
-    /// // etc.
-    /// ```
+    /// Returns the piece [`Bitboard`]s of the starting position.
     fn default_pieces() -> [Bitboard; Nums::PIECES] {
         [
             Bitboard::from(0x00ff00000000ff00), // Pawns
@@ -236,11 +226,7 @@ impl Board {
         Side::WHITE
     }
 
-    /// Returns the sides of the starting position.
-    /// ```
-    /// assert_eq!(default_pieces()[Side::WHITE.to_index()], Bitboard::from(0x000000000000ffff));
-    /// assert_eq!(default_pieces()[Side::BLACK.to_index()], Bitboard::from(0xffff000000000000));
-    /// ```
+    /// Returns the side [`Bitboard`]s of the starting position.
     fn default_sides() -> [Bitboard; Nums::SIDES] {
         [
             Bitboard::from(0xffff000000000000), // Black
@@ -248,9 +234,11 @@ impl Board {
         ]
     }
 
-    /// Returns an empty piece board.
+    /// Returns an empty [`Piece`] board.
     #[rustfmt::skip]
     fn empty_piece_board() -> [Piece; Nums::SQUARES] {
+        // technically [Piece::NONE; 64] would be the same but this is more
+        // clear
         let e = Piece::NONE;
         [
             e, e, e, e, e, e, e, e,
@@ -264,7 +252,7 @@ impl Board {
         ]
     }
 
-    /// Returns the pieces of an empty board.
+    /// Returns the piece [`Bitboard`]s of an empty board.
     fn no_pieces() -> [Bitboard; Nums::PIECES] {
         [
             Bitboard::from(0x0000000000000000),
@@ -276,7 +264,7 @@ impl Board {
         ]
     }
 
-    /// Returns the sides of an empty board.
+    /// Returns the side [`Bitboard`]s of an empty board.
     #[rustfmt::skip]
     fn no_sides() -> [Bitboard; Nums::SIDES] {
         [

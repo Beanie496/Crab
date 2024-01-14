@@ -22,15 +22,13 @@ pub struct Lookup {
     rook_magics: [Magic; Nums::SQUARES],
 }
 
-/**
- * A wrapper for a move and associated methods.
- *
- * From LSB onwards, a [`Move`] is as follows:
- * * Start pos == 6 bits, 0-63
- * * End pos == 6 bits, 0-63
- * * Flags == 2 bits.
- * * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
- */
+/// A wrapper for a move and associated methods.
+///
+/// From LSB onwards, a [`Move`] is as follows:
+/// * Start pos == 6 bits, 0-63
+/// * End pos == 6 bits, 0-63
+/// * Flags == 2 bits.
+/// * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Move {
     mv: u16,
