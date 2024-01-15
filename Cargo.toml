@@ -2,6 +2,7 @@
 name = "crab"
 version = "0.1.0"
 edition = "2021"
+default-run = "gui"
 
 [lib]
 name = "backend"
@@ -9,7 +10,11 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "cmdline"
-path = "src/main.rs"
+path = "src/bin/cmdline.rs"
+
+[[bin]]
+name = "gui"
+path = "src/bin/gui.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
