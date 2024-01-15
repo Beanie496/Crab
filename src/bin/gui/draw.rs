@@ -1,7 +1,10 @@
 use crate::util::points_to_pixels;
 
 use eframe::{
-    egui::{Color32, Context, Frame, Id, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, Ui},
+    egui::{
+        widgets::Button, Align, Color32, Context, Frame, Id, Layout, Pos2, Rect, Rounding, Shape,
+        SidePanel, Stroke, Ui, Vec2,
+    },
     epaint::RectShape,
 };
 
@@ -75,6 +78,47 @@ fn draw_board(ctx: &Context, ui: &mut Ui) {
 
 fn draw_pieces(_ctx: &Context, _ui: &mut Ui) {}
 
-fn draw_buttons(_ctx: &Context, _ui: &mut Ui) {}
+fn draw_buttons(ctx: &Context, ui: &mut Ui) {
+    // I need child UI's to lay out the buttons exactly where I want them
+    let mut child = ui.child_ui(
+        Rect {
+            // this is REALLY fucked. The width of the child UI is the width of
+            // two buttons, plus the spacing between. Ok. The HEIGHT is the
+            // height of ONE button so `Align::Center` causes the button to
+            // fill the whole vertical space, then overflow the UI to form a
+            // nice 2x2 grid. Why am I doing this? So the text is in the centre
+            // of the buttons. Because aligning the text within the buttons is
+            // not a feature for SOME GOD DAMN REASON.
+            min: Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
+            max: Pos2::new(points_to_pixels(ctx, 640.0), points_to_pixels(ctx, 110.0)),
+        },
+        Layout::left_to_right(Align::Center).with_main_wrap(true),
+    );
+    child.spacing_mut().item_spacing =
+        // due to floating-point imprecision, 190.0 * 2 + 20.0 > 400.0 if any
+        // of the numbers are divided
+        Vec2::new(points_to_pixels(ctx, 19.9), points_to_pixels(ctx, 20.0));
+
+    let stop = Button::new("Stop").min_size(Vec2::new(
+        points_to_pixels(ctx, 190.0),
+        points_to_pixels(ctx, 70.0),
+    ));
+    let restart = Button::new("Restart").min_size(Vec2::new(
+        points_to_pixels(ctx, 190.0),
+        points_to_pixels(ctx, 70.0),
+    ));
+    let import_fen = Button::new("Import FEN").min_size(Vec2::new(
+        points_to_pixels(ctx, 190.0),
+        points_to_pixels(ctx, 70.0),
+    ));
+    let copy_fen = Button::new("Copy FEN").min_size(Vec2::new(
+        points_to_pixels(ctx, 190.0),
+        points_to_pixels(ctx, 70.0),
+    ));
+    child.add(stop);
+    child.add(restart);
+    child.add(import_fen);
+    child.add(copy_fen);
+}
 
 fn draw_labels(_ctx: &Context, _ui: &mut Ui) {}
