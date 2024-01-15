@@ -14,6 +14,7 @@ pub struct Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             board: Board::new(),
