@@ -1,54 +1,31 @@
+use crate::util::points_to_pixels;
+
 use eframe::{
-    egui::{
-        self, Color32, Context, Frame, Id, Pos2, Rect, Rounding, Shape, Stroke, Ui, Vec2,
-        ViewportBuilder,
-    },
+    egui::{Color32, Context, Frame, Id, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, Ui},
     epaint::RectShape,
-    run_simple_native, Error, NativeOptions,
 };
 
-fn main() -> Result<(), Error> {
-    let title = "Crab - A chess engine";
-
-    let options = NativeOptions {
-        viewport: ViewportBuilder::default()
-            .with_title(title)
-            .with_decorations(false)
-            .with_inner_size(Vec2::new(1920.0, 1080.0)),
-        ..Default::default()
-    };
-
-    run_simple_native(title, options, move |ctx, _frame| {
-        let board_area_width = 880.0;
-        let info_box_width = 1920.0 - 880.0;
-        let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
-        draw_board_area(ctx, board_area_width, bg_col);
-        draw_info_area(ctx, info_box_width, Color32::RED);
-    })
-}
-
-fn draw_board_area(ctx: &Context, width: f32, col: Color32) {
-    egui::SidePanel::left(Id::new("board"))
+pub fn draw_board_area(ctx: &Context, width: f32, col: Color32) {
+    SidePanel::left(Id::new("board"))
         .resizable(false)
         .show_separator_line(false)
         .exact_width(points_to_pixels(ctx, width))
         .frame(Frame::none().fill(col))
         .show(ctx, |ui| {
             draw_board(ctx, ui);
+            draw_pieces(ctx, ui);
+            draw_buttons(ctx, ui);
+            draw_labels(ctx, ui);
         });
 }
 
-fn draw_info_area(ctx: &Context, width: f32, col: Color32) {
-    egui::SidePanel::right(Id::new("info"))
+pub fn draw_info_area(ctx: &Context, width: f32, col: Color32) {
+    SidePanel::right(Id::new("info"))
         .resizable(false)
         .show_separator_line(false)
         .exact_width(points_to_pixels(ctx, width))
         .frame(Frame::none().fill(col))
         .show(ctx, |_ui| {});
-}
-
-fn points_to_pixels(ctx: &Context, points: f32) -> f32 {
-    points / ctx.native_pixels_per_point().unwrap()
 }
 
 fn draw_board(ctx: &Context, ui: &mut Ui) {
@@ -95,3 +72,9 @@ fn draw_board(ctx: &Context, ui: &mut Ui) {
         };
     }
 }
+
+fn draw_pieces(_ctx: &Context, _ui: &mut Ui) {}
+
+fn draw_buttons(_ctx: &Context, _ui: &mut Ui) {}
+
+fn draw_labels(_ctx: &Context, _ui: &mut Ui) {}

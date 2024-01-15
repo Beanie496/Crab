@@ -14,7 +14,7 @@ path = "src/bin/cmdline.rs"
 
 [[bin]]
 name = "gui"
-path = "src/bin/gui.rs"
+path = "src/bin/gui/gui.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
