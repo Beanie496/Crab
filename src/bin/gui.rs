@@ -1,7 +1,7 @@
 use eframe::{
     egui::{
-        self, Color32, Context, Frame, Id, Pos2, Rect, Rounding, Shape, Stroke, Vec2,
-        ViewportBuilder, Ui
+        self, Color32, Context, Frame, Id, Pos2, Rect, Rounding, Shape, Stroke, Ui, Vec2,
+        ViewportBuilder,
     },
     epaint::RectShape,
     run_simple_native, Error, NativeOptions,
@@ -34,7 +34,7 @@ fn draw_board_area(ctx: &Context, width: f32, col: Color32) {
         .exact_width(points_to_pixels(ctx, width))
         .frame(Frame::none().fill(col))
         .show(ctx, |ui| {
-            draw_board(ctx, ui, width);
+            draw_board(ctx, ui);
         });
 }
 
@@ -51,24 +51,47 @@ fn points_to_pixels(ctx: &Context, points: f32) -> f32 {
     points / ctx.native_pixels_per_point().unwrap()
 }
 
-fn draw_board(ctx: &Context, ui: &mut Ui, width: f32) {
-    let top_left = Pos2::new(
-        points_to_pixels(ctx, 40.0),
-        ui.available_height() - points_to_pixels(ctx, 840.0),
-    );
-    let bottom_right = Pos2::new(
-        points_to_pixels(ctx, width - 40.0),
-        ui.available_height() - points_to_pixels(ctx, 40.0),
-    );
-    let rect = Rect {
-        min: top_left,
-        max: bottom_right,
-    };
-    ui.set_clip_rect(rect);
-    ui.painter().add(Shape::Rect(RectShape::new(
-        Rect::EVERYTHING,
-        Rounding::ZERO,
-        Color32::WHITE,
-        Stroke::default(),
-    )));
+fn draw_board(ctx: &Context, ui: &mut Ui) {
+    let mut col = Color32::WHITE;
+    // draw the board, starting at the top left square; go left to right then
+    // top to bottom
+    for rank in 0..8 {
+        for file in 0..8 {
+            // the board to be drawn is 800x800 pixels and sits at the bottom
+            // left with a margix of 40 pixels. You can figure out the rest :)
+            let top_left = Pos2::new(
+                points_to_pixels(ctx, 40.0 + 100.0 * file as f32),
+                // yeah idk why the available height is given in pixels to
+                // begin with
+                ui.available_height() - points_to_pixels(ctx, 840.0 - 100.0 * rank as f32),
+            );
+            let bottom_right = Pos2::new(
+                points_to_pixels(ctx, 140.0 + 100.0 * file as f32),
+                ui.available_height() - points_to_pixels(ctx, 740.0 - 100.0 * rank as f32),
+            );
+            let rect = Rect {
+                min: top_left,
+                max: bottom_right,
+            };
+            ui.painter().add(Shape::Rect(RectShape::new(
+                rect,
+                Rounding::ZERO,
+                col,
+                Stroke::default(),
+            )));
+            // flip the square colour
+            col = if col == Color32::WHITE {
+                Color32::from_rgb(0xb8, 0x87, 0x62)
+            } else {
+                Color32::WHITE
+            };
+        }
+        // when going onto a new rank, flip the square again because it needs
+        // stay the same colour
+        col = if col == Color32::WHITE {
+            Color32::from_rgb(0xb8, 0x87, 0x62)
+        } else {
+            Color32::WHITE
+        };
+    }
 }
