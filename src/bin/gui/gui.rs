@@ -4,6 +4,7 @@ use eframe::{
     egui::{Color32, Vec2, ViewportBuilder},
     run_simple_native, Error, NativeOptions,
 };
+use egui_extras::install_image_loaders;
 
 mod draw;
 mod util;
@@ -25,6 +26,7 @@ fn main() -> Result<(), Error> {
         let info_box_width = 1920.0 - 880.0;
         // I like this colour
         let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
+        install_image_loaders(ctx);
         draw_board_area(ctx, board_area_width, bg_col);
         draw_info_area(ctx, info_box_width, Color32::RED);
     })

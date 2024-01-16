@@ -2,8 +2,8 @@ use crate::util::points_to_pixels;
 
 use eframe::{
     egui::{
-        widgets::Button, Align, Color32, Context, Frame, Id, Layout, Pos2, Rect, Rounding, Shape,
-        SidePanel, Stroke, Ui, Vec2,
+        include_image, widgets::Button, Align, Color32, Context, Direction, Frame, Id, Image,
+        Layout, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, Ui, Vec2,
     },
     epaint::RectShape,
 };
@@ -16,7 +16,6 @@ pub fn draw_board_area(ctx: &Context, width: f32, col: Color32) {
         .frame(Frame::none().fill(col))
         .show(ctx, |ui| {
             draw_board(ctx, ui);
-            draw_pieces(ctx, ui);
             draw_buttons(ctx, ui);
             draw_labels(ctx, ui);
         });
@@ -37,46 +36,37 @@ fn draw_board(ctx: &Context, ui: &mut Ui) {
     // top to bottom
     for rank in 0..8 {
         for file in 0..8 {
-            // the board to be drawn is 800x800 pixels and sits at the bottom
-            // left with a margix of 40 pixels. You can figure out the rest :)
-            let top_left = Pos2::new(
-                points_to_pixels(ctx, 40.0 + 100.0 * file as f32),
-                // yeah idk why the available height is given in pixels to
-                // begin with
-                ui.available_height() - points_to_pixels(ctx, 840.0 - 100.0 * rank as f32),
-            );
-            let bottom_right = Pos2::new(
-                points_to_pixels(ctx, 140.0 + 100.0 * file as f32),
-                ui.available_height() - points_to_pixels(ctx, 740.0 - 100.0 * rank as f32),
-            );
             let rect = Rect {
-                min: top_left,
-                max: bottom_right,
+                // the board to be drawn is 800x800 pixels and sits at the bottom
+                // left with a margix of 40 pixels. You can figure out the rest :)
+                min: Pos2::new(
+                    points_to_pixels(ctx, 40.0 + 100.0 * file as f32),
+                    // yeah idk why the available height is given in pixels to
+                    // begin with
+                    ui.available_height() - points_to_pixels(ctx, 840.0 - 100.0 * rank as f32),
+                ),
+                max: Pos2::new(
+                    points_to_pixels(ctx, 140.0 + 100.0 * file as f32),
+                    ui.available_height() - points_to_pixels(ctx, 740.0 - 100.0 * rank as f32),
+                ),
             };
-            ui.painter().add(Shape::Rect(RectShape::new(
+
+            let mut child = ui.child_ui_with_id_source(
                 rect,
-                Rounding::ZERO,
-                col,
-                Stroke::default(),
-            )));
-            // flip the square colour
-            col = if col == Color32::WHITE {
-                Color32::from_rgb(0xb8, 0x87, 0x62)
-            } else {
-                Color32::WHITE
-            };
+                Layout::centered_and_justified(Direction::LeftToRight),
+                rank * 8 + file,
+            );
+
+            draw_square(&mut child, &rect, &col);
+            draw_piece(&mut child);
+
+            flip_colour(&mut col, &Color32::WHITE, &Color32::from_rgb(0xb8, 0x87, 0x62));
         }
         // when going onto a new rank, flip the square again because it needs
         // stay the same colour
-        col = if col == Color32::WHITE {
-            Color32::from_rgb(0xb8, 0x87, 0x62)
-        } else {
-            Color32::WHITE
-        };
+        flip_colour(&mut col, &Color32::WHITE, &Color32::from_rgb(0xb8, 0x87, 0x62));
     }
 }
-
-fn draw_pieces(_ctx: &Context, _ui: &mut Ui) {}
 
 fn draw_buttons(ctx: &Context, ui: &mut Ui) {
     // I need child UI's to lay out the buttons exactly where I want them
@@ -122,3 +112,25 @@ fn draw_buttons(ctx: &Context, ui: &mut Ui) {
 }
 
 fn draw_labels(_ctx: &Context, _ui: &mut Ui) {}
+
+fn draw_piece(child: &mut Ui) {
+    // TODO: add an actual piece instead of just a placeholder
+    child.add(Image::new(include_image!("pieces/wk.png")));
+}
+
+fn draw_square(child: &mut Ui, rect: &Rect, col: &Color32) {
+    child.painter().add(Shape::Rect(RectShape::new(
+        *rect,
+        Rounding::ZERO,
+        *col,
+        Stroke::default(),
+    )));
+}
+
+fn flip_colour(col: &mut Color32, col1: &Color32, col2: &Color32) {
+    *col = if *col == *col1 {
+        *col2
+    } else {
+        *col1
+    };
+}
