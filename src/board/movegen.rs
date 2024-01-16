@@ -34,7 +34,7 @@ pub struct Move {
     mv: u16,
 }
 
-/// An array of [`Move`]s
+/// An array of `Move`s
 pub struct Moves {
     moves: [Move; MAX_LEGAL_MOVES],
     first_empty: usize,
@@ -287,7 +287,7 @@ impl Move {
 }
 
 impl Moves {
-    /// Pops a [`Move`] from the array. Returns `Some(move)` if there are `> 0`
+    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     pub fn pop_move(&mut self) -> Option<Move> {
         (self.first_empty > 0).then(|| {
