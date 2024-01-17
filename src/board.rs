@@ -15,7 +15,8 @@ pub struct CastlingRights {
 /// Items related to move generation.
 mod movegen;
 
-/// Stores information about the current state of the board.
+/// The board. It contains information about the current board state and can
+/// generate pseudo-legal moves. It is small (131 bytes) so it uses copy-make.
 #[derive(Clone)]
 pub struct Board {
     // `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
@@ -123,6 +124,16 @@ impl Board {
         self.side_to_move = Side::NONE;
     }
 
+    /// Copies and returns its mailbox board array.
+    pub fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
+        self.piece_board
+    }
+
+    /// Returns the piece on `square`.
+    pub fn piece_on(&self, square: Square) -> Piece {
+        self.piece_board[square.to_index()]
+    }
+
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (0..Nums::RANKS as u8).rev() {
@@ -177,6 +188,18 @@ impl Board {
         self.castling_rights = CastlingRights::new();
         self.ep_square = Self::default_ep_square();
         self.side_to_move = Self::default_side();
+    }
+
+    /// Returns the [`Side`] of `square`.
+    pub fn side_of(&self, square: Square) -> Side {
+        let square_bb = Bitboard::from_square(square);
+        if self.side::<{ Side::WHITE.to_bool() }>() & square_bb != Bitboard::from(0) {
+            Side::WHITE
+        } else if self.side::<{ Side::BLACK.to_bool() }>() & square_bb != Bitboard::from(0) {
+            Side::BLACK
+        } else {
+            Side::NONE
+        }
     }
 }
 
@@ -306,11 +329,6 @@ impl Board {
         } else {
             piece_to_char(Side::BLACK, piece)
         }
-    }
-
-    /// Returns the piece on `square`.
-    fn piece_on(&self, square: Square) -> Piece {
-        self.piece_board[square.to_index()]
     }
 
     /// Sets the piece on `square` in the piece array to `piece`.

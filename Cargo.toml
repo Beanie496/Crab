@@ -32,6 +32,11 @@ version = "0.25.0"
 default-features = false
 features = ["file", "image"]
 
+[dependencies.image]
+version = "0.24.8"
+default-features = false
+features = ["png"]
+
 [profile.release]
 strip = true
 lto = "fat"

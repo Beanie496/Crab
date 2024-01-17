@@ -8,13 +8,12 @@ mod search;
 
 /// Master object that contains all the other major objects.
 pub struct Engine {
-    board: Board,
+    pub board: Board,
 }
 
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             board: Board::new(),
@@ -23,21 +22,11 @@ impl Engine {
 }
 
 impl Engine {
-    /// Pretty-prints the current state of the board.
-    pub fn pretty_print_board(&self) {
-        self.board.pretty_print();
-    }
-
     /// Sets `self.board` to the given FEN and moves, as given by the
     /// `position` UCI command. Unexpected/incorrect tokens will be ignored.
     pub fn set_position(&mut self, position: &str, moves: &str) {
         self.set_pos_to_fen(position);
         self.play_moves(moves);
-    }
-
-    /// Resets `self.board`.
-    pub fn set_startpos(&mut self) {
-        self.board.set_startpos();
     }
 }
 
@@ -55,7 +44,7 @@ impl Engine {
         let board = if let Some(x) = iter.next() {
             x
         } else {
-            self.set_startpos();
+            self.board.set_startpos();
             return eprintln!("Need to pass a board");
         };
         let side_to_move = iter.next();
@@ -83,7 +72,7 @@ impl Engine {
                     let piece_num = if let Some(pn) = piece_num {
                         pn
                     } else {
-                        self.set_startpos();
+                        self.board.set_startpos();
                         return eprintln!("Error: \"{piece}\" is not a valid piece.");
                     };
                     // 1 if White, 0 if Black
@@ -100,7 +89,7 @@ impl Engine {
             }
             // if there are too few/many files in that rank, reset and return
             if file_idx != 8 {
-                self.set_startpos();
+                self.board.set_startpos();
                 return eprintln!("Error: FEN is invalid");
             }
 
@@ -108,7 +97,7 @@ impl Engine {
         }
         // if there are too many/few ranks in the board, reset and return
         if rank_idx != 0 {
-            self.set_startpos();
+            self.board.set_startpos();
             return eprintln!("Error: FEN is invalid (incorrect number of ranks)");
         }
 
@@ -119,7 +108,7 @@ impl Engine {
             } else if stm == "b" {
                 self.board.set_side_to_move(Side::BLACK);
             } else {
-                self.set_startpos();
+                self.board.set_startpos();
                 return eprintln!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
             }
         } else {
@@ -147,7 +136,7 @@ impl Engine {
                         .add_castling_right(CastlingRights::CASTLE_FLAGS_q),
                     '-' => (),
                     _ => {
-                        self.set_startpos();
+                        self.board.set_startpos();
                         return eprintln!("Error: castling right \"{right}\" is not valid");
                     }
                 }
@@ -164,7 +153,7 @@ impl Engine {
             } else if let Some(square) = Square::from_string(ep) {
                 square
             } else {
-                self.set_startpos();
+                self.board.set_startpos();
                 return eprintln!("Error: En passant square \"{ep}\" is not a valid square");
             }
         } else {
@@ -176,7 +165,7 @@ impl Engine {
             if let Ok(hm) = hm.parse::<u32>() {
                 hm
             } else {
-                self.set_startpos();
+                self.board.set_startpos();
                 return eprintln!("Error: Invalid number (\"hm\") given for halfmove counter");
             }
         } else {

@@ -23,7 +23,7 @@ pub struct File {
 pub struct Nums;
 
 /// A wrapper for a `u8`, since a piece can go from 0 to 12.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Piece {
     p: u8,
 }
@@ -35,7 +35,7 @@ pub struct Rank {
 }
 
 /// A wrapper for a `u8`, since a side is just 0, 1 or 2.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Side {
     s: u8,
 }

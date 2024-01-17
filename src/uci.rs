@@ -122,7 +122,7 @@ impl Uci {
                             "fen" => {
                                 Self::handle_position(&mut line, engine);
                             }
-                            "startpos" => engine.set_startpos(),
+                            "startpos" => engine.board.set_startpos(),
                             _ => (),
                         }
                     }
@@ -152,7 +152,7 @@ impl Uci {
                 }
                 /* "p" - prints current position */
                 "p" => {
-                    engine.pretty_print_board();
+                    engine.board.pretty_print();
                 }
                 /* "perft n", where n is a number - run perft to depth n */
                 "perft" => {

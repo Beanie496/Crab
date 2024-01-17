@@ -1,11 +1,12 @@
 //! Crab, a UCI-compatible chess engine for my A-level project written in Rust.
+#![allow(clippy::new_without_default)]
 
 /// For unit testing.
 mod bench;
 /// Items related to the board. Mainly [`Board`](board::Board).
-mod board;
+pub mod board;
 /// Definitions and enumerations.
-mod defs;
+pub mod defs;
 /// A container for [`Engine`](engine::Engine).
 pub mod engine;
 /// Handles UCI input
