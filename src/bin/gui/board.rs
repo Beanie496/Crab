@@ -1,24 +1,8 @@
 use super::Gui;
 
-use backend::{
-    board::Move,
-    defs::{Piece, Side, Square},
-};
+use backend::defs::{Piece, Side, Square};
 
 impl Gui {
-    /// Remove the [`Piece`] and [`Side`] on `square` in the mailboxes of
-    /// `self`.
-    pub fn clear_square(&mut self, square: Square) {
-        self.piece_mailbox[square.to_index()] = Piece::NONE;
-        self.side_mailbox[square.to_index()] = Side::NONE;
-    }
-
-    /// Add a [`Piece`] on [`Side`] to `square` to the mailboxes of `self`.
-    pub fn add_piece(&mut self, square: Square, piece: Piece, side: Side) {
-        self.piece_mailbox[square.to_index()] = piece;
-        self.side_mailbox[square.to_index()] = side;
-    }
-
     /// Attempts to move a piece from `start` to `end`. Returns `true` if the
     /// given move is legal; false otherwise.
     // there are many ways to do this. The method I've chosen is
@@ -31,10 +15,12 @@ impl Gui {
     // It's not very efficient, but I doubt it takes more than a few hundred
     // nanoseconds, so who cares.
     pub fn move_piece(&mut self, start: Square, end: Square) -> bool {
-        let mv = Move::new::<{ Move::NO_FLAG }>(start, end);
-        if !self.legal_moves.contains(mv) {
+        let mv = self.legal_moves.move_with(start, end);
+        let mv = if mv.is_none() {
             return false;
-        }
+        } else {
+            unsafe { mv.unwrap_unchecked() }
+        };
 
         let mut copy = self.engine.board.clone();
         if !copy.make_move(mv) {
@@ -45,11 +31,9 @@ impl Gui {
         copy.generate_moves(&mut self.legal_moves);
         self.engine.board = copy;
 
-        self.move_piece(start, end);
-        self.clear_square(start);
-        let piece = self.engine.board.piece_on(end);
-        let side = self.engine.board.side_of(end);
-        self.add_piece(end, piece, side);
+        // not the most efficient, but considering how fast it is anyway, who
+        // cares
+        self.regenerate_mailboxes();
 
         true
     }
@@ -63,5 +47,16 @@ impl Gui {
     /// `square`, it returns [`Side::NONE`].
     pub fn side_of(&self, square: Square) -> Side {
         self.side_mailbox[square.to_index()]
+    }
+
+    /// Refreshes the piece and side mailboxes of `self` from
+    /// `self.engine.board`. The piece mailbox probably takes a matter of
+    /// cycles but the side mailbox is a little more expensive due to the 64
+    /// unpredictable branches.
+    pub fn regenerate_mailboxes(&mut self) {
+        self.piece_mailbox = self.engine.board.clone_piece_board();
+        for (square, side) in self.side_mailbox.iter_mut().enumerate() {
+            *side = self.engine.board.side_of(Square::from(square as u8));
+        }
     }
 }

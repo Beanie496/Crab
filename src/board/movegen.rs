@@ -71,16 +71,20 @@ impl Iterator for Moves {
 }
 
 impl Move {
-    pub const START_MASK: u16 = 0b11_1111;
-    pub const START_SHIFT: usize = 0;
-    pub const END_MASK: u16 = 0b1111_1100_0000;
-    pub const END_SHIFT: usize = 6;
     pub const NO_FLAG: u16 = 0b0000_0000_0000_0000;
     pub const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
     pub const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
     pub const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
-    pub const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
-    pub const PIECE_SHIFT: usize = 14;
+}
+
+impl Move {
+    const START_MASK: u16 = 0b11_1111;
+    const START_SHIFT: usize = 0;
+    const END_MASK: u16 = 0b1111_1100_0000;
+    const END_SHIFT: usize = 6;
+    const SQUARE_MASK: u16 = 0b0000_1111_1111_1111;
+    const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
+    const PIECE_SHIFT: usize = 14;
 }
 
 impl Lookup {
@@ -327,6 +331,13 @@ impl Move {
         self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
     }
 
+    /// Checks if the given start and end square match the start and end square
+    /// contained within `self`.
+    pub fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
+        let other = Move::new::<{ Self::NO_FLAG }>(start, end);
+        other.mv & Self::SQUARE_MASK == self.mv & Self::SQUARE_MASK
+    }
+
     /// Checks if the move is a promotion.
     pub fn is_promotion(&self) -> bool {
         self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
@@ -360,10 +371,15 @@ impl Moves {
         self.first_empty = 0;
     }
 
-    /// Does a linear search to see if `self` contains `mv`. Returns `true` if
-    /// it does, `false` otherwise.
-    pub fn contains(&mut self, mv: Move) -> bool {
-        self.moves.contains(&mv)
+    /// Finds and returns, if it exists, the move that has start square `start`
+    /// and end square `end`.
+    ///
+    /// Returns `Some(mv)` if a `Move` does match the start and end square;
+    /// returns `None` otherwise.
+    pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
+        self.moves
+            .into_iter()
+            .find(|&mv| mv.is_moving_from_to(start, end))
     }
 
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
