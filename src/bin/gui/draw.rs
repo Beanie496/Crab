@@ -1,11 +1,11 @@
-use super::Gui;
-use crate::util::{flip_colour, points_to_pixels};
+use super::{Gui, SquareColour, SQUARE_COLOURS};
+use crate::util::{flip_square_colour, points_to_pixels};
 
 use backend::defs::{Nums, Piece, Side, Square};
 use eframe::{
     egui::{
         widgets::Button, Align, Color32, Context, Direction, Frame, Id, Layout, Pos2, Rect,
-        Rounding, Shape, SidePanel, Stroke, Ui, Vec2,
+        Rounding, Sense, Shape, SidePanel, Stroke, Ui, Vec2,
     },
     epaint::RectShape,
 };
@@ -14,7 +14,7 @@ impl Gui {
     /// Creates a [`SidePanel`] and draws the chessboard, buttons and timers.
     ///
     /// Buttons currently do nothing and timers are not implemented yet.
-    pub fn draw_board_area(&self, ctx: &Context, width: f32, col: Color32) {
+    pub fn draw_board_area(&mut self, ctx: &Context, width: f32, col: Color32) {
         SidePanel::left(Id::new("board"))
             .resizable(false)
             .show_separator_line(false)
@@ -42,11 +42,8 @@ impl Gui {
 
 impl Gui {
     /// Draws the chessboard and all the pieces on it.
-    fn draw_board(&self, ctx: &Context, ui: &mut Ui) {
-        let white = Color32::WHITE;
-        let black = Color32::from_rgb(0xb8, 0x87, 0x62);
-
-        let mut colour = black;
+    fn draw_board(&mut self, ctx: &Context, ui: &mut Ui) {
+        let mut colour = SQUARE_COLOURS.dark;
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
         for rank in 0..Nums::RANKS {
@@ -76,16 +73,16 @@ impl Gui {
                     square.inner(),
                 );
 
-                // colour it
-                self.paint_area_with_colour(&mut child, &square_corners, &colour);
+                // colour the square
+                self.draw_square(&mut child, square_corners, square, colour);
                 // add the piece
                 self.draw_piece(&mut child, square);
 
-                flip_colour(&mut colour, &white, &black);
+                flip_square_colour(&mut colour);
             }
             // when going onto a new rank, flip the square again because it needs
             // stay the same colour
-            flip_colour(&mut colour, &white, &black);
+            flip_square_colour(&mut colour);
         }
     }
 
@@ -168,12 +165,34 @@ impl Gui {
         ui.image(image_path);
     }
 
+    /// Draw a square on `ui` in area `rect` with the given square `square` and
+    /// the the given square colour `colour`.
+    ///
+    /// If it's clicked, it will draw the square as selected and update the
+    /// selected square of `self`.
+    // TODO: I don't like how a function called 'draw_xyz' mutates some
+    // unrelated thing. Fix when adding piece movement.
+    fn draw_square(&mut self, ui: &mut Ui, rect: Rect, square: Square, colour: SquareColour) {
+        if ui.interact(rect, ui.id(), Sense::click()).clicked() {
+            if self.selected_square().is_none() {
+                self.set_selected_square(Some(square));
+            } else {
+                self.set_selected_square(None);
+            }
+        }
+        if self.selected_square() == Some(square) {
+            self.paint_area_with_colour(ui, rect, colour.selected);
+        } else {
+            self.paint_area_with_colour(ui, rect, colour.unselected);
+        }
+    }
+
     /// Paints the area on `ui` defined by `rect` the colour `colour`.
-    fn paint_area_with_colour(&self, ui: &mut Ui, rect: &Rect, colour: &Color32) {
+    fn paint_area_with_colour(&self, ui: &mut Ui, rect: Rect, colour: Color32) {
         ui.painter().add(Shape::Rect(RectShape::new(
-            *rect,
+            rect,
             Rounding::ZERO,
-            *colour,
+            colour,
             Stroke::default(),
         )));
     }
