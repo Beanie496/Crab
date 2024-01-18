@@ -1,5 +1,5 @@
-use super::{Gui, SquareColour, SQUARE_COLOURS};
-use crate::util::{flip_square_colour, points_to_pixels};
+use super::{Gui, SquareColour, SquareColourType};
+use crate::util::points_to_pixels;
 
 use backend::defs::{Nums, Piece, Side, Square};
 use eframe::{
@@ -43,7 +43,7 @@ impl Gui {
 impl Gui {
     /// Draws the chessboard and all the pieces on it.
     fn draw_board(&mut self, ctx: &Context, ui: &mut Ui) {
-        let mut colour = SQUARE_COLOURS.dark;
+        let mut colour = SquareColour::new(SquareColourType::Dark);
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
         for rank in 0..Nums::RANKS {
@@ -78,11 +78,11 @@ impl Gui {
                 // add the piece
                 self.draw_piece(&mut child, square);
 
-                flip_square_colour(&mut colour);
+                colour.flip_colour();
             }
             // when going onto a new rank, flip the square again because it needs
             // stay the same colour
-            flip_square_colour(&mut colour);
+            colour.flip_colour();
         }
     }
 

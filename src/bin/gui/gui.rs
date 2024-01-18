@@ -22,23 +22,6 @@ enum SquareColourType {
     Dark,
 }
 
-/// The 4 colours that each square can take.
-///
-/// Yes I say 'colour' not 'color'. This isn't a library crate and I'm British.
-#[derive(Copy, Clone)]
-struct SquareColour {
-    unselected: Color32,
-    selected: Color32,
-    square_type: SquareColourType,
-}
-
-/// Helper for `SQUARE_COLOURS` to give a name to both colours instead of just
-/// an array.
-struct SquareColourTypes {
-    light: SquareColour,
-    dark: SquareColour,
-}
-
 /// The GUI: used to save state between frames.
 struct Gui {
     // redundant mailboxes to separate them from the internal board.
@@ -50,27 +33,15 @@ struct Gui {
     selected_square: Option<Square>,
 }
 
-/// Stores the global square colours for selected and unselected light and dark
-/// squares.
-const SQUARE_COLOURS: SquareColourTypes = SquareColourTypes {
-    // I took the method of changing the selected square colour according to
-    // the way chess.com does it: increasing red and green by a certain amount
-    // (increasing it more if the base colour is darker) and decreasing blue
-    // by a certain amount (decreasing it more if the base colour is lighter)
-    // It looks good to me so I'll use these colours.
-    light: SquareColour {
-        selected: Color32::from_rgb(0xf2, 0xf2, 0x7f),
-        // 0xfff is too harsh so tone it down a little
-        unselected: Color32::from_rgb(0xee, 0xee, 0xee),
-        square_type: SquareColourType::Light,
-    },
-    dark: SquareColour {
-        selected: Color32::from_rgb(0xd0, 0xc2, 0x38),
-        // universally-recognised and looks nice
-        unselected: Color32::from_rgb(0xb8, 0x87, 0x62),
-        square_type: SquareColourType::Dark,
-    },
-};
+/// The 4 colours that each square can take.
+///
+/// Yes I say 'colour' not 'color'. This isn't a library crate and I'm British.
+#[derive(Copy, Clone)]
+struct SquareColour {
+    unselected: Color32,
+    selected: Color32,
+    square_type: SquareColourType,
+}
 
 impl App for Gui {
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
@@ -84,6 +55,32 @@ impl App for Gui {
     }
 }
 
+/// Stores the square colours for selected and unselected light and dark
+/// squares.
+impl SquareColour {
+    const DARK: Color32 = Color32::from_rgb(0xb8, 0x87, 0x62);
+    const LIGHT: Color32 = Color32::from_rgb(0xee, 0xee, 0xee);
+    const SELECTED_DARK: Color32 = Color32::from_rgb(0xd0, 0xc2, 0x38);
+    const SELECTED_LIGHT: Color32 = Color32::from_rgb(0xf2, 0xf2, 0x7f);
+}
+
+impl SquareColour {
+    pub fn new(square_type: SquareColourType) -> Self {
+        match square_type {
+            SquareColourType::Light => Self {
+                selected: Self::SELECTED_LIGHT,
+                unselected: Self::LIGHT,
+                square_type: SquareColourType::Light,
+            },
+            SquareColourType::Dark => Self {
+                selected: Self::SELECTED_DARK,
+                unselected: Self::DARK,
+                square_type: SquareColourType::Dark,
+            },
+        }
+    }
+}
+
 impl Gui {
     /// Returns the selected square of `self`.
     pub fn selected_square(&self) -> Option<Square> {
@@ -93,6 +90,16 @@ impl Gui {
     /// Sets the selected square of `self`.
     pub fn set_selected_square(&mut self, square: Option<Square>) {
         self.selected_square = square;
+    }
+}
+
+impl SquareColour {
+    pub fn flip_colour(&mut self) {
+        *self = if self.square_type == SquareColourType::Light {
+            Self::new(SquareColourType::Dark)
+        } else {
+            Self::new(SquareColourType::Light)
+        };
     }
 }
 
