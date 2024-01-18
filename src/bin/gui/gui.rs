@@ -1,4 +1,5 @@
 use backend::{
+    board::Moves,
     defs::{Nums, Piece, Side, Square},
     engine::Engine,
 };
@@ -31,6 +32,7 @@ struct Gui {
     #[allow(dead_code)]
     engine: Engine,
     selected_square: Option<Square>,
+    legal_moves: Moves,
 }
 
 /// The 4 colours that each square can take.
@@ -115,12 +117,15 @@ impl Gui {
         for (square, side) in side_mailbox.iter_mut().enumerate() {
             *side = engine.board.side_of(Square::from(square as u8));
         }
+        let mut moves = Moves::new();
+        engine.board.generate_moves(&mut moves);
 
         Self {
             piece_mailbox: engine.board.clone_piece_board(),
             side_mailbox,
             engine,
             selected_square: None,
+            legal_moves: moves,
         }
     }
 }

@@ -71,16 +71,16 @@ impl Iterator for Moves {
 }
 
 impl Move {
-    const START_MASK: u16 = 0b11_1111;
-    const START_SHIFT: usize = 0;
-    const END_MASK: u16 = 0b1111_1100_0000;
-    const END_SHIFT: usize = 6;
-    const NO_FLAG: u16 = 0b0000_0000_0000_0000;
-    const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
-    const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
-    const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
-    const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
-    const PIECE_SHIFT: usize = 14;
+    pub const START_MASK: u16 = 0b11_1111;
+    pub const START_SHIFT: usize = 0;
+    pub const END_MASK: u16 = 0b1111_1100_0000;
+    pub const END_SHIFT: usize = 6;
+    pub const NO_FLAG: u16 = 0b0000_0000_0000_0000;
+    pub const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
+    pub const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
+    pub const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
+    pub const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
+    pub const PIECE_SHIFT: usize = 14;
 }
 
 impl Lookup {
@@ -92,6 +92,39 @@ impl Lookup {
             LOOKUPS.init_king_attacks();
             LOOKUPS.init_magics();
         };
+    }
+}
+
+impl Move {
+    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
+    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
+    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
+    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
+    /// promotion [`Move`].
+    pub fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
+        debug_assert!(FLAG != Move::PROMOTION_FLAG);
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | FLAG,
+        }
+    }
+
+    /// Creates a promotion [`Move`] to the given piece.
+    pub fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
+        debug_assert!(PIECE != Piece::PAWN.inner());
+        debug_assert!(PIECE != Piece::KING.inner());
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | Self::PROMOTION_FLAG
+                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
+        }
+    }
+
+    /// Creates a null [`Move`].
+    pub fn null() -> Move {
+        Self { mv: 0 }
     }
 }
 
@@ -271,6 +304,40 @@ impl Lookup {
 }
 
 impl Move {
+    /// Turns a [`Move`] into its components: start square, end square, is
+    /// castling, is promotion, is en passant and piece (only set if
+    /// `is_promotion`), in that order.
+    pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let is_promotion = self.is_promotion();
+        let is_castling = self.is_castling();
+        let is_en_passant = self.is_en_passant();
+        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        (start, end, is_castling, is_en_passant, is_promotion, piece)
+    }
+
+    /// Checks if the move is castling.
+    pub fn is_castling(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::CASTLING_FLAG
+    }
+
+    /// Checks if the move is en passant.
+    pub fn is_en_passant(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
+    }
+
+    /// Checks if the move is a promotion.
+    pub fn is_promotion(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
+    }
+
+    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
+    /// only return a value from 1 to 4.
+    pub fn promotion_piece(&self) -> Piece {
+        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+    }
+
     /// Converts `mv` into its string representation.
     pub fn stringify(&self) -> String {
         let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
@@ -287,6 +354,18 @@ impl Move {
 }
 
 impl Moves {
+    /// Clears `self`. This doesn't actually zero any bits: it just resets the
+    /// head pointer, so it's O(1).
+    pub fn clear(&mut self) {
+        self.first_empty = 0;
+    }
+
+    /// Does a linear search to see if `self` contains `mv`. Returns `true` if
+    /// it does, `false` otherwise.
+    pub fn contains(&mut self, mv: Move) -> bool {
+        self.moves.contains(&mv)
+    }
+
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     pub fn pop_move(&mut self) -> Option<Move> {
@@ -572,39 +651,6 @@ impl Lookup {
     }
 }
 
-impl Move {
-    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
-    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
-    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
-    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
-    /// promotion [`Move`].
-    fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
-        debug_assert!(FLAG != Move::PROMOTION_FLAG);
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | FLAG,
-        }
-    }
-
-    /// Creates a promotion [`Move`] to the given piece.
-    fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
-        debug_assert!(PIECE != Piece::PAWN.inner());
-        debug_assert!(PIECE != Piece::KING.inner());
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | Self::PROMOTION_FLAG
-                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
-        }
-    }
-
-    /// Creates a null [`Move`].
-    fn null() -> Move {
-        Self { mv: 0 }
-    }
-}
-
 impl Lookup {
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
@@ -713,41 +759,5 @@ impl Lookup {
             let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
             *bb = pushed.east() | pushed.west();
         }
-    }
-}
-
-impl Move {
-    /// Turns a [`Move`] into its components: start square, end square, is
-    /// castling, is promotion, is en passant and piece (only set if
-    /// `is_promotion`), in that order.
-    fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
-        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let is_promotion = self.is_promotion();
-        let is_castling = self.is_castling();
-        let is_en_passant = self.is_en_passant();
-        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
-        (start, end, is_castling, is_en_passant, is_promotion, piece)
-    }
-
-    /// Checks if the move is castling.
-    fn is_castling(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::CASTLING_FLAG
-    }
-
-    /// Checks if the move is en passant.
-    fn is_en_passant(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
-    }
-
-    /// Checks if the move is a promotion.
-    fn is_promotion(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
-    }
-
-    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
-    /// only return a value from 1 to 4.
-    fn promotion_piece(&self) -> Piece {
-        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
     }
 }

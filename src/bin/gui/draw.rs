@@ -73,8 +73,9 @@ impl Gui {
                     square.inner(),
                 );
 
+                self.handle_clicks(&child, square_corners, square);
                 // colour the square
-                self.draw_square(&mut child, square_corners, square, colour);
+                self.draw_square(&child, square_corners, square, colour);
                 // add the piece
                 self.draw_piece(&mut child, square);
 
@@ -167,19 +168,7 @@ impl Gui {
 
     /// Draw a square on `ui` in area `rect` with the given square `square` and
     /// the the given square colour `colour`.
-    ///
-    /// If it's clicked, it will draw the square as selected and update the
-    /// selected square of `self`.
-    // TODO: I don't like how a function called 'draw_xyz' mutates some
-    // unrelated thing. Fix when adding piece movement.
-    fn draw_square(&mut self, ui: &mut Ui, rect: Rect, square: Square, colour: SquareColour) {
-        if ui.interact(rect, ui.id(), Sense::click()).clicked() {
-            if self.selected_square().is_none() {
-                self.set_selected_square(Some(square));
-            } else {
-                self.set_selected_square(None);
-            }
-        }
+    fn draw_square(&mut self, ui: &Ui, rect: Rect, square: Square, colour: SquareColour) {
         if self.selected_square() == Some(square) {
             self.paint_area_with_colour(ui, rect, colour.selected);
         } else {
@@ -187,8 +176,27 @@ impl Gui {
         }
     }
 
+    /// Detect if `ui` is clicked in region `rect`, given that it is square
+    /// `square`: if it is, it updates the selected square of `self`.
+    fn handle_clicks(&mut self, ui: &Ui, rect: Rect, square: Square) {
+        if ui.interact(rect, ui.id(), Sense::click()).clicked() {
+            if let Some(selected) = self.selected_square() {
+                self.set_selected_square(None);
+                let start = selected;
+                let end = square;
+                if selected == square {
+                    return;
+                }
+
+                self.move_piece(start, end);
+            } else {
+                self.set_selected_square(Some(square));
+            }
+        }
+    }
+
     /// Paints the area on `ui` defined by `rect` the colour `colour`.
-    fn paint_area_with_colour(&self, ui: &mut Ui, rect: Rect, colour: Color32) {
+    fn paint_area_with_colour(&self, ui: &Ui, rect: Rect, colour: Color32) {
         ui.painter().add(Shape::Rect(RectShape::new(
             rect,
             Rounding::ZERO,
