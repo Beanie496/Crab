@@ -1,6 +1,9 @@
 use super::Gui;
 
-use backend::defs::{Piece, Side, Square};
+use backend::{
+    board::Moves,
+    defs::{Piece, Side, Square},
+};
 
 impl Gui {
     /// Attempts to move a piece from `start` to `end`. Returns `true` if the
@@ -15,7 +18,10 @@ impl Gui {
     // It's not very efficient, but I doubt it takes more than a few hundred
     // nanoseconds, so who cares.
     pub fn move_piece(&mut self, start: Square, end: Square) -> bool {
-        let mv = self.legal_moves.move_with(start, end);
+        let mut moves = Moves::new();
+        self.engine.board.generate_moves(&mut moves);
+
+        let mv = moves.move_with(start, end);
         let mv = if mv.is_none() {
             return false;
         } else {
@@ -27,10 +33,7 @@ impl Gui {
             return false;
         }
 
-        self.legal_moves.clear();
-        copy.generate_moves(&mut self.legal_moves);
         self.engine.board = copy;
-
         // not the most efficient, but considering how fast it is anyway, who
         // cares
         self.regenerate_mailboxes();
