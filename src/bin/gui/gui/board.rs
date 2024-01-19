@@ -34,6 +34,21 @@ impl Gui {
         }
 
         self.engine.board = copy;
+
+        // let the engine respond with a random move. TODO: when this starts
+        // doing an actual search, make this happen on a new thread.
+        self.engine.board = loop {
+            let mut copy = self.engine.board.clone();
+            moves.clear();
+            copy.generate_moves(&mut moves);
+            let rand_move = moves.random_move();
+            // if we've selected a legal move, break. Otherwise, keep trying
+            // other random moves.
+            if copy.make_move(rand_move) {
+                break copy;
+            }
+        };
+
         // not the most efficient, but considering how fast it is anyway, who
         // cares
         self.regenerate_mailboxes();

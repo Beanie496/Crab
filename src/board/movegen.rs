@@ -6,6 +6,8 @@ use crate::{
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
 
+use getrandom::getrandom;
+
 /// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
@@ -371,6 +373,16 @@ impl Moves {
         self.first_empty = 0;
     }
 
+    /// Returns if it's empty
+    pub fn is_empty(&self) -> bool {
+        self.first_empty == 0
+    }
+
+    /// Returns its length.
+    pub fn len(&self) -> usize {
+        self.first_empty
+    }
+
     /// Finds and returns, if it exists, the move that has start square `start`
     /// and end square `end`.
     ///
@@ -395,6 +407,15 @@ impl Moves {
     pub fn push_move(&mut self, mv: Move) {
         self.moves[self.first_empty] = mv;
         self.first_empty += 1;
+    }
+
+    /// Returns a random move. Panics if `self` is empty.
+    pub fn random_move(&self) -> Move {
+        let mut rand = [0u8; 1];
+        let _ = getrandom(&mut rand);
+        assert!(!self.is_empty());
+        let rand = rand[0] as usize;
+        self.moves[rand % self.len()]
     }
 }
 
