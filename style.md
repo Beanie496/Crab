@@ -126,7 +126,7 @@ impl B {
     fn bar() {}
 }
 ```
-Functions/methods within `impl` blocks should be sorted alphabetically.
+Functions should be ordered alphabetically. Methods should be ordered in whatever order seems logical.
 
 ### 8. Comments
 

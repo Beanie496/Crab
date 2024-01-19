@@ -1,48 +1,65 @@
 use super::{Gui, SquareColour, SquareColourType};
-use crate::util::points_to_pixels;
+use crate::{gui::draw::paint_area_with_colour, util::points_to_pixels};
 
 use backend::defs::{Nums, Piece, Side, Square};
 use eframe::{
     egui::{
-        widgets::Button, Align, Color32, Context, Direction, Frame, Id, Layout, Pos2, Rect,
-        Rounding, Sense, Shape, SidePanel, Stroke, Ui, Vec2,
+        self, widgets::Button, Align, Color32, Context, Direction, Id, Layout, Pos2, Rect, Sense,
+        SidePanel, Ui, Vec2,
     },
-    epaint::RectShape,
+    App,
 };
+
+impl App for Gui {
+    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        // board width with 40 px margin
+        let board_area_width = 880.0;
+        let info_box_width = 1920.0 - 880.0;
+        // I like this colour
+        let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
+        self.update_board_area(ctx, board_area_width, bg_col);
+        self.update_info_area(ctx, info_box_width, Color32::RED);
+    }
+}
 
 impl Gui {
     /// Creates a [`SidePanel`] and draws the chessboard, buttons and timers.
+    /// It also handles clicks in the board area.
+    ///
+    /// The reason why this isn't two functions is because the `Ui`s that make
+    /// the squares (and detect the clicks) are created to draw the square and
+    /// then immediately destroyed, so they need to handle clicks there and
+    /// then.
     ///
     /// Buttons currently do nothing and timers are not implemented yet.
-    pub fn draw_board_area(&mut self, ctx: &Context, width: f32, col: Color32) {
+    fn update_board_area(&mut self, ctx: &Context, width: f32, col: Color32) {
         SidePanel::left(Id::new("board"))
             .resizable(false)
             .show_separator_line(false)
             .exact_width(points_to_pixels(ctx, width))
-            .frame(Frame::none().fill(col))
+            .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
-                self.draw_board(ctx, ui);
-                self.draw_buttons(ctx, ui);
-                self.draw_labels(ctx, ui);
+                self.update_board(ctx, ui);
+                self.update_buttons(ctx, ui);
+                self.update_labels(ctx, ui);
             });
     }
 
     /// Draws the area where all the information from the engine is displayed.
     ///
-    /// Currently just paints the whole thing red.
-    pub fn draw_info_area(&self, ctx: &Context, width: f32, col: Color32) {
+    /// Currently just paints the whole thing the colour `col`.
+    fn update_info_area(&self, ctx: &Context, width: f32, col: Color32) {
         SidePanel::right(Id::new("info"))
             .resizable(false)
             .show_separator_line(false)
             .exact_width(points_to_pixels(ctx, width))
-            .frame(Frame::none().fill(col))
+            .frame(egui::Frame::none().fill(col))
             .show(ctx, |_ui| {});
     }
-}
 
-impl Gui {
-    /// Draws the chessboard and all the pieces on it.
-    fn draw_board(&mut self, ctx: &Context, ui: &mut Ui) {
+    /// Draws the chessboard and all the pieces on it, handling clicks within
+    /// the board as it does so.
+    fn update_board(&mut self, ctx: &Context, ui: &mut Ui) {
         let mut colour = SquareColour::new(SquareColourType::Dark);
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
@@ -73,11 +90,7 @@ impl Gui {
                     square.inner(),
                 );
 
-                self.handle_clicks(&child, square_corners, square);
-                // colour the square
-                self.draw_square(&child, square_corners, square, colour);
-                // add the piece
-                self.draw_piece(&mut child, square);
+                self.update_square(&mut child, square_corners, square, colour);
 
                 colour.flip_colour();
             }
@@ -87,8 +100,11 @@ impl Gui {
         }
     }
 
-    /// Draws the buttons on the board [`SidePanel`].
-    fn draw_buttons(&self, ctx: &Context, ui: &mut Ui) {
+    /// Draws the buttons on the board [`SidePanel`] and handles clicks on
+    /// them.
+    ///
+    /// Currently only draws them.
+    fn update_buttons(&self, ctx: &Context, ui: &mut Ui) {
         // I need child UI's to lay out the buttons exactly where I want them
         let mut child = ui.child_ui(
             Rect {
@@ -100,14 +116,14 @@ impl Gui {
                 // of the buttons. Because aligning the text within the buttons is
                 // not a feature for SOME GOD DAMN REASON.
                 min: Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
-                max: Pos2::new(points_to_pixels(ctx, 640.0), points_to_pixels(ctx, 110.0)),
+                // buttons won't lay out correctly because of floating-point
+                // imprecision so I have to do this
+                max: Pos2::new(points_to_pixels(ctx, 640.1), points_to_pixels(ctx, 110.0)),
             },
             Layout::left_to_right(Align::Center).with_main_wrap(true),
         );
         child.spacing_mut().item_spacing =
-            // due to floating-point imprecision, 190.0 * 2 + 20.0 > 400.0 if any
-            // of the numbers are divided
-            Vec2::new(points_to_pixels(ctx, 19.9), points_to_pixels(ctx, 20.0));
+            Vec2::new(points_to_pixels(ctx, 20.0), points_to_pixels(ctx, 20.0));
 
         let stop = Button::new("Stop").min_size(Vec2::new(
             points_to_pixels(ctx, 190.0),
@@ -134,11 +150,39 @@ impl Gui {
     /// Draws the labels on the board [`SidePanel`].
     ///
     /// Not implemented yet.
-    fn draw_labels(&self, _ctx: &Context, _ui: &mut Ui) {}
+    fn update_labels(&self, _ctx: &Context, _ui: &mut Ui) {}
+
+    /// Draws a square on `ui` in the given region, assuming the square number
+    /// is `square`. If it is selected, it will draw the selected field of
+    /// `colour`; otherwise, it'll draw the unselected field.
+    ///
+    /// It will update the selected square of `self` if `ui` is clicked.
+    fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, colour: SquareColour) {
+        if ui.interact(region, ui.id(), Sense::click()).clicked() {
+            if let Some(selected) = self.selected_square() {
+                self.set_selected_square(None);
+                let start = selected;
+                let end = square;
+                if selected == square {
+                    return;
+                }
+
+                self.move_piece(start, end);
+            } else {
+                self.set_selected_square(Some(square));
+            }
+        }
+        if self.selected_square() == Some(square) {
+            paint_area_with_colour(ui, region, colour.selected);
+        } else {
+            paint_area_with_colour(ui, region, colour.unselected);
+        }
+        self.update_piece(ui, square);
+    }
 
     /// Adds the image of the piece that is on the given square. Adds nothing
     /// if there is no piece on the given square.
-    fn draw_piece(&self, ui: &mut Ui, square: Square) {
+    fn update_piece(&self, ui: &mut Ui, square: Square) {
         if self.piece_on(square) == Piece::NONE {
             return;
         }
@@ -164,44 +208,5 @@ impl Gui {
             _ => unreachable!("If there is a piece, it must be White or Black"),
         };
         ui.image(image_path);
-    }
-
-    /// Draw a square on `ui` in area `rect` with the given square `square` and
-    /// the the given square colour `colour`.
-    fn draw_square(&mut self, ui: &Ui, rect: Rect, square: Square, colour: SquareColour) {
-        if self.selected_square() == Some(square) {
-            self.paint_area_with_colour(ui, rect, colour.selected);
-        } else {
-            self.paint_area_with_colour(ui, rect, colour.unselected);
-        }
-    }
-
-    /// Detect if `ui` is clicked in region `rect`, given that it is square
-    /// `square`: if it is, it updates the selected square of `self`.
-    fn handle_clicks(&mut self, ui: &Ui, rect: Rect, square: Square) {
-        if ui.interact(rect, ui.id(), Sense::click()).clicked() {
-            if let Some(selected) = self.selected_square() {
-                self.set_selected_square(None);
-                let start = selected;
-                let end = square;
-                if selected == square {
-                    return;
-                }
-
-                self.move_piece(start, end);
-            } else {
-                self.set_selected_square(Some(square));
-            }
-        }
-    }
-
-    /// Paints the area on `ui` defined by `rect` the colour `colour`.
-    fn paint_area_with_colour(&self, ui: &Ui, rect: Rect, colour: Color32) {
-        ui.painter().add(Shape::Rect(RectShape::new(
-            rect,
-            Rounding::ZERO,
-            colour,
-            Stroke::default(),
-        )));
     }
 }
