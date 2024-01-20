@@ -1,6 +1,7 @@
 ### 0. Intro
 
 First, read <https://doc.rust-lang.org/beta/style-guide/index.html>. Below is my own version of this.
+Second, use clippy and rustfmt! Many things are omitted from this guide because one of the two tools already cover them.
 
 ### 1. Modules
 
@@ -21,8 +22,6 @@ Unit tests should usually be inline modules. All other modules should be in exte
 
 ### 2. Imports
 
-If you import multiple items from one module, do so on one line. If you import multiple items that are themselves importing multiple items, put each item on a new line.
-Sort the imports alphabetically.
 Only import what is used.
 ```
 // ok
@@ -60,16 +59,13 @@ use a::b::z as a_z;
 
 ### 3. Indentation and line width
 
-Never leave trailing whitespace. Ever.
-Avoid excessive indentation. If you can see a refactor that removes at least one level of indentation, do it.
-There is a hard line length limit of 100, enforced by rustfmt.
+Avoid excessive indentation.
 Keep both comments and doc comments to 80 lines.
 
 ### 4. Newlines
 
-At the highest scope, everything should be separated with a blank line. This includes everything defined in the 'order' section.
+At the highest scope, everything should be separated with a blank line, unless they take only one line. This includes everything defined in the 'order' section.
 Function definitions & declarations should be separated with a blank line at any scope.
-When the code changes slightly (e.g. from declarations to expressions), separate with one blank line. Otherwise, cluster.
 Never use two blank lines.
 ```
 fn fun() {
@@ -126,7 +122,7 @@ impl B {
     fn bar() {}
 }
 ```
-Functions should be ordered alphabetically. Methods should be ordered in whatever order seems logical.
+Functions and methods should be ordered in whatever order seems logical.
 
 ### 8. Comments
 

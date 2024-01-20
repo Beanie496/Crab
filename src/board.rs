@@ -5,10 +5,12 @@ use movegen::Lookup;
 
 pub use movegen::{magic::find_magics, Move, Moves};
 
-/// Stores castling rights.
-#[derive(Clone, Copy, PartialEq)]
+/// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
+/// E.g. `0b1101` would be castling rights `KQq`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+// The inner value of a wrapper does not need to be documented.
+#[allow(clippy::missing_docs_in_private_items)]
 pub struct CastlingRights {
-    // 4 bits: KQkq.
     cr: u8,
 }
 
@@ -19,47 +21,53 @@ mod movegen;
 /// generate pseudo-legal moves. It is small (131 bytes) so it uses copy-make.
 #[derive(Clone)]
 pub struct Board {
-    // `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
-    // is the knights, and so on, as according to the order set by
-    // [`Piece`].
+    /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
+    /// is the knights, and so on, as according to the order set by
+    /// [`Piece`].
     pieces: [Bitboard; Nums::PIECES],
-    // `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
-    // is is the intersection of all Black piece bitboards.
+    /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
+    /// is is the intersection of all Black piece bitboards.
     sides: [Bitboard; Nums::SIDES],
-    // An array of piece values, used for seeing which pieces are on the start
-    // and end square.
-    // `piece_board[SQUARE] == piece on that square`.
+    /// An array of piece values, used for seeing which pieces are on the start
+    /// and end square.
+    /// `piece_board[SQUARE] == piece on that square`.
     piece_board: [Piece; Nums::SQUARES],
-    // castling rights. Encoded as KQkq. E.g. 0b1101 would be castling rights
-    // KQq.
+    /// Castling rights.
     castling_rights: CastlingRights,
+    /// The current en passant square. Is [`Square::NONE`] if there is no ep
+    /// square.
     ep_square: Square,
+    /// The current side to move.
     side_to_move: Side,
 }
 
 impl BitAnd for CastlingRights {
     type Output = Self;
 
+    #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
         Self::from(self.inner() & rhs.inner())
     }
 }
 
 impl BitAndAssign for CastlingRights {
+    #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
-        self.cr &= rhs.inner()
+        self.cr &= rhs.inner();
     }
 }
 
 impl BitOrAssign for CastlingRights {
+    #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
-        self.cr |= rhs.inner()
+        self.cr |= rhs.inner();
     }
 }
 
 impl Not for CastlingRights {
     type Output = Self;
 
+    #[inline]
     fn not(self) -> Self::Output {
         Self::from(!self.inner())
     }
@@ -68,6 +76,7 @@ impl Not for CastlingRights {
 impl Shl<u8> for CastlingRights {
     type Output = Self;
 
+    #[inline]
     fn shl(self, rhs: u8) -> Self::Output {
         Self::from(self.inner() << rhs)
     }
@@ -75,17 +84,19 @@ impl Shl<u8> for CastlingRights {
 
 #[allow(non_upper_case_globals)]
 impl CastlingRights {
-    pub const CASTLE_FLAGS_K: CastlingRights = Self::from(0b1000);
-    pub const CASTLE_FLAGS_Q: CastlingRights = Self::from(0b0100);
-    pub const CASTLE_FLAGS_k: CastlingRights = Self::from(0b0010);
-    pub const CASTLE_FLAGS_q: CastlingRights = Self::from(0b0001);
-    pub const CASTLE_FLAGS_KQkq: CastlingRights = Self::from(0b1111);
-    pub const CASTLE_FLAGS_NONE: CastlingRights = Self::from(0b0000);
+    pub const CASTLE_FLAGS_K: Self = Self::from(0b1000);
+    pub const CASTLE_FLAGS_Q: Self = Self::from(0b0100);
+    pub const CASTLE_FLAGS_k: Self = Self::from(0b0010);
+    pub const CASTLE_FLAGS_q: Self = Self::from(0b0001);
+    pub const CASTLE_FLAGS_KQkq: Self = Self::from(0b1111);
+    pub const CASTLE_FLAGS_NONE: Self = Self::from(0b0000);
 }
 
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Lookup::init();
         Self {
@@ -101,12 +112,14 @@ impl Board {
 
 impl Board {
     /// Adds the given right to the castling rights.
+    #[inline]
     pub fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
     }
 
     /// Adds a piece to square `square` for side `side`. Assumes there is no
     /// piece on the square to be written to.
+    #[inline]
     pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
         let square_bb = Bitboard::from_square(square);
         self.set_piece(square, piece);
@@ -115,6 +128,7 @@ impl Board {
     }
 
     /// Clears `self`.
+    #[inline]
     pub fn clear_board(&mut self) {
         self.piece_board = Self::empty_piece_board();
         self.pieces = Self::no_pieces();
@@ -125,16 +139,21 @@ impl Board {
     }
 
     /// Copies and returns its mailbox board array.
-    pub fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
+    #[inline]
+    #[must_use]
+    pub const fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
         self.piece_board
     }
 
     /// Returns the piece on `square`.
-    pub fn piece_on(&self, square: Square) -> Piece {
+    #[inline]
+    #[must_use]
+    pub const fn piece_on(&self, square: Square) -> Piece {
         self.piece_board[square.to_index()]
     }
 
     /// Pretty-prints the current state of the board.
+    #[inline]
     pub fn pretty_print(&self) {
         for r in (0..Nums::RANKS as u8).rev() {
             print!("{} | ", r + 1);
@@ -151,36 +170,43 @@ impl Board {
     }
 
     /// Sets the default castling rights.
+    #[inline]
     pub fn set_default_castling_rights(&mut self) {
         self.castling_rights.set_to_default();
     }
 
     /// Sets the en passant square to `square`.
+    #[inline]
     pub fn set_ep_square(&mut self, square: Square) {
         self.ep_square = square;
     }
 
     /// Sets side to move to the default side.
+    #[inline]
     pub fn set_default_side_to_move(&mut self) {
         self.side_to_move = Self::default_side();
     }
 
     /// Sets fullmoves. Currently does nothing.
+    #[inline]
     pub fn set_fullmoves(&mut self, _count: u32) {
         /* unused */
     }
 
     /// Sets halfmoves. Currently does nothing.
+    #[inline]
     pub fn set_halfmoves(&mut self, _count: u32) {
         /* unused */
     }
 
     /// Sets side to move to `side`.
+    #[inline]
     pub fn set_side_to_move(&mut self, side: Side) {
         self.side_to_move = side;
     }
 
     /// Resets the board.
+    #[inline]
     pub fn set_startpos(&mut self) {
         self.piece_board = Self::default_piece_board();
         self.pieces = Self::default_pieces();
@@ -191,11 +217,13 @@ impl Board {
     }
 
     /// Returns the [`Side`] of `square`.
+    #[inline]
+    #[must_use]
     pub fn side_of(&self, square: Square) -> Side {
         let square_bb = Bitboard::from_square(square);
-        if self.side::<{ Side::WHITE.to_bool() }>() & square_bb != Bitboard::from(0) {
+        if !(self.side::<{ Side::WHITE.to_bool() }>() & square_bb).is_empty() {
             Side::WHITE
-        } else if self.side::<{ Side::BLACK.to_bool() }>() & square_bb != Bitboard::from(0) {
+        } else if !(self.side::<{ Side::BLACK.to_bool() }>() & square_bb).is_empty() {
             Side::BLACK
         } else {
             Side::NONE
@@ -205,13 +233,14 @@ impl Board {
 
 impl Board {
     /// Returns the default en passant square.
-    fn default_ep_square() -> Square {
+    const fn default_ep_square() -> Square {
         Square::NONE
     }
 
     /// Returns the [`Piece`] board of the starting position.
     #[rustfmt::skip]
-    fn default_piece_board() -> [Piece; Nums::SQUARES] {
+    #[allow(clippy::many_single_char_names)]
+    const fn default_piece_board() -> [Piece; Nums::SQUARES] {
         let p = Piece::PAWN;
         let n = Piece::KNIGHT;
         let b = Piece::BISHOP;
@@ -232,34 +261,34 @@ impl Board {
     }
 
     /// Returns the piece [`Bitboard`]s of the starting position.
-    fn default_pieces() -> [Bitboard; Nums::PIECES] {
+    const fn default_pieces() -> [Bitboard; Nums::PIECES] {
         [
-            Bitboard::from(0x00ff00000000ff00), // Pawns
-            Bitboard::from(0x4200000000000042), // Knights
-            Bitboard::from(0x2400000000000024), // Bishops
-            Bitboard::from(0x8100000000000081), // Rooks
-            Bitboard::from(0x0800000000000008), // Queens
-            Bitboard::from(0x1000000000000010), // Kings
+            Bitboard::from(0x00ff_0000_0000_ff00), // Pawns
+            Bitboard::from(0x4200_0000_0000_0042), // Knights
+            Bitboard::from(0x2400_0000_0000_0024), // Bishops
+            Bitboard::from(0x8100_0000_0000_0081), // Rooks
+            Bitboard::from(0x0800_0000_0000_0008), // Queens
+            Bitboard::from(0x1000_0000_0000_0010), // Kings
         ]
     }
 
     /// Returns the side to move from the starting position. Unless chess 1.1
     /// has been released, this will be [`Side::WHITE`].
-    fn default_side() -> Side {
+    const fn default_side() -> Side {
         Side::WHITE
     }
 
     /// Returns the side [`Bitboard`]s of the starting position.
-    fn default_sides() -> [Bitboard; Nums::SIDES] {
+    const fn default_sides() -> [Bitboard; Nums::SIDES] {
         [
-            Bitboard::from(0xffff000000000000), // Black
-            Bitboard::from(0x000000000000ffff), // White
+            Bitboard::from(0xffff_0000_0000_0000), // Black
+            Bitboard::from(0x0000_0000_0000_ffff), // White
         ]
     }
 
     /// Returns an empty [`Piece`] board.
     #[rustfmt::skip]
-    fn empty_piece_board() -> [Piece; Nums::SQUARES] {
+    const fn empty_piece_board() -> [Piece; Nums::SQUARES] {
         // technically [Piece::NONE; 64] would be the same but this is more
         // clear
         let e = Piece::NONE;
@@ -276,23 +305,23 @@ impl Board {
     }
 
     /// Returns the piece [`Bitboard`]s of an empty board.
-    fn no_pieces() -> [Bitboard; Nums::PIECES] {
+    const fn no_pieces() -> [Bitboard; Nums::PIECES] {
         [
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
         ]
     }
 
     /// Returns the side [`Bitboard`]s of an empty board.
     #[rustfmt::skip]
-    fn no_sides() -> [Bitboard; Nums::SIDES] {
+    const fn no_sides() -> [Bitboard; Nums::SIDES] {
         [
-            Bitboard::from(0x0000000000000000),
-            Bitboard::from(0x0000000000000000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
         ]
     }
 }
@@ -304,12 +333,12 @@ impl CastlingRights {
     }
 
     /// Returns new [`CastlingRights`] with the default castling rights.
-    fn new() -> Self {
+    const fn new() -> Self {
         Self::CASTLE_FLAGS_KQkq
     }
 
     /// Returns empty [`CastlingRights`].
-    fn none() -> CastlingRights {
+    const fn none() -> Self {
         Self::CASTLE_FLAGS_NONE
     }
 }
@@ -324,10 +353,10 @@ impl Board {
         if piece == Piece::NONE {
             return '0';
         }
-        if self.side::<{ Side::WHITE.to_bool() }>() & sq_bb != Bitboard::from(0) {
-            piece_to_char(Side::WHITE, piece)
-        } else {
+        if (self.side::<{ Side::WHITE.to_bool() }>() & sq_bb).is_empty() {
             piece_to_char(Side::BLACK, piece)
+        } else {
+            piece_to_char(Side::WHITE, piece)
         }
     }
 
@@ -337,7 +366,7 @@ impl Board {
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
-    fn side<const IS_WHITE: bool>(&self) -> Bitboard {
+    const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
             self.sides[Side::WHITE.to_index()]
         } else {
@@ -363,26 +392,30 @@ impl CastlingRights {
     }
 
     /// Calculates if the given side can castle kingside.
-    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+    fn can_castle_kingside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
-            *self & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
+            self & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
         } else {
-            *self & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
+            self & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
         }
     }
 
     /// Calculates if the given side can castle queenside.
-    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+    fn can_castle_queenside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
-            *self & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
+            self & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
         } else {
-            *self & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
+            self & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
         }
     }
 
     /// Clears the rights for `side`.
     fn clear_side(&mut self, side: Side) {
-        debug_assert_eq!(Side::WHITE.inner(), 1);
+        debug_assert_eq!(
+            Side::WHITE.inner(),
+            1,
+            "This function relies on White being 1 and Black 0"
+        );
         // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
         // a mask for the bits for White or Black. `&`ing the rights with
         // `!(0b11 << (side * 2))` will clear the bits on the given side.
@@ -390,7 +423,7 @@ impl CastlingRights {
     }
 
     /// Returns the contents of `self`.
-    fn inner(self) -> u8 {
+    const fn inner(self) -> u8 {
         self.cr
     }
 

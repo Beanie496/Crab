@@ -15,38 +15,49 @@ mod draw;
 /// Defines what updates each frame and draws it.
 mod update;
 
-/// Helper enum for `SquareColour` to show which square it is.
+/// Helper enum for `SquareColor` to show which square it is.
 #[derive(Copy, Clone, PartialEq)]
-enum SquareColourType {
+// variants are self-explanatory
+#[allow(clippy::missing_docs_in_private_items)]
+enum SquareColorType {
     Light,
     Dark,
 }
 
 /// The GUI: used to save state between frames.
 pub struct Gui {
-    // redundant mailboxes to separate them from the internal board.
+    /// A redundant piece mailbox to separate it from the internal board.
     piece_mailbox: [Piece; Nums::SQUARES],
+    /// A redundant side mailbox to easily see which side a piece on a square
+    /// belongs to.
     side_mailbox: [Side; Nums::SQUARES],
+    /// The internal engine, used for calculating legal moves and searching.
     engine: Engine,
+    /// Which square is selected, if any.
     selected_square: Option<Square>,
 }
 
-/// The 4 colours that each square can take.
-///
-/// Yes I say 'colour' not 'color'. This isn't a library crate and I'm British.
+/// The 4 colors that each square can take.
 #[derive(Copy, Clone)]
-struct SquareColour {
+struct SquareColor {
+    /// The color it will use if the square is unselected.
     unselected: Color32,
+    /// The color it will use if the square it selected.
     selected: Color32,
-    square_type: SquareColourType,
+    /// Which type of square it is coloring: light or dark.
+    square_type: SquareColorType,
 }
 
-/// Stores the square colours for selected and unselected light and dark
+/// Stores the square colors for selected and unselected light and dark
 /// squares.
-impl SquareColour {
+impl SquareColor {
+    ///  The color of a dark square: a light brown.
     const DARK: Color32 = Color32::from_rgb(0xb8, 0x87, 0x62);
+    /// The color of a light square: a very faint grey, almost white.
     const LIGHT: Color32 = Color32::from_rgb(0xee, 0xee, 0xee);
+    /// The color of a selected dark square: a brown-ish yellow.
     const SELECTED_DARK: Color32 = Color32::from_rgb(0xd0, 0xc2, 0x38);
+    /// The color of a selected light square: a light yellow.
     const SELECTED_LIGHT: Color32 = Color32::from_rgb(0xf2, 0xf2, 0x7f);
 }
 
@@ -72,18 +83,21 @@ impl Gui {
     }
 }
 
-impl SquareColour {
-    fn new(square_type: SquareColourType) -> Self {
+impl SquareColor {
+    /// Creates a new `SquareColor`. If `square_type ==
+    /// SquareColorType::Light`, it'll set the selected and unselected colors
+    /// to a light color. Otherwise, it'll set them to a dark color.
+    const fn new(square_type: SquareColorType) -> Self {
         match square_type {
-            SquareColourType::Light => Self {
+            SquareColorType::Light => Self {
                 selected: Self::SELECTED_LIGHT,
                 unselected: Self::LIGHT,
-                square_type: SquareColourType::Light,
+                square_type: SquareColorType::Light,
             },
-            SquareColourType::Dark => Self {
+            SquareColorType::Dark => Self {
                 selected: Self::SELECTED_DARK,
                 unselected: Self::DARK,
-                square_type: SquareColourType::Dark,
+                square_type: SquareColorType::Dark,
             },
         }
     }
@@ -91,7 +105,7 @@ impl SquareColour {
 
 impl Gui {
     /// Returns the selected square of `self`.
-    fn selected_square(&self) -> Option<Square> {
+    const fn selected_square(&self) -> Option<Square> {
         self.selected_square
     }
 
@@ -101,12 +115,17 @@ impl Gui {
     }
 }
 
-impl SquareColour {
-    fn flip_colour(&mut self) {
-        *self = if self.square_type == SquareColourType::Light {
-            Self::new(SquareColourType::Dark)
+impl SquareColor {
+    /// Flips the selected and unselected color of `self` depending on the
+    /// value of `self.square_type`.
+    ///
+    /// If `self.square_type` is `Light`, it will set `self` to
+    /// `Self::new(Dark)`. Otherwise, it'll set it to `Self::new(Light)`.
+    fn flip_color(&mut self) {
+        *self = if self.square_type == SquareColorType::Light {
+            Self::new(SquareColorType::Dark)
         } else {
-            Self::new(SquareColourType::Light)
+            Self::new(SquareColorType::Light)
         };
     }
 }

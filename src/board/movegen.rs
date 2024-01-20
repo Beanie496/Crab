@@ -15,12 +15,26 @@ pub mod util;
 
 /// Contains lookup tables for each piece.
 pub struct Lookup {
+    /// The pawn attack table. `pawn_attacks[side][square] == attack bitboard
+    /// for that square`.
     pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
+    /// The knight attack table. `knight_attacks[square] == attack bitboard for
+    /// that square`.
     knight_attacks: [Bitboard; Nums::SQUARES],
+    /// The king attack table. `king_attacks[square] == attack bitboard for
+    /// that square`.
     king_attacks: [Bitboard; Nums::SQUARES],
+    /// The magic lookup table for bishops. It uses the 'fancy' approach. See
+    /// <https://www.chessprogramming.org/Magic_Bitboards>.
     bishop_magic_table: [Bitboard; BISHOP_SIZE],
+    /// The magic lookup table for rooks. It uses the 'fancy' approach. See
+    /// <https://www.chessprogramming.org/Magic_Bitboards>.
     rook_magic_table: [Bitboard; ROOK_SIZE],
+    /// The (wrapped) magic numbers for the bishop. One per square. See
+    /// <https://www.chessprogramming.org/Magic_Bitboards>.
     bishop_magics: [Magic; Nums::SQUARES],
+    /// The (wrapped) magic numbers for the rook. One per square. See
+    /// <https://www.chessprogramming.org/Magic_Bitboards>.
     rook_magics: [Magic; Nums::SQUARES],
 }
 
@@ -31,14 +45,18 @@ pub struct Lookup {
 /// * End pos == 6 bits, 0-63
 /// * Flags == 2 bits.
 /// * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+// The inner value of a wrapper does not need to be documented.
+#[allow(clippy::missing_docs_in_private_items)]
 pub struct Move {
     mv: u16,
 }
 
-/// An array of `Move`s
+/// An stack of `Move`s.
 pub struct Moves {
+    /// The internal array.
     moves: [Move; MAX_LEGAL_MOVES],
+    /// The first index that can be written to.
     first_empty: usize,
 }
 
@@ -67,6 +85,7 @@ pub static mut LOOKUPS: Lookup = Lookup::empty();
 impl Iterator for Moves {
     type Item = Move;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.pop_move()
     }
@@ -80,18 +99,35 @@ impl Move {
 }
 
 impl Move {
+    /// Mask for the start square.
     const START_MASK: u16 = 0b11_1111;
+    /// Shift for the start square, after it has been masked.
     const START_SHIFT: usize = 0;
+    /// Mask for the end square.
     const END_MASK: u16 = 0b1111_1100_0000;
+    /// Shift for the end square, after it has been masked.
     const END_SHIFT: usize = 6;
+    /// Mask for both the start and end square.
     const SQUARE_MASK: u16 = 0b0000_1111_1111_1111;
+    /// Shift for the start and end square, after they have been masked.
+    const SQUARE_SHIFT: usize = 0;
+    /// Mask for the flags. They do not need a shift because they simply need
+    /// to be set or unset.
     const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
+    /// Shift for the promotion piece. It does not need a mask because shifting
+    /// already removes unwanted bits.
     const PIECE_SHIFT: usize = 14;
 }
 
 impl Lookup {
     /// Initialises the tables of [`LOOKUPS`].
+    // for some reason clippy _doesn't_ complain if I remove this
+    // attribute. I'll add it anyway though.
+    #[inline]
     pub fn init() {
+        // SAFETY: These functions write to a mutable static before anything
+        // else reads from it.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
         unsafe {
             LOOKUPS.init_pawn_attacks();
             LOOKUPS.init_knight_attacks();
@@ -107,8 +143,13 @@ impl Move {
     /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
     /// additional parameter. See [`new_promo`](Move::new_promo) for a new
     /// promotion [`Move`].
-    pub fn new<const FLAG: u16>(start: Square, end: Square) -> Move {
-        debug_assert!(FLAG != Move::PROMOTION_FLAG);
+    #[inline]
+    #[must_use]
+    pub const fn new<const FLAG: u16>(start: Square, end: Square) -> Self {
+        debug_assert!(
+            FLAG != Self::PROMOTION_FLAG,
+            "Tried to make a new promotion `Move` with the wrong function"
+        );
         Self {
             mv: (start.inner() as u16) << Self::START_SHIFT
                 | (end.inner() as u16) << Self::END_SHIFT
@@ -117,9 +158,17 @@ impl Move {
     }
 
     /// Creates a promotion [`Move`] to the given piece.
-    pub fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Move {
-        debug_assert!(PIECE != Piece::PAWN.inner());
-        debug_assert!(PIECE != Piece::KING.inner());
+    #[inline]
+    #[must_use]
+    pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
+        debug_assert!(
+            PIECE != Piece::PAWN.inner(),
+            "Tried to make a new promotion `Move` into a pawn"
+        );
+        debug_assert!(
+            PIECE != Piece::KING.inner(),
+            "Tried to make a new promotion `Move` into a king"
+        );
         Self {
             mv: (start.inner() as u16) << Self::START_SHIFT
                 | (end.inner() as u16) << Self::END_SHIFT
@@ -129,14 +178,18 @@ impl Move {
     }
 
     /// Creates a null [`Move`].
-    pub fn null() -> Move {
+    #[inline]
+    #[must_use]
+    pub const fn null() -> Self {
         Self { mv: 0 }
     }
 }
 
 impl Moves {
     /// Creates an empty [`Moves`] object.
-    pub fn new() -> Self {
+    #[inline]
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             moves: [Move::null(); MAX_LEGAL_MOVES],
             first_empty: 0,
@@ -147,6 +200,7 @@ impl Moves {
 impl Board {
     /// Generates all legal moves for the current position and puts them in
     /// `moves`.
+    #[inline]
     pub fn generate_moves(&self, moves: &mut Moves) {
         if self.side_to_move() == Side::WHITE {
             self.generate_pawn_moves::<true>(moves);
@@ -164,6 +218,7 @@ impl Board {
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move. Returns `true` if the given move is legal, `false`
     /// otherwise.
+    #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
             mv.decompose();
@@ -219,7 +274,7 @@ impl Board {
                 // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
                 // the starting position of our rooks.
                 let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
-                if end_bb & rook_squares != Bitboard::from(0) {
+                if !(end_bb & rook_squares).is_empty() {
                     // 0 or 56 for queenside -> 0
                     // 7 or 63 for kingside -> 1
                     let is_kingside = end.inner() & 1;
@@ -261,7 +316,7 @@ impl Board {
         if piece == Piece::ROOK {
             let them_inner = them.inner();
             let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
-            if start_bb & rook_squares != Bitboard::from(0) {
+            if !(start_bb & rook_squares).is_empty() {
                 let is_kingside = start.inner() & 1;
                 let flag = is_kingside + 1;
                 self.unset_castling_right(us, CastlingRights::from(flag));
@@ -279,31 +334,37 @@ impl Board {
 
 impl Lookup {
     /// Finds the bishop attacks from `square` with the given blockers.
+    #[inline]
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         self.bishop_magic_table[self.bishop_magics[square.to_index()].get_table_index(blockers)]
     }
 
     /// Finds the king attacks from `square`.
-    pub fn king_attacks(&self, square: Square) -> Bitboard {
+    #[inline]
+    pub const fn king_attacks(&self, square: Square) -> Bitboard {
         self.king_attacks[square.to_index()]
     }
 
     /// Finds the knight attacks from `square`.
-    pub fn knight_attacks(&self, square: Square) -> Bitboard {
+    #[inline]
+    pub const fn knight_attacks(&self, square: Square) -> Bitboard {
         self.knight_attacks[square.to_index()]
     }
 
     /// Finds the pawn attacks from `square`.
-    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+    #[inline]
+    pub const fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
         self.pawn_attacks[side.to_index()][square.to_index()]
     }
 
     /// Finds the queen attacks from `square` with the given blockers.
+    #[inline]
     pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
     }
 
     /// Finds the rook attacks from `square` with the given blockers.
+    #[inline]
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         self.rook_magic_table[self.rook_magics[square.to_index()].get_table_index(blockers)]
     }
@@ -313,7 +374,9 @@ impl Move {
     /// Turns a [`Move`] into its components: start square, end square, is
     /// castling, is promotion, is en passant and piece (only set if
     /// `is_promotion`), in that order.
-    pub fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
+    #[inline]
+    #[must_use]
+    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
         let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
         let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let is_promotion = self.is_promotion();
@@ -324,34 +387,47 @@ impl Move {
     }
 
     /// Checks if the move is castling.
-    pub fn is_castling(&self) -> bool {
+    #[inline]
+    #[must_use]
+    pub const fn is_castling(&self) -> bool {
         self.mv & Self::FLAG_MASK == Self::CASTLING_FLAG
     }
 
     /// Checks if the move is en passant.
-    pub fn is_en_passant(&self) -> bool {
+    #[inline]
+    #[must_use]
+    pub const fn is_en_passant(&self) -> bool {
         self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
     }
 
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
-    pub fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
-        let other = Move::new::<{ Self::NO_FLAG }>(start, end);
-        other.mv & Self::SQUARE_MASK == self.mv & Self::SQUARE_MASK
+    #[inline]
+    #[must_use]
+    pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
+        let other = Self::new::<{ Self::NO_FLAG }>(start, end);
+        (other.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+            == (self.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
     }
 
     /// Checks if the move is a promotion.
-    pub fn is_promotion(&self) -> bool {
+    #[inline]
+    #[must_use]
+    pub const fn is_promotion(&self) -> bool {
         self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
     }
 
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
     /// only return a value from 1 to 4.
-    pub fn promotion_piece(&self) -> Piece {
+    #[inline]
+    #[must_use]
+    pub const fn promotion_piece(&self) -> Piece {
         Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
     }
 
     /// Converts `mv` into its string representation.
+    #[inline]
+    #[must_use]
     pub fn stringify(&self) -> String {
         let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
         let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
@@ -369,17 +445,22 @@ impl Move {
 impl Moves {
     /// Clears `self`. This doesn't actually zero any bits: it just resets the
     /// head pointer, so it's O(1).
+    #[inline]
     pub fn clear(&mut self) {
         self.first_empty = 0;
     }
 
     /// Returns if it's empty
-    pub fn is_empty(&self) -> bool {
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.first_empty == 0
     }
 
     /// Returns its length.
-    pub fn len(&self) -> usize {
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.first_empty
     }
 
@@ -388,6 +469,7 @@ impl Moves {
     ///
     /// Returns `Some(mv)` if a `Move` does match the start and end square;
     /// returns `None` otherwise.
+    #[inline]
     pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
         self.moves
             .into_iter()
@@ -396,6 +478,7 @@ impl Moves {
 
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
+    #[inline]
     pub fn pop_move(&mut self) -> Option<Move> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
@@ -404,18 +487,31 @@ impl Moves {
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.
+    #[inline]
     pub fn push_move(&mut self, mv: Move) {
         self.moves[self.first_empty] = mv;
         self.first_empty += 1;
     }
 
-    /// Returns a random move. Panics if `self` is empty.
+    /// Returns a random move.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `self` is empty.
+    #[inline]
+    #[must_use]
     pub fn random_move(&self) -> Move {
+        assert!(
+            !self.is_empty(),
+            "Tried to get a random move from an empty `Moves` list"
+        );
         let mut rand = [0u8; 1];
-        let _ = getrandom(&mut rand);
-        assert!(!self.is_empty());
-        let rand = rand[0] as usize;
-        self.moves[rand % self.len()]
+        if getrandom(&mut rand).is_ok() {
+            let rand = rand[0] as usize;
+            self.moves[rand % self.len()]
+        } else {
+            self.moves[0]
+        }
     }
 }
 
@@ -437,7 +533,7 @@ impl Board {
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
-    fn ep_square(&self) -> Square {
+    const fn ep_square(&self) -> Square {
         self.ep_square
     }
 
@@ -452,23 +548,23 @@ impl Board {
 
         if IS_WHITE {
             if self.can_castle_kingside::<true>()
-                && occupancies & Bitboard::CASTLING_SPACE_WK == Bitboard::from(0)
+                && (occupancies & Bitboard::CASTLING_SPACE_WK).is_empty()
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::H1));
             }
             if self.can_castle_queenside::<true>()
-                && occupancies & Bitboard::CASTLING_SPACE_WQ == Bitboard::from(0)
+                && (occupancies & Bitboard::CASTLING_SPACE_WQ).is_empty()
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::A1));
             }
         } else {
             if self.can_castle_kingside::<false>()
-                && occupancies & Bitboard::CASTLING_SPACE_BK == Bitboard::from(0)
+                && (occupancies & Bitboard::CASTLING_SPACE_BK).is_empty()
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::H8));
             }
             if self.can_castle_queenside::<false>()
-                && occupancies & Bitboard::CASTLING_SPACE_BQ == Bitboard::from(0)
+                && (occupancies & Bitboard::CASTLING_SPACE_BQ).is_empty()
             {
                 moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::A8));
             }
@@ -482,6 +578,7 @@ impl Board {
 
         let knights = self.piece::<{ Piece::KNIGHT.to_index() }>() & us_bb;
         for knight in knights {
+            // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(knight, target));
@@ -490,6 +587,7 @@ impl Board {
 
         let kings = self.piece::<{ Piece::KING.to_index() }>() & us_bb;
         for king in kings {
+            // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.king_attacks(king) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(king, target));
@@ -503,14 +601,14 @@ impl Board {
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
         let ep_square_bb = if self.ep_square() == Square::NONE {
-            Bitboard::from(0)
+            Bitboard::EMPTY
         } else {
             Bitboard::from_square(self.ep_square())
         };
         let empty = !occupancies;
 
         let mut pawns = self.piece::<{ Piece::PAWN.to_index() }>() & us_bb;
-        while pawns != Bitboard::from(0) {
+        while !pawns.is_empty() {
             let pawn = pawns.pop_lsb();
             let pawn_sq = pawn.to_square();
 
@@ -523,12 +621,12 @@ impl Board {
             };
             let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
-            let all_captures = unsafe {
-                if IS_WHITE {
-                    LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq)
-                } else {
-                    LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq)
-                }
+            let all_captures = if IS_WHITE {
+                // SAFETY: Instantiating `self` initialises `LOOKUP`.
+                unsafe { LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq) }
+            } else {
+                // SAFETY: Instantiating `self` initialises `LOOKUP`.
+                unsafe { LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq) }
             };
             let normal_captures = all_captures & them_bb;
             let ep_captures = all_captures & ep_square_bb;
@@ -565,6 +663,7 @@ impl Board {
 
         let bishops = self.piece::<{ Piece::BISHOP.to_index() }>() & us_bb;
         for bishop in bishops {
+            // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(bishop, target));
@@ -573,6 +672,7 @@ impl Board {
 
         let rooks = self.piece::<{ Piece::ROOK.to_index() }>() & us_bb;
         for rook in rooks {
+            // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(rook, target));
@@ -581,6 +681,7 @@ impl Board {
 
         let queens = self.piece::<{ Piece::QUEEN.to_index() }>() & us_bb;
         for queen in queens {
+            // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb;
             for target in targets {
                 moves.push_move(Move::new::<{ Move::NO_FLAG }>(queen, target));
@@ -594,10 +695,15 @@ impl Board {
         let us = self.side_to_move();
         let them_bb = self.sides[us.flip().to_index()];
 
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
 
         let pawns = self.piece::<{ Piece::PAWN.to_index() }>();
@@ -613,13 +719,12 @@ impl Board {
         let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
         let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
 
-        (is_attacked_by_pawns
+        !((is_attacked_by_pawns
             | is_attacked_by_knights
             | is_attacked_by_kings
             | is_attacked_diagonally
             | is_attacked_orthogonally)
-            & them_bb
-            != Bitboard::from(0)
+            & them_bb).is_empty()
     }
 
     /// Calculates the square the king is on.
@@ -647,12 +752,12 @@ impl Board {
     }
 
     /// Returns the piece bitboard given by `piece`.
-    fn piece<const PIECE: usize>(&self) -> Bitboard {
+    const fn piece<const PIECE: usize>(&self) -> Bitboard {
         self.pieces[PIECE]
     }
 
     /// Returns the side to move.
-    fn side_to_move(&self) -> Side {
+    const fn side_to_move(&self) -> Side {
         self.side_to_move
     }
 
@@ -663,7 +768,7 @@ impl Board {
 
     /// Clears the castling rights for `side`.
     fn unset_castling_rights(&mut self, side: Side) {
-        self.castling_rights.clear_side(side)
+        self.castling_rights.clear_side(side);
     }
 
     /// Sets the piece on `square` in the piece array to [`Square::NONE`].
@@ -675,12 +780,15 @@ impl Board {
 impl Lookup {
     /// Returns a [`Lookup`] with empty tables.
     // used to initialise a static `Lookup` variable
+    #[allow(clippy::large_stack_frames)]
     const fn empty() -> Self {
         Self {
             pawn_attacks: [[Bitboard::EMPTY; Nums::SQUARES]; Nums::SIDES],
             knight_attacks: [Bitboard::EMPTY; Nums::SQUARES],
             king_attacks: [Bitboard::EMPTY; Nums::SQUARES],
             bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
+            // allowed because, after testing, a vector was slightly slower
+            #[allow(clippy::large_stack_arrays)]
             rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
             bishop_magics: [Magic::default(); Nums::SQUARES],
             rook_magics: [Magic::default(); Nums::SQUARES],
@@ -715,7 +823,7 @@ impl Lookup {
             w = w.west();
             attacks |= (e | w).north();
             attacks |= (e | w).south();
-            *bb = attacks
+            *bb = attacks;
         }
     }
 

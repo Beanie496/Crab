@@ -1,5 +1,5 @@
-use super::{Gui, SquareColour, SquareColourType};
-use crate::{gui::draw::paint_area_with_colour, util::points_to_pixels};
+use super::{Gui, SquareColor, SquareColorType};
+use crate::{gui::draw::paint_area_with_color, util::points_to_pixels};
 
 use backend::defs::{Nums, Piece, Side, Square};
 use eframe::{
@@ -15,7 +15,7 @@ impl App for Gui {
         // board width with 40 px margin
         let board_area_width = 880.0;
         let info_box_width = 1920.0 - 880.0;
-        // I like this colour
+        // I like this color
         let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
         self.update_board_area(ctx, board_area_width, bg_col);
         self.update_info_area(ctx, info_box_width, Color32::RED);
@@ -47,7 +47,9 @@ impl Gui {
 
     /// Draws the area where all the information from the engine is displayed.
     ///
-    /// Currently just paints the whole thing the colour `col`.
+    /// Currently just paints the whole thing the color `col`.
+    // I'm using `self` in a few commits' time, hence the lint allow
+    #[allow(clippy::unused_self)]
     fn update_info_area(&self, ctx: &Context, width: f32, col: Color32) {
         SidePanel::right(Id::new("info"))
             .resizable(false)
@@ -60,7 +62,7 @@ impl Gui {
     /// Draws the chessboard and all the pieces on it, handling clicks within
     /// the board as it does so.
     fn update_board(&mut self, ctx: &Context, ui: &mut Ui) {
-        let mut colour = SquareColour::new(SquareColourType::Dark);
+        let mut color = SquareColor::new(SquareColorType::Dark);
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
         for rank in 0..Nums::RANKS {
@@ -71,14 +73,16 @@ impl Gui {
                     // bottom left with a margix of 40 pixels between it and
                     // the bottom and left. You can figure out the rest :)
                     min: Pos2::new(
-                        points_to_pixels(ctx, 40.0 + 100.0 * file as f32),
+                        points_to_pixels(ctx, 100.0f32.mul_add(file as f32, 40.0)),
                         // yeah idk why the available height is given in pixels to
                         // begin with
-                        ui.available_height() - points_to_pixels(ctx, 140.0 + 100.0 * rank as f32),
+                        ui.available_height()
+                            - points_to_pixels(ctx, 100.0f32.mul_add(rank as f32, 140.0)),
                     ),
                     max: Pos2::new(
-                        points_to_pixels(ctx, 140.0 + 100.0 * file as f32),
-                        ui.available_height() - points_to_pixels(ctx, 40.0 + 100.0 * rank as f32),
+                        points_to_pixels(ctx, 100.0f32.mul_add(file as f32, 140.0)),
+                        ui.available_height()
+                            - points_to_pixels(ctx, 100.0f32.mul_add(rank as f32, 40.0)),
                     ),
                 };
 
@@ -90,13 +94,13 @@ impl Gui {
                     square.inner(),
                 );
 
-                self.update_square(&mut child, square_corners, square, colour);
+                self.update_square(&mut child, square_corners, square, color);
 
-                colour.flip_colour();
+                color.flip_color();
             }
             // when going onto a new rank, flip the square again because it needs
-            // stay the same colour
-            colour.flip_colour();
+            // stay the same color
+            color.flip_color();
         }
     }
 
@@ -104,6 +108,8 @@ impl Gui {
     /// them.
     ///
     /// Currently only draws them.
+    // I'm using `self` in a few commits' time, hence the lint allow
+    #[allow(clippy::unused_self)]
     fn update_buttons(&self, ctx: &Context, ui: &mut Ui) {
         // I need child UI's to lay out the buttons exactly where I want them
         let mut child = ui.child_ui(
@@ -118,7 +124,12 @@ impl Gui {
                 min: Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
                 // buttons won't lay out correctly because of floating-point
                 // imprecision so I have to do this
-                max: Pos2::new(points_to_pixels(ctx, 640.1), points_to_pixels(ctx, 110.0)),
+                // oh, and any value smaller than or equal to 0.00003 will
+                // break. That includes `f32::EPSILON`.
+                max: Pos2::new(
+                    points_to_pixels(ctx, 640.0 + 0.00004),
+                    points_to_pixels(ctx, 110.0),
+                ),
             },
             Layout::left_to_right(Align::Center).with_main_wrap(true),
         );
@@ -150,14 +161,15 @@ impl Gui {
     /// Draws the labels on the board [`SidePanel`].
     ///
     /// Not implemented yet.
+    #[allow(clippy::unused_self)]
     fn update_labels(&self, _ctx: &Context, _ui: &mut Ui) {}
 
     /// Draws a square on `ui` in the given region, assuming the square number
     /// is `square`. If it is selected, it will draw the selected field of
-    /// `colour`; otherwise, it'll draw the unselected field.
+    /// `color`; otherwise, it'll draw the unselected field.
     ///
     /// It will update the selected square of `self` if `ui` is clicked.
-    fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, colour: SquareColour) {
+    fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, color: SquareColor) {
         if ui.interact(region, ui.id(), Sense::click()).clicked() {
             if let Some(selected) = self.selected_square() {
                 self.set_selected_square(None);
@@ -173,9 +185,9 @@ impl Gui {
             }
         }
         if self.selected_square() == Some(square) {
-            paint_area_with_colour(ui, region, colour.selected);
+            paint_area_with_color(ui, region, color.selected);
         } else {
-            paint_area_with_colour(ui, region, colour.unselected);
+            paint_area_with_color(ui, region, color.unselected);
         }
         self.update_piece(ui, square);
     }

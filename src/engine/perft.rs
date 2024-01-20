@@ -8,6 +8,7 @@ impl Engine {
     /// future.
     ///
     /// If `IS_TIMED`, it will also output the time taken and the average NPS.
+    #[inline]
     pub fn perft<const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
         if IS_TIMED {
             let time = Instant::now();

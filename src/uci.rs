@@ -2,12 +2,18 @@ use std::{io, process::exit, str::Split};
 
 use crate::{board::find_magics, defs::Piece, engine::Engine};
 
+#[non_exhaustive]
 pub struct Uci;
 
 impl Uci {
     /// Repeatedly waits for a command and executes it according to the UCI
     /// protocol. It is not yet concurrent, i.e. it cannot process commands
     /// while not idle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`std::io::BufRead::read_line()`] returns an [`Err`].
+    #[inline]
     pub fn main_loop() {
         let mut engine = Engine::new();
         let mut input = String::new();
@@ -60,6 +66,7 @@ impl Uci {
             if command.is_empty() {
                 return;
             }
+            #[allow(clippy::match_same_arms)]
             match command {
                 // Ignored commands
                 "debug" | "ponderhit" => {
@@ -96,7 +103,7 @@ impl Uci {
                         if let Some(depth) = line.next() {
                             match depth.parse::<u8>() {
                                 Ok(result) => engine.search(Some(result)),
-                                Err(result) => println!("{}; must give 0-255", result),
+                                Err(result) => println!("{result}; must give 0-255"),
                             }
                         }
                     } else {
@@ -159,7 +166,7 @@ impl Uci {
                     if let Some(depth) = line.next() {
                         match depth.parse::<u8>() {
                             Ok(result) => _ = engine.perft::<true>(result),
-                            Err(result) => println!("{}; must give 0-255", result),
+                            Err(result) => println!("{result}; must give 0-255"),
                         }
                     }
                 }

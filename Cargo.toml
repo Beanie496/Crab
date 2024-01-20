@@ -17,10 +17,86 @@ name = "gui"
 path = "src/bin/gui/main.rs"
 
 [lints.clippy]
-enum_glob_use = "deny"
-pedantic = "deny"
 nursery = "deny"
+pedantic = "deny"
+perf = "deny"
+absolute_paths = "deny"
+as_underscore = "deny"
+clone_on_ref_ptr = "deny"
+dbg_macro = "deny"
+disallowed_script_idents = "deny"
+empty_drop = "deny"
+# not added to rustc yet
+#empty_enum_variants_with_brackets = "deny"
+empty_structs_with_brackets = "deny"
+error_impl_error = "deny"
+exhaustive_enums = "deny"
+exhaustive_structs = "deny"
+exit = "deny"
+filetype_is_file = "deny"
+float_cmp_const = "deny"
+fn_to_numeric_cast_any = "deny"
+format_push_string = "deny"
+get_unwrap = "deny"
+if_then_some_else_none = "deny"
+impl_trait_in_params = "deny"
+# not added to rustc yet
+#infinite_loop = "deny"
+large_include_file = "deny"
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+lossy_float_literal = "deny"
+map_err_ignore = "deny"
+mem_forget = "deny"
+missing_assert_message = "deny"
+missing_asserts_for_indexing = "deny"
+missing_docs_in_private_items = "deny"
+missing_inline_in_public_items = "deny"
+mixed_read_write_in_expression = "deny"
+mod_module_files = "deny"
+# TODO: come back to this
+multiple_inherent_impl = "allow"
+multiple_unsafe_ops_per_block = "deny"
+mutex_atomic = "deny"
+needless_raw_strings = "deny"
+panic_in_result_fn = "deny"
+partial_pub_fields = "deny"
+pattern_type_mismatch = "deny"
+pub_without_shorthand = "deny"
+rc_buffer = "deny"
+rc_mutex = "deny"
+redundant_type_annotations = "deny"
+ref_patterns = "deny"
+rest_pat_in_fully_bound_structs = "deny"
+same_name_method = "deny"
+semicolon_outside_block = "deny"
+separated_literal_suffix = "deny"
+string_add = "deny"
+string_lit_chars_any = "deny"
+string_slice = "deny"
+string_to_string = "deny"
+suspicious_xor_used_as_pow = "deny"
+tests_outside_test_module = "deny"
+todo = "deny"
+try_err = "deny"
+undocumented_unsafe_blocks = "deny"
+unimplemented = "deny"
+unnecessary_safety_comment = "deny"
+unnecessary_safety_doc = "deny"
+unnecessary_self_imports = "deny"
+unneeded_field_pattern = "deny"
+unwrap_in_result = "deny"
 unwrap_used = "deny"
+use_debug = "deny"
+verbose_file_reads = "deny"
+wildcard_enum_match_arm = "deny"
+# This codebase is (and will remain) small enough that casting is from one
+# known value to another, so any kind of cast that loses precision is either
+# deliberate or will simply never truncate (e.g. casting a usize within 0..=65
+# to a u8)
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
 
 [dependencies]
 lazy_static = "1.4.0"
@@ -44,9 +120,7 @@ features = ["png"]
 
 [profile.release]
 strip = true
-# enabling this results in a 10% speedup of move generation but makes the gui
-# take 30 seconds to link. Uncomment this as soon as the GUI is removed.
-#lto = "fat"
+lto = "fat"
 codegen-units = 1
 
 [profile.test]

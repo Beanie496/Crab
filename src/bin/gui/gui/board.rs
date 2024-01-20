@@ -25,6 +25,7 @@ impl Gui {
         let mv = if mv.is_none() {
             return false;
         } else {
+            // SAFETY: We just checked that `mv` is not `None`.
             unsafe { mv.unwrap_unchecked() }
         };
 
@@ -57,13 +58,13 @@ impl Gui {
     }
 
     /// Finds the piece on `square`.
-    pub fn piece_on(&self, square: Square) -> Piece {
+    pub const fn piece_on(&self, square: Square) -> Piece {
         self.piece_mailbox[square.to_index()]
     }
 
     /// Finds the side of the piece on `square`. If there is no piece on
     /// `square`, it returns [`Side::NONE`].
-    pub fn side_of(&self, square: Square) -> Side {
+    pub const fn side_of(&self, square: Square) -> Side {
         self.side_mailbox[square.to_index()]
     }
 

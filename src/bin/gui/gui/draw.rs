@@ -3,12 +3,12 @@ use eframe::{
     epaint::RectShape,
 };
 
-/// Paints the area on `ui` defined by `rect` the colour `colour`.
-pub fn paint_area_with_colour(ui: &Ui, rect: Rect, colour: Color32) {
+/// Paints the area on `ui` defined by `rect` the color `color`.
+pub fn paint_area_with_color(ui: &Ui, rect: Rect, color: Color32) {
     ui.painter().add(Shape::Rect(RectShape::new(
         rect,
         Rounding::ZERO,
-        colour,
+        color,
         Stroke::default(),
     )));
 }

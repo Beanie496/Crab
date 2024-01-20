@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use oorandom::Rand64;
 
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
@@ -9,6 +11,7 @@ pub struct Magic {
     /// The relevant attacked squares, excluding the edge.
     mask: Bitboard,
     /// The magic number.
+    #[allow(clippy::struct_field_names)]
     magic: u64,
     /// The bits required to index into the lookup table - it's the number of
     /// permutations of blockers, excluding the edge (since it makes no
@@ -19,6 +22,8 @@ pub struct Magic {
     offset: u32,
 }
 
+/// The hardcoded magic numbers for the bishop. Generated using [`find_magics`].
+#[allow(clippy::unreadable_literal)]
 pub const BISHOP_MAGICS: [u64; Nums::SQUARES] = [
     18017181921083777,
     2459251561629761536,
@@ -85,9 +90,13 @@ pub const BISHOP_MAGICS: [u64; Nums::SQUARES] = [
     4620763597834879264,
     72638153366733312,
 ];
-// 4096 is the largest number of blocker permutations from a single square: a
-// rook attacking from one of the corners
+
+/// The maximum number of blocker permutations from a single square: a rook
+/// attacking from one of the corners.
 pub const MAX_BLOCKERS: usize = 4096;
+
+/// The hardcoded magic numbers for the rook. Generated using [`find_magics`].
+#[allow(clippy::unreadable_literal)]
 pub const ROOK_MAGICS: [u64; Nums::SQUARES] = [
     36033333578174594,
     10394312406808535040,
@@ -157,7 +166,7 @@ pub const ROOK_MAGICS: [u64; Nums::SQUARES] = [
 
 impl Magic {
     /// Returns a [`Magic`] with the fields set to the given parameters.
-    pub fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
+    pub const fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
         Self {
             magic,
             mask,
@@ -170,7 +179,7 @@ impl Magic {
     pub const fn default() -> Self {
         Self {
             magic: 0,
-            mask: Bitboard::from(0),
+            mask: Bitboard::EMPTY,
             offset: 0,
             shift: 0,
         }
@@ -190,6 +199,9 @@ impl Magic {
 }
 
 /// Finds magic numbers for all 64 squares for both the rook and bishop.
+// the `expect()` within cannot panic, so no need to add to doc
+#[allow(clippy::missing_panics_doc)]
+#[inline]
 pub fn find_magics<const PIECE: u8>() {
     let piece = Piece::from(PIECE);
     let piece_str = if piece == Piece::BISHOP {
@@ -206,10 +218,10 @@ pub fn find_magics<const PIECE: u8>() {
     let mut lookup_table = [Bitboard::EMPTY; MAX_BLOCKERS];
     // this is used to store the latest iteration of each index
     let mut epoch = [0u32; MAX_BLOCKERS];
-    let mut rand_gen: Rand64 = Rand64::new(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+    let mut rand_gen = Rand64::new(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Cannot panic as of rust 1.75.0")
             .as_millis(),
     );
 

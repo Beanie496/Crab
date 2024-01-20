@@ -3,10 +3,13 @@ use crate::{
     defs::{File, Piece, Rank, Side, Square},
 };
 
+/// For perft, as it's counting leaf nodes, not searching.
 mod perft;
+/// For search-related code.
 mod search;
 
 /// Master object that contains all the other major objects.
+#[non_exhaustive]
 pub struct Engine {
     pub board: Board,
 }
@@ -14,6 +17,8 @@ pub struct Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             board: Board::new(),
@@ -24,6 +29,7 @@ impl Engine {
 impl Engine {
     /// Sets `self.board` to the given FEN and moves, as given by the
     /// `position` UCI command. Unexpected/incorrect tokens will be ignored.
+    #[inline]
     pub fn set_position(&mut self, position: &str, moves: &str) {
         self.set_pos_to_fen(position);
         self.play_moves(moves);
@@ -33,19 +39,19 @@ impl Engine {
 impl Engine {
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
-    fn play_moves(&self, _moves: &str) {}
+    #[allow(clippy::unused_self)]
+    const fn play_moves(&self, _moves: &str) {}
 
     /// Sets `self.board` to the given FEN. It will check for basic errors,
     /// like the board having too many ranks, but not many more.
+    #[allow(clippy::too_many_lines)]
     fn set_pos_to_fen(&mut self, position: &str) {
         self.board.clear_board();
 
         let mut iter = position.split(' ');
-        let board = if let Some(x) = iter.next() {
-            x
-        } else {
+        let Some(board) = iter.next() else {
             self.board.set_startpos();
-            return eprintln!("Need to pass a board");
+            return println!("Need to pass a board");
         };
         let side_to_move = iter.next();
         let castling_rights = iter.next();
@@ -66,17 +72,15 @@ impl Engine {
             for piece in rank.chars() {
                 // if it's a number, skip over that many files
                 if ('0'..='8').contains(&piece) {
-                    file_idx += piece.to_digit(10).unwrap() as u8;
+                    file_idx += piece.to_digit(10).expect("Hardcoded values cannot fail.") as u8;
                 } else {
                     let piece_num = Piece::from_char(piece.to_ascii_lowercase());
-                    let piece_num = if let Some(pn) = piece_num {
-                        pn
-                    } else {
+                    let Some(piece_num) = piece_num else {
                         self.board.set_startpos();
-                        return eprintln!("Error: \"{piece}\" is not a valid piece.");
+                        return println!("Error: \"{piece}\" is not a valid piece.");
                     };
                     // 1 if White, 0 if Black
-                    let side = Side::from(piece.is_ascii_uppercase() as u8);
+                    let side = Side::from(u8::from(piece.is_ascii_uppercase()));
 
                     self.board.add_piece(
                         side,
@@ -90,7 +94,7 @@ impl Engine {
             // if there are too few/many files in that rank, reset and return
             if file_idx != 8 {
                 self.board.set_startpos();
-                return eprintln!("Error: FEN is invalid");
+                return println!("Error: FEN is invalid");
             }
 
             file_idx = 0;
@@ -98,7 +102,7 @@ impl Engine {
         // if there are too many/few ranks in the board, reset and return
         if rank_idx != 0 {
             self.board.set_startpos();
-            return eprintln!("Error: FEN is invalid (incorrect number of ranks)");
+            return println!("Error: FEN is invalid (incorrect number of ranks)");
         }
 
         // 2. side to move
@@ -109,7 +113,7 @@ impl Engine {
                 self.board.set_side_to_move(Side::BLACK);
             } else {
                 self.board.set_startpos();
-                return eprintln!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
+                return println!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
             }
         } else {
             // I've decided that everything apart from the board can be omitted
@@ -137,7 +141,7 @@ impl Engine {
                     '-' => (),
                     _ => {
                         self.board.set_startpos();
-                        return eprintln!("Error: castling right \"{right}\" is not valid");
+                        return println!("Error: castling right \"{right}\" is not valid");
                     }
                 }
             }
@@ -154,7 +158,7 @@ impl Engine {
                 square
             } else {
                 self.board.set_startpos();
-                return eprintln!("Error: En passant square \"{ep}\" is not a valid square");
+                return println!("Error: En passant square \"{ep}\" is not a valid square");
             }
         } else {
             Square::NONE
@@ -166,7 +170,7 @@ impl Engine {
                 hm
             } else {
                 self.board.set_startpos();
-                return eprintln!("Error: Invalid number (\"hm\") given for halfmove counter");
+                return println!("Error: Invalid number (\"hm\") given for halfmove counter");
             }
         } else {
             0
@@ -177,7 +181,7 @@ impl Engine {
             if let Ok(fm) = fm.parse::<u32>() {
                 fm
             } else {
-                return eprintln!("Error: Invalid number (\"fm\") given for fullmove counter");
+                return println!("Error: Invalid number (\"fm\") given for fullmove counter");
             }
         } else {
             0

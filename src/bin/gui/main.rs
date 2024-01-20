@@ -1,3 +1,5 @@
+//! A GUI used to play chess against.
+
 use gui::Gui;
 
 use eframe::{
