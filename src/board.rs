@@ -115,9 +115,7 @@ impl Board {
             side_to_move: Self::default_side(),
         }
     }
-}
 
-impl Board {
     /// Adds the given right to the castling rights.
     #[inline]
     pub fn add_castling_right(&mut self, right: CastlingRights) {
@@ -236,9 +234,7 @@ impl Board {
             Side::NONE
         }
     }
-}
 
-impl Board {
     /// Returns the default en passant square.
     const fn default_ep_square() -> Square {
         Square::NONE
@@ -331,26 +327,7 @@ impl Board {
             Bitboard::from(0x0000_0000_0000_0000),
         ]
     }
-}
 
-impl CastlingRights {
-    /// Returns new [`CastlingRights`] with contents `cr`.
-    const fn from(cr: u8) -> Self {
-        Self { cr }
-    }
-
-    /// Returns new [`CastlingRights`] with the default castling rights.
-    const fn new() -> Self {
-        Self::KQkq
-    }
-
-    /// Returns empty [`CastlingRights`].
-    const fn none() -> Self {
-        Self::NONE
-    }
-}
-
-impl Board {
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
@@ -393,6 +370,21 @@ impl Board {
 }
 
 impl CastlingRights {
+    /// Returns new [`CastlingRights`] with contents `cr`.
+    const fn from(cr: u8) -> Self {
+        Self { cr }
+    }
+
+    /// Returns new [`CastlingRights`] with the default castling rights.
+    const fn new() -> Self {
+        Self::KQkq
+    }
+
+    /// Returns empty [`CastlingRights`].
+    const fn none() -> Self {
+        Self::NONE
+    }
+
     /// Adds the given right to `self`.
     fn add_right(&mut self, right: Self) {
         *self |= right;

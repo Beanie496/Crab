@@ -46,9 +46,7 @@ impl Engine {
         println!("Total: {total}");
         total
     }
-}
 
-impl Engine {
     /// Counts the number of leaf nodes `depth` moves in the future. It is used
     /// because copy-make requires an additional parameter, but I don't want to
     /// have that parameter in the API.

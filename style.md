@@ -94,32 +94,28 @@ Functions shouldn't be as small as possible for the sake of being small.
 If a function is doing several separate things, fence the separate things into their own braced blocks. If a block needs to be called elsewhere, turn it into a function.
 The `impl` blocks should be in this order for each struct:
 - Trait impls
-- Public constants
-- Private constants
-- Public associated functions
-- Public methods
-- Private associated functions
-- Private methods
+- Constants
+- Methods/associated functions
 
 If two struct share the same type of `impl`, they should be grouped, in alphabetical order.
 ```
-struct A;
-struct B;
+pub struct A;
+pub struct B;
 
 impl A {
-    pub fn foo() {}
+    pub const FOO: i32 = 5;
 }
 
 impl B {
-    pub fn foo() {}
+    pub const FOO: i32 = 5;
 }
 
 impl A {
-    fn bar() {}
+    pub fn bar() {}
 }
 
 impl B {
-    fn bar() {}
+    pub fn bar() {}
 }
 ```
 Functions and methods should be ordered in whatever order seems logical.
@@ -127,13 +123,6 @@ Functions and methods should be ordered in whatever order seems logical.
 ### 8. Comments
 
 Comments are an unfortunate necessity. Write your code such that the code itself explains what it's doing. Sometimes comments are needed, but they shouldn't be needed often.
-If a comment is a single sentence, the first letter should not be capitalised and the full stop should be omitted; 'shortened' grammar is also fine.
-```
-// don't do this.
-// Don't do this
-// Don't do this.
-// do this
-```
 
 ### 9. Assembly
 

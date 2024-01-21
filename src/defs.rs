@@ -363,110 +363,7 @@ impl Bitboard {
     pub const fn rank_bb(rank: Rank) -> Self {
         Self::from(0xff << (rank.inner() * 8))
     }
-}
 
-impl Direction {
-    /// Wraps an `i8` in a [`Direction`].
-    #[inline]
-    #[must_use]
-    pub const fn from(direction: i8) -> Self {
-        Self { d: direction }
-    }
-}
-
-impl File {
-    /// Wraps a `u8` in a [`File`].
-    #[inline]
-    #[must_use]
-    pub const fn from(file: u8) -> Self {
-        Self { f: file }
-    }
-}
-
-impl Piece {
-    /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
-    /// piece is not valid.
-    #[inline]
-    #[must_use]
-    pub const fn from_char(piece: char) -> Option<Self> {
-        match piece {
-            'p' => Some(Self::PAWN),
-            'n' => Some(Self::KNIGHT),
-            'b' => Some(Self::BISHOP),
-            'r' => Some(Self::ROOK),
-            'q' => Some(Self::QUEEN),
-            'k' => Some(Self::KING),
-            _ => None,
-        }
-    }
-
-    /// Wraps a `u8` in a [`Piece`].
-    #[inline]
-    #[must_use]
-    pub const fn from(piece: u8) -> Self {
-        Self { p: piece }
-    }
-}
-
-impl Rank {
-    /// Wraps a `u8` in a [`Rank`].
-    #[inline]
-    #[must_use]
-    pub const fn from(rank: u8) -> Self {
-        Self { r: rank }
-    }
-}
-
-impl Side {
-    /// Wraps a `u8` in a [`Side`].
-    #[inline]
-    #[must_use]
-    pub const fn from(side: u8) -> Self {
-        Self { s: side }
-    }
-}
-
-impl Square {
-    /// Wraps a `u8` in a [`Square`].
-    #[inline]
-    #[must_use]
-    pub const fn from(square: u8) -> Self {
-        Self { sq: square }
-    }
-
-    /// Converts `rank` and `file` into a [`Square`].
-    #[inline]
-    #[must_use]
-    pub const fn from_pos(rank: Rank, file: File) -> Self {
-        Self::from(rank.inner() * 8 + file.inner())
-    }
-
-    /// Converts a string representation of a square (e.g. "e4") into a
-    /// [`Square`]. Will return [`None`] if the square is not valid.
-    #[inline]
-    #[must_use]
-    pub fn from_string(string: &str) -> Option<Self> {
-        let mut square = 0;
-        let mut iter = string.as_bytes().iter();
-
-        let file = iter.next()?;
-        if (b'a'..=b'h').contains(file) {
-            square += file - b'a';
-        } else {
-            return None;
-        }
-        let rank = iter.next()?;
-        if (b'1'..=b'8').contains(rank) {
-            square += (rank - b'1') * 8;
-        } else {
-            return None;
-        }
-
-        Some(Self::from(square))
-    }
-}
-
-impl Bitboard {
     /// Shifts `self` one square east without wrapping.
     #[inline]
     #[must_use]
@@ -567,6 +464,13 @@ impl Bitboard {
 }
 
 impl Direction {
+    /// Wraps an `i8` in a [`Direction`].
+    #[inline]
+    #[must_use]
+    pub const fn from(direction: i8) -> Self {
+        Self { d: direction }
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
@@ -576,6 +480,13 @@ impl Direction {
 }
 
 impl File {
+    /// Wraps a `u8` in a [`File`].
+    #[inline]
+    #[must_use]
+    pub const fn from(file: u8) -> Self {
+        Self { f: file }
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
@@ -585,6 +496,29 @@ impl File {
 }
 
 impl Piece {
+    /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
+    /// piece is not valid.
+    #[inline]
+    #[must_use]
+    pub const fn from_char(piece: char) -> Option<Self> {
+        match piece {
+            'p' => Some(Self::PAWN),
+            'n' => Some(Self::KNIGHT),
+            'b' => Some(Self::BISHOP),
+            'r' => Some(Self::ROOK),
+            'q' => Some(Self::QUEEN),
+            'k' => Some(Self::KING),
+            _ => None,
+        }
+    }
+
+    /// Wraps a `u8` in a [`Piece`].
+    #[inline]
+    #[must_use]
+    pub const fn from(piece: u8) -> Self {
+        Self { p: piece }
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
@@ -601,6 +535,13 @@ impl Piece {
 }
 
 impl Rank {
+    /// Wraps a `u8` in a [`Rank`].
+    #[inline]
+    #[must_use]
+    pub const fn from(rank: u8) -> Self {
+        Self { r: rank }
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
@@ -610,6 +551,13 @@ impl Rank {
 }
 
 impl Side {
+    /// Wraps a `u8` in a [`Side`].
+    #[inline]
+    #[must_use]
+    pub const fn from(side: u8) -> Self {
+        Self { s: side }
+    }
+
     /// Flips the contents of `self`.
     ///
     /// e.g. `Side::WHITE.flip() == Side::BLACK`.
@@ -645,6 +593,44 @@ impl Side {
 }
 
 impl Square {
+    /// Wraps a `u8` in a [`Square`].
+    #[inline]
+    #[must_use]
+    pub const fn from(square: u8) -> Self {
+        Self { sq: square }
+    }
+
+    /// Converts `rank` and `file` into a [`Square`].
+    #[inline]
+    #[must_use]
+    pub const fn from_pos(rank: Rank, file: File) -> Self {
+        Self::from(rank.inner() * 8 + file.inner())
+    }
+
+    /// Converts a string representation of a square (e.g. "e4") into a
+    /// [`Square`]. Will return [`None`] if the square is not valid.
+    #[inline]
+    #[must_use]
+    pub fn from_string(string: &str) -> Option<Self> {
+        let mut square = 0;
+        let mut iter = string.as_bytes().iter();
+
+        let file = iter.next()?;
+        if (b'a'..=b'h').contains(file) {
+            square += file - b'a';
+        } else {
+            return None;
+        }
+        let rank = iter.next()?;
+        if (b'1'..=b'8').contains(rank) {
+            square += (rank - b'1') * 8;
+        } else {
+            return None;
+        }
+
+        Some(Self::from(square))
+    }
+
     /// Calculates the file that `self` is on.
     #[inline]
     #[must_use]

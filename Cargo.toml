@@ -53,8 +53,6 @@ missing_docs_in_private_items = "deny"
 missing_inline_in_public_items = "deny"
 mixed_read_write_in_expression = "deny"
 mod_module_files = "deny"
-# TODO: come back to this
-multiple_inherent_impl = "allow"
 multiple_unsafe_ops_per_block = "deny"
 mutex_atomic = "deny"
 needless_raw_strings = "deny"

@@ -27,9 +27,7 @@ impl Engine {
             board: Board::new(),
         }
     }
-}
 
-impl Engine {
     /// Sets `self.board` to the given FEN and moves, as given by the
     /// `position` UCI command. Unexpected/incorrect tokens will be ignored.
     #[inline]
@@ -37,9 +35,7 @@ impl Engine {
         self.set_pos_to_fen(position);
         self.play_moves(moves);
     }
-}
 
-impl Engine {
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
     #[allow(clippy::unused_self)]

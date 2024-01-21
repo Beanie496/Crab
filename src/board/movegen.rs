@@ -104,9 +104,6 @@ impl Move {
     pub const PROMOTION: u16 = 0b0011_0000_0000_0000;
     /// No flags.
     pub const NORMAL: u16 = 0b0000_0000_0000_0000;
-}
-
-impl Move {
     /// Mask for the start square.
     const START_MASK: u16 = 0b11_1111;
     /// Shift for the start square, after it has been masked.
@@ -125,85 +122,6 @@ impl Move {
     /// Shift for the promotion piece. It does not need a mask because shifting
     /// already removes unwanted bits.
     const PIECE_SHIFT: usize = 14;
-}
-
-impl Lookup {
-    /// Initialises the tables of [`LOOKUPS`].
-    // for some reason clippy _doesn't_ complain if I remove this
-    // attribute. I'll add it anyway though.
-    #[inline]
-    pub fn init() {
-        // SAFETY: These functions write to a mutable static before anything
-        // else reads from it.
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
-        unsafe {
-            LOOKUPS.init_pawn_attacks();
-            LOOKUPS.init_knight_attacks();
-            LOOKUPS.init_king_attacks();
-            LOOKUPS.init_magics();
-        };
-    }
-}
-
-impl Move {
-    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
-    /// set to either [`CASTLING`](Move::CASTLING) or
-    /// [`EN_PASSANT`](Move::EN_PASSANT), but cannot be used for
-    /// [`PROMOTION`](Move::PROMOTION), since that requires an additional
-    /// parameter. See [`new_promo`](Move::new_promo) for a new promotion
-    /// [`Move`].
-    #[inline]
-    #[must_use]
-    pub const fn new<const FLAG: u16>(start: Square, end: Square) -> Self {
-        debug_assert!(
-            FLAG != Self::PROMOTION,
-            "Tried to make a new promotion `Move` with the wrong function"
-        );
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | FLAG,
-        }
-    }
-
-    /// Creates a promotion [`Move`] to the given piece.
-    #[inline]
-    #[must_use]
-    pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
-        debug_assert!(
-            PIECE != Piece::PAWN.inner(),
-            "Tried to make a new promotion `Move` into a pawn"
-        );
-        debug_assert!(
-            PIECE != Piece::KING.inner(),
-            "Tried to make a new promotion `Move` into a king"
-        );
-        Self {
-            mv: (start.inner() as u16) << Self::START_SHIFT
-                | (end.inner() as u16) << Self::END_SHIFT
-                | Self::PROMOTION
-                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
-        }
-    }
-
-    /// Creates a null [`Move`].
-    #[inline]
-    #[must_use]
-    pub const fn null() -> Self {
-        Self { mv: 0 }
-    }
-}
-
-impl Moves {
-    /// Creates an empty [`Moves`] object.
-    #[inline]
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            moves: [Move::null(); MAX_LEGAL_MOVES],
-            first_empty: 0,
-        }
-    }
 }
 
 impl Board {
@@ -339,193 +257,7 @@ impl Board {
 
         true
     }
-}
 
-impl Lookup {
-    /// Finds the bishop attacks from `square` with the given blockers.
-    #[inline]
-    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_magic_table[self.bishop_magics[square.to_index()].get_table_index(blockers)]
-    }
-
-    /// Finds the king attacks from `square`.
-    #[inline]
-    pub const fn king_attacks(&self, square: Square) -> Bitboard {
-        self.king_attacks[square.to_index()]
-    }
-
-    /// Finds the knight attacks from `square`.
-    #[inline]
-    pub const fn knight_attacks(&self, square: Square) -> Bitboard {
-        self.knight_attacks[square.to_index()]
-    }
-
-    /// Finds the pawn attacks from `square`.
-    #[inline]
-    pub const fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        self.pawn_attacks[side.to_index()][square.to_index()]
-    }
-
-    /// Finds the queen attacks from `square` with the given blockers.
-    #[inline]
-    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
-    }
-
-    /// Finds the rook attacks from `square` with the given blockers.
-    #[inline]
-    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.rook_magic_table[self.rook_magics[square.to_index()].get_table_index(blockers)]
-    }
-}
-
-impl Move {
-    /// Turns a [`Move`] into its components: start square, end square, is
-    /// castling, is promotion, is en passant and piece (only set if
-    /// `is_promotion`), in that order.
-    #[inline]
-    #[must_use]
-    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
-        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let is_promotion = self.is_promotion();
-        let is_castling = self.is_castling();
-        let is_en_passant = self.is_en_passant();
-        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
-        (start, end, is_castling, is_en_passant, is_promotion, piece)
-    }
-
-    /// Checks if the move is castling.
-    #[inline]
-    #[must_use]
-    pub const fn is_castling(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::CASTLING
-    }
-
-    /// Checks if the move is en passant.
-    #[inline]
-    #[must_use]
-    pub const fn is_en_passant(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::EN_PASSANT
-    }
-
-    /// Checks if the given start and end square match the start and end square
-    /// contained within `self`.
-    #[inline]
-    #[must_use]
-    pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
-        let other = Self::new::<{ Self::NORMAL }>(start, end);
-        (other.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
-            == (self.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
-    }
-
-    /// Checks if the move is a promotion.
-    #[inline]
-    #[must_use]
-    pub const fn is_promotion(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::PROMOTION
-    }
-
-    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
-    /// only return a value from 1 to 4.
-    #[inline]
-    #[must_use]
-    pub const fn promotion_piece(&self) -> Piece {
-        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
-    }
-
-    /// Converts `mv` into its string representation.
-    #[inline]
-    #[must_use]
-    pub fn stringify(&self) -> String {
-        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let mut ret = String::with_capacity(5);
-        ret += &start.stringify();
-        ret += &end.stringify();
-        if self.is_promotion() {
-            // we want the lowercase letter here
-            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
-        }
-        ret
-    }
-}
-
-impl Moves {
-    /// Clears `self`. This doesn't actually zero any bits: it just resets the
-    /// head pointer, so it's O(1).
-    #[inline]
-    pub fn clear(&mut self) {
-        self.first_empty = 0;
-    }
-
-    /// Returns if it's empty
-    #[inline]
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.first_empty == 0
-    }
-
-    /// Returns its length.
-    #[inline]
-    #[must_use]
-    pub const fn len(&self) -> usize {
-        self.first_empty
-    }
-
-    /// Finds and returns, if it exists, the move that has start square `start`
-    /// and end square `end`.
-    ///
-    /// Returns `Some(mv)` if a `Move` does match the start and end square;
-    /// returns `None` otherwise.
-    #[inline]
-    pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
-        self.moves
-            .into_iter()
-            .find(|&mv| mv.is_moving_from_to(start, end))
-    }
-
-    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
-    /// moves, otherwise returns `None`.
-    #[inline]
-    pub fn pop_move(&mut self) -> Option<Move> {
-        (self.first_empty > 0).then(|| {
-            self.first_empty -= 1;
-            self.moves[self.first_empty]
-        })
-    }
-
-    /// Pushes `mv` onto itself. Assumes `self` is not full.
-    #[inline]
-    pub fn push_move(&mut self, mv: Move) {
-        self.moves[self.first_empty] = mv;
-        self.first_empty += 1;
-    }
-
-    /// Returns a random move.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `self` is empty.
-    #[inline]
-    #[must_use]
-    pub fn random_move(&self) -> Move {
-        assert!(
-            !self.is_empty(),
-            "Tried to get a random move from an empty `Moves` list"
-        );
-        let mut rand = [0u8; 1];
-        if getrandom(&mut rand).is_ok() {
-            let rand = rand[0] as usize;
-            self.moves[rand % self.len()]
-        } else {
-            self.moves[0]
-        }
-    }
-}
-
-/// Generates pseudo-legal moves for all pieces.
-impl Board {
     /// Calculates if the given side can castle kingside.
     fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_kingside::<IS_WHITE>()
@@ -788,6 +520,58 @@ impl Board {
 }
 
 impl Lookup {
+    /// Initialises the tables of [`LOOKUPS`].
+    // for some reason clippy _doesn't_ complain if I remove this
+    // attribute. I'll add it anyway though.
+    #[inline]
+    pub fn init() {
+        // SAFETY: These functions write to a mutable static before anything
+        // else reads from it.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
+        unsafe {
+            LOOKUPS.init_pawn_attacks();
+            LOOKUPS.init_knight_attacks();
+            LOOKUPS.init_king_attacks();
+            LOOKUPS.init_magics();
+        };
+    }
+
+    /// Finds the bishop attacks from `square` with the given blockers.
+    #[inline]
+    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_magic_table[self.bishop_magics[square.to_index()].get_table_index(blockers)]
+    }
+
+    /// Finds the king attacks from `square`.
+    #[inline]
+    pub const fn king_attacks(&self, square: Square) -> Bitboard {
+        self.king_attacks[square.to_index()]
+    }
+
+    /// Finds the knight attacks from `square`.
+    #[inline]
+    pub const fn knight_attacks(&self, square: Square) -> Bitboard {
+        self.knight_attacks[square.to_index()]
+    }
+
+    /// Finds the pawn attacks from `square`.
+    #[inline]
+    pub const fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+        self.pawn_attacks[side.to_index()][square.to_index()]
+    }
+
+    /// Finds the queen attacks from `square` with the given blockers.
+    #[inline]
+    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
+    }
+
+    /// Finds the rook attacks from `square` with the given blockers.
+    #[inline]
+    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.rook_magic_table[self.rook_magics[square.to_index()].get_table_index(blockers)]
+    }
+
     /// Returns a [`Lookup`] with empty tables.
     // used to initialise a static `Lookup` variable
     #[allow(clippy::large_stack_frames)]
@@ -804,9 +588,7 @@ impl Lookup {
             rook_magics: [Magic::default(); Nums::SQUARES],
         }
     }
-}
 
-impl Lookup {
     /// Initialises king attack lookup table.
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
@@ -913,6 +695,208 @@ impl Lookup {
         {
             let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
             *bb = pushed.east() | pushed.west();
+        }
+    }
+}
+
+impl Move {
+    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
+    /// set to either [`CASTLING`](Move::CASTLING) or
+    /// [`EN_PASSANT`](Move::EN_PASSANT), but cannot be used for
+    /// [`PROMOTION`](Move::PROMOTION), since that requires an additional
+    /// parameter. See [`new_promo`](Move::new_promo) for a new promotion
+    /// [`Move`].
+    #[inline]
+    #[must_use]
+    pub const fn new<const FLAG: u16>(start: Square, end: Square) -> Self {
+        debug_assert!(
+            FLAG != Self::PROMOTION,
+            "Tried to make a new promotion `Move` with the wrong function"
+        );
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | FLAG,
+        }
+    }
+
+    /// Creates a promotion [`Move`] to the given piece.
+    #[inline]
+    #[must_use]
+    pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
+        debug_assert!(
+            PIECE != Piece::PAWN.inner(),
+            "Tried to make a new promotion `Move` into a pawn"
+        );
+        debug_assert!(
+            PIECE != Piece::KING.inner(),
+            "Tried to make a new promotion `Move` into a king"
+        );
+        Self {
+            mv: (start.inner() as u16) << Self::START_SHIFT
+                | (end.inner() as u16) << Self::END_SHIFT
+                | Self::PROMOTION
+                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
+        }
+    }
+
+    /// Creates a null [`Move`].
+    #[inline]
+    #[must_use]
+    pub const fn null() -> Self {
+        Self { mv: 0 }
+    }
+
+    /// Turns a [`Move`] into its components: start square, end square, is
+    /// castling, is promotion, is en passant and piece (only set if
+    /// `is_promotion`), in that order.
+    #[inline]
+    #[must_use]
+    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let is_promotion = self.is_promotion();
+        let is_castling = self.is_castling();
+        let is_en_passant = self.is_en_passant();
+        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        (start, end, is_castling, is_en_passant, is_promotion, piece)
+    }
+
+    /// Checks if the move is castling.
+    #[inline]
+    #[must_use]
+    pub const fn is_castling(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::CASTLING
+    }
+
+    /// Checks if the move is en passant.
+    #[inline]
+    #[must_use]
+    pub const fn is_en_passant(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::EN_PASSANT
+    }
+
+    /// Checks if the given start and end square match the start and end square
+    /// contained within `self`.
+    #[inline]
+    #[must_use]
+    pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
+        let other = Self::new::<{ Self::NORMAL }>(start, end);
+        (other.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+            == (self.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+    }
+
+    /// Checks if the move is a promotion.
+    #[inline]
+    #[must_use]
+    pub const fn is_promotion(&self) -> bool {
+        self.mv & Self::FLAG_MASK == Self::PROMOTION
+    }
+
+    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
+    /// only return a value from 1 to 4.
+    #[inline]
+    #[must_use]
+    pub const fn promotion_piece(&self) -> Piece {
+        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+    }
+
+    /// Converts `mv` into its string representation.
+    #[inline]
+    #[must_use]
+    pub fn stringify(&self) -> String {
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let mut ret = String::with_capacity(5);
+        ret += &start.stringify();
+        ret += &end.stringify();
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
+        }
+        ret
+    }
+}
+
+impl Moves {
+    /// Creates an empty [`Moves`] object.
+    #[inline]
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            moves: [Move::null(); MAX_LEGAL_MOVES],
+            first_empty: 0,
+        }
+    }
+
+    /// Clears `self`. This doesn't actually zero any bits: it just resets the
+    /// head pointer, so it's O(1).
+    #[inline]
+    pub fn clear(&mut self) {
+        self.first_empty = 0;
+    }
+
+    /// Returns if it's empty
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.first_empty == 0
+    }
+
+    /// Returns its length.
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.first_empty
+    }
+
+    /// Finds and returns, if it exists, the move that has start square `start`
+    /// and end square `end`.
+    ///
+    /// Returns `Some(mv)` if a `Move` does match the start and end square;
+    /// returns `None` otherwise.
+    #[inline]
+    pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
+        self.moves
+            .into_iter()
+            .find(|&mv| mv.is_moving_from_to(start, end))
+    }
+
+    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
+    /// moves, otherwise returns `None`.
+    #[inline]
+    pub fn pop_move(&mut self) -> Option<Move> {
+        (self.first_empty > 0).then(|| {
+            self.first_empty -= 1;
+            self.moves[self.first_empty]
+        })
+    }
+
+    /// Pushes `mv` onto itself. Assumes `self` is not full.
+    #[inline]
+    pub fn push_move(&mut self, mv: Move) {
+        self.moves[self.first_empty] = mv;
+        self.first_empty += 1;
+    }
+
+    /// Returns a random move.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `self` is empty.
+    #[inline]
+    #[must_use]
+    pub fn random_move(&self) -> Move {
+        assert!(
+            !self.is_empty(),
+            "Tried to get a random move from an empty `Moves` list"
+        );
+        let mut rand = [0u8; 1];
+        if getrandom(&mut rand).is_ok() {
+            let rand = rand[0] as usize;
+            self.moves[rand % self.len()]
+        } else {
+            self.moves[0]
         }
     }
 }

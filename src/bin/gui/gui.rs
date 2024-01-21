@@ -81,6 +81,16 @@ impl Gui {
             selected_square: None,
         }
     }
+
+    /// Returns the selected square of `self`.
+    const fn selected_square(&self) -> Option<Square> {
+        self.selected_square
+    }
+
+    /// Sets the selected square of `self`.
+    fn set_selected_square(&mut self, square: Option<Square>) {
+        self.selected_square = square;
+    }
 }
 
 impl SquareColor {
@@ -101,21 +111,7 @@ impl SquareColor {
             },
         }
     }
-}
 
-impl Gui {
-    /// Returns the selected square of `self`.
-    const fn selected_square(&self) -> Option<Square> {
-        self.selected_square
-    }
-
-    /// Sets the selected square of `self`.
-    fn set_selected_square(&mut self, square: Option<Square>) {
-        self.selected_square = square;
-    }
-}
-
-impl SquareColor {
     /// Flips the selected and unselected color of `self` depending on the
     /// value of `self.square_type`.
     ///

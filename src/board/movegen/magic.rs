@@ -184,9 +184,7 @@ impl Magic {
             shift: 0,
         }
     }
-}
 
-impl Magic {
     /// Calculates the index into the table it is for. See
     /// <https://www.chessprogramming.org/Magic_Bitboards> for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
@@ -199,8 +197,11 @@ impl Magic {
 }
 
 /// Finds magic numbers for all 64 squares for both the rook and bishop.
-// the `expect()` within cannot panic, so no need to add to doc
-#[allow(clippy::missing_panics_doc)]
+///
+/// # Panics
+///
+/// Panics if the value given for the generic parameter does not match the
+/// inner value of a [`Piece::BISHOP`] or a [`Piece::ROOK`].
 #[inline]
 pub fn find_magics<const PIECE: u8>() {
     let piece = Piece::from(PIECE);
@@ -239,9 +240,9 @@ pub fn find_magics<const PIECE: u8>() {
         gen_all_sliding_attacks::<PIECE>(square, &mut attacks);
 
         let mut count = 0;
-        // this repeatedly generates a sparse random number and tests it on
-        // all different permutations. If the magic number works, it's
-        // printed and the loop is exited.
+        // this repeatedly generates a sparse random number and tests it on all
+        // different permutations. If the magic number works, it's printed and
+        // the loop is exited.
         loop {
             // 1/8 of bits set on average
             let sparse_rand = rand_gen.rand_u64() & rand_gen.rand_u64() & rand_gen.rand_u64();
@@ -252,12 +253,12 @@ pub fn find_magics<const PIECE: u8>() {
                 let index = blockers.inner().wrapping_mul(sparse_rand) >> shift;
                 /* Each time an index is made, it's checked to see if it's
                  * collided with one of its previous indexes. If it hasn't
-                 * (i.e. epoch[index] < count), the index is marked as
-                 * being visited (i.e. epoch[index] = count) and the loop
-                 * continues. If it has, it checks to see if the collision
-                 * is constructive. If it's not, the magic doesn't work -
-                 * discard the magic and start the loop over. I've borrowed
-                 * this epoch trick from Stockfish.
+                 * (i.e. epoch[index] < count), the index is marked as being
+                 * visited (i.e. epoch[index] = count) and the loop continues.
+                 * If it has, it checks to see if the collision is
+                 * constructive. If it's not, the magic doesn't work - discard
+                 * the magic and start the loop over. I've borrowed this epoch
+                 * trick from Stockfish.
                  */
                 if epoch[index as usize] < count {
                     epoch[index as usize] = count;
