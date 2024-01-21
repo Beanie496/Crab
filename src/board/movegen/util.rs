@@ -35,12 +35,10 @@ pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
     }
     let start_bb = Bitboard::from_square(start);
     let end_bb = Bitboard::from_square(end);
-    if (start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))).is_empty()
-    {
+    if (start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))).is_empty() {
         return false;
     }
-    if (end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))).is_empty()
-    {
+    if (end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))).is_empty() {
         return false;
     }
     true
@@ -65,9 +63,7 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
     let mut attacks = Bitboard::EMPTY;
     // checks if the next square is valid and if the piece can move from the
     // square
-    while is_valid::<DIRECTION>(square)
-        && (Bitboard::from_square(square) & blockers).is_empty()
-    {
+    while is_valid::<DIRECTION>(square) && (Bitboard::from_square(square) & blockers).is_empty() {
         // I want to lose the sign and intentially overflow `square`, since
         // that would have the same effect as just adding the i8 to the u8
         square = Square::from(square.inner().wrapping_add(DIRECTION as u8));

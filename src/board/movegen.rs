@@ -91,11 +91,19 @@ impl Iterator for Moves {
     }
 }
 
+/// Flags used for [`new`](Move::new) and [`new_promo`](Move::new_promo).
+///
+/// Note that it isn't safe to do bitwise operations on them, as they're
+/// mutually exclusive.
 impl Move {
-    pub const NO_FLAG: u16 = 0b0000_0000_0000_0000;
-    pub const CASTLING_FLAG: u16 = 0b0001_0000_0000_0000;
-    pub const EN_PASSANT_FLAG: u16 = 0b0010_0000_0000_0000;
-    pub const PROMOTION_FLAG: u16 = 0b0011_0000_0000_0000;
+    /// Flag for castling.
+    pub const CASTLING: u16 = 0b0001_0000_0000_0000;
+    /// Flag for en passant.
+    pub const EN_PASSANT: u16 = 0b0010_0000_0000_0000;
+    /// Flag for promotion.
+    pub const PROMOTION: u16 = 0b0011_0000_0000_0000;
+    /// No flags.
+    pub const NORMAL: u16 = 0b0000_0000_0000_0000;
 }
 
 impl Move {
@@ -139,15 +147,16 @@ impl Lookup {
 
 impl Move {
     /// Creates a [`Move`] given a start square and end square. `FLAG` can be
-    /// set to either [`Move::CASTLING_FLAG`] or [`Move::EN_PASSANT_FLAG`], but
-    /// cannot be used for [`Move::PROMOTION_FLAG`], since that requires an
-    /// additional parameter. See [`new_promo`](Move::new_promo) for a new
-    /// promotion [`Move`].
+    /// set to either [`CASTLING`](Move::CASTLING) or
+    /// [`EN_PASSANT`](Move::EN_PASSANT), but cannot be used for
+    /// [`PROMOTION`](Move::PROMOTION), since that requires an additional
+    /// parameter. See [`new_promo`](Move::new_promo) for a new promotion
+    /// [`Move`].
     #[inline]
     #[must_use]
     pub const fn new<const FLAG: u16>(start: Square, end: Square) -> Self {
         debug_assert!(
-            FLAG != Self::PROMOTION_FLAG,
+            FLAG != Self::PROMOTION,
             "Tried to make a new promotion `Move` with the wrong function"
         );
         Self {
@@ -172,7 +181,7 @@ impl Move {
         Self {
             mv: (start.inner() as u16) << Self::START_SHIFT
                 | (end.inner() as u16) << Self::END_SHIFT
-                | Self::PROMOTION_FLAG
+                | Self::PROMOTION
                 | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
         }
     }
@@ -390,14 +399,14 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn is_castling(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::CASTLING_FLAG
+        self.mv & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
     #[inline]
     #[must_use]
     pub const fn is_en_passant(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::EN_PASSANT_FLAG
+        self.mv & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the given start and end square match the start and end square
@@ -405,7 +414,7 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
-        let other = Self::new::<{ Self::NO_FLAG }>(start, end);
+        let other = Self::new::<{ Self::NORMAL }>(start, end);
         (other.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
             == (self.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
     }
@@ -414,7 +423,7 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn is_promotion(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::PROMOTION_FLAG
+        self.mv & Self::FLAG_MASK == Self::PROMOTION
     }
 
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
@@ -550,23 +559,23 @@ impl Board {
             if self.can_castle_kingside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WK).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::H1));
+                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E1, Square::H1));
             }
             if self.can_castle_queenside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WQ).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E1, Square::A1));
+                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E1, Square::A1));
             }
         } else {
             if self.can_castle_kingside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BK).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::H8));
+                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E8, Square::H8));
             }
             if self.can_castle_queenside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BQ).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING_FLAG }>(Square::E8, Square::A8));
+                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E8, Square::A8));
             }
         }
     }
@@ -581,7 +590,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(knight, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(knight, target));
             }
         }
 
@@ -590,7 +599,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.king_attacks(king) } & !us_bb;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(king, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(king, target));
             }
         }
     }
@@ -637,7 +646,7 @@ impl Board {
             let normal_targets = targets ^ promotion_targets;
 
             for target in normal_targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(pawn_sq, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(pawn_sq, target));
             }
             for target in promotion_targets {
                 moves.push_move(Move::new_promo::<{ Piece::KNIGHT.inner() }>(
@@ -650,7 +659,7 @@ impl Board {
                 moves.push_move(Move::new_promo::<{ Piece::QUEEN.inner() }>(pawn_sq, target));
             }
             for target in ep_captures {
-                moves.push_move(Move::new::<{ Move::EN_PASSANT_FLAG }>(pawn_sq, target));
+                moves.push_move(Move::new::<{ Move::EN_PASSANT }>(pawn_sq, target));
             }
         }
     }
@@ -666,7 +675,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(bishop, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(bishop, target));
             }
         }
 
@@ -675,7 +684,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(rook, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(rook, target));
             }
         }
 
@@ -684,7 +693,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NO_FLAG }>(queen, target));
+                moves.push_move(Move::new::<{ Move::NORMAL }>(queen, target));
             }
         }
     }
@@ -724,7 +733,8 @@ impl Board {
             | is_attacked_by_kings
             | is_attacked_diagonally
             | is_attacked_orthogonally)
-            & them_bb).is_empty()
+            & them_bb)
+            .is_empty()
     }
 
     /// Calculates the square the king is on.

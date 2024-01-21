@@ -83,13 +83,20 @@ impl Shl<u8> for CastlingRights {
 }
 
 #[allow(non_upper_case_globals)]
+/// Flags. It's fine to use `&`, `^` and `|` on these.
 impl CastlingRights {
-    pub const CASTLE_FLAGS_K: Self = Self::from(0b1000);
-    pub const CASTLE_FLAGS_Q: Self = Self::from(0b0100);
-    pub const CASTLE_FLAGS_k: Self = Self::from(0b0010);
-    pub const CASTLE_FLAGS_q: Self = Self::from(0b0001);
-    pub const CASTLE_FLAGS_KQkq: Self = Self::from(0b1111);
-    pub const CASTLE_FLAGS_NONE: Self = Self::from(0b0000);
+    /// The flag `K`.
+    pub const K: Self = Self::from(0b1000);
+    /// The flag `Q`.
+    pub const Q: Self = Self::from(0b0100);
+    /// The flag `k`.
+    pub const k: Self = Self::from(0b0010);
+    /// The flag `q`.
+    pub const q: Self = Self::from(0b0001);
+    /// The flags `KQkq`, i.e. all flags.
+    pub const KQkq: Self = Self::from(0b1111);
+    /// No flags.
+    pub const NONE: Self = Self::from(0b0000);
 }
 
 impl Board {
@@ -334,12 +341,12 @@ impl CastlingRights {
 
     /// Returns new [`CastlingRights`] with the default castling rights.
     const fn new() -> Self {
-        Self::CASTLE_FLAGS_KQkq
+        Self::KQkq
     }
 
     /// Returns empty [`CastlingRights`].
     const fn none() -> Self {
-        Self::CASTLE_FLAGS_NONE
+        Self::NONE
     }
 }
 
@@ -394,18 +401,18 @@ impl CastlingRights {
     /// Calculates if the given side can castle kingside.
     fn can_castle_kingside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
-            self & Self::CASTLE_FLAGS_K == Self::CASTLE_FLAGS_K
+            self & Self::K == Self::K
         } else {
-            self & Self::CASTLE_FLAGS_k == Self::CASTLE_FLAGS_k
+            self & Self::k == Self::k
         }
     }
 
     /// Calculates if the given side can castle queenside.
     fn can_castle_queenside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
-            self & Self::CASTLE_FLAGS_Q == Self::CASTLE_FLAGS_Q
+            self & Self::Q == Self::Q
         } else {
-            self & Self::CASTLE_FLAGS_q == Self::CASTLE_FLAGS_q
+            self & Self::q == Self::q
         }
     }
 

@@ -145,40 +145,74 @@ impl Shl<u8> for Bitboard {
 
 /// Pre-constructed bitboards.
 impl Bitboard {
-    pub const EMPTY: Self = Self::from(0);
+    /// The squares betwen the White king and kingside rook in the starting
+    /// position.
     pub const CASTLING_SPACE_WK: Self = Self::from(0x0000_0000_0000_0060);
+    /// The squares betwen the White king and queenside rook in the starting
+    /// position.
     pub const CASTLING_SPACE_WQ: Self = Self::from(0x0000_0000_0000_000e);
+    /// The squares betwen the Black king and kingside rook in the starting
+    /// position.
     pub const CASTLING_SPACE_BK: Self = Self::from(0x6000_0000_0000_0000);
+    /// The squares betwen the Black king and queenside rook in the starting
+    /// position.
     pub const CASTLING_SPACE_BQ: Self = Self::from(0x0e00_0000_0000_0000);
+    /// An empty bitboard: `0x0`.
+    pub const EMPTY: Self = Self::from(0);
 }
 
 /// The square difference in each of the 8 directions.
 impl Direction {
+    /// North.
     pub const N: Self = Self::from(8);
+    /// North-east.
     pub const NE: Self = Self::from(9);
+    /// East.
     pub const E: Self = Self::from(1);
+    /// South-east.
     pub const SE: Self = Self::from(-7);
+    /// South.
     pub const S: Self = Self::from(-8);
+    /// South-west.
     pub const SW: Self = Self::from(-9);
+    /// West.
     pub const W: Self = Self::from(-1);
+    /// North-west.
     pub const NW: Self = Self::from(7);
 }
 
 /// Enumerates files.
+///
+/// To avoid casting everywhere, this isn't an enum.
+#[allow(missing_docs)]
 impl File {
     pub const FILE1: Self = Self::from(0);
+    pub const FILE2: Self = Self::from(1);
+    pub const FILE3: Self = Self::from(2);
+    pub const FILE4: Self = Self::from(3);
+    pub const FILE5: Self = Self::from(4);
+    pub const FILE6: Self = Self::from(5);
+    pub const FILE7: Self = Self::from(6);
     pub const FILE8: Self = Self::from(7);
 }
 
 impl Nums {
+    /// The number of files.
     pub const FILES: usize = 8;
-    pub const SIDES: usize = 2;
-    pub const SQUARES: usize = 64;
-    pub const PIECES: usize = 6;
+    /// The number of ranks.
     pub const RANKS: usize = 8;
+    /// The number of squares.
+    pub const SQUARES: usize = 64;
+    /// The number of pieces.
+    pub const PIECES: usize = 6;
+    /// The number of sides.
+    pub const SIDES: usize = 2;
 }
 
 /// Enumerates pieces.
+///
+/// To avoid casting everywhere, this isn't an enum.
+#[allow(missing_docs)]
 impl Piece {
     pub const PAWN: Self = Self::from(0);
     pub const KNIGHT: Self = Self::from(1);
@@ -190,16 +224,24 @@ impl Piece {
 }
 
 /// Enumerates ranks.
+///
+/// To avoid casting everywhere, this isn't an enum.
+#[allow(missing_docs)]
 impl Rank {
     pub const RANK1: Self = Self::from(0);
     pub const RANK2: Self = Self::from(1);
+    pub const RANK3: Self = Self::from(2);
     pub const RANK4: Self = Self::from(3);
     pub const RANK5: Self = Self::from(4);
+    pub const RANK6: Self = Self::from(5);
     pub const RANK7: Self = Self::from(6);
     pub const RANK8: Self = Self::from(7);
 }
 
 /// Enumerates sides.
+///
+/// To avoid casting everywhere, this isn't an enum.
+#[allow(missing_docs)]
 impl Side {
     pub const BLACK: Self = Self::from(0);
     pub const WHITE: Self = Self::from(1);
@@ -207,12 +249,75 @@ impl Side {
 }
 
 /// Enumerates squares. This engine uses little-endian rank-file mapping.
+///
+/// To avoid casting everywhere, this isn't an enum.
+#[allow(missing_docs)]
 impl Square {
+    // fuck me, this seems dumb. Oh well, that's the price for not using an
+    // enum.
     pub const A1: Self = Self::from(0);
+    pub const B1: Self = Self::from(1);
+    pub const C1: Self = Self::from(2);
+    pub const D1: Self = Self::from(3);
     pub const E1: Self = Self::from(4);
+    pub const F1: Self = Self::from(5);
+    pub const G1: Self = Self::from(6);
     pub const H1: Self = Self::from(7);
+    pub const A2: Self = Self::from(8);
+    pub const B2: Self = Self::from(9);
+    pub const C2: Self = Self::from(10);
+    pub const D2: Self = Self::from(11);
+    pub const E2: Self = Self::from(12);
+    pub const F2: Self = Self::from(13);
+    pub const G2: Self = Self::from(14);
+    pub const H2: Self = Self::from(15);
+    pub const A3: Self = Self::from(16);
+    pub const B3: Self = Self::from(17);
+    pub const C3: Self = Self::from(18);
+    pub const D3: Self = Self::from(19);
+    pub const E3: Self = Self::from(20);
+    pub const F3: Self = Self::from(21);
+    pub const G3: Self = Self::from(22);
+    pub const H3: Self = Self::from(23);
+    pub const A4: Self = Self::from(24);
+    pub const B4: Self = Self::from(25);
+    pub const C4: Self = Self::from(26);
+    pub const D4: Self = Self::from(27);
+    pub const E4: Self = Self::from(28);
+    pub const F4: Self = Self::from(29);
+    pub const G4: Self = Self::from(30);
+    pub const H4: Self = Self::from(31);
+    pub const A5: Self = Self::from(32);
+    pub const B5: Self = Self::from(33);
+    pub const C5: Self = Self::from(34);
+    pub const D5: Self = Self::from(35);
+    pub const E5: Self = Self::from(36);
+    pub const F5: Self = Self::from(37);
+    pub const G5: Self = Self::from(38);
+    pub const H5: Self = Self::from(39);
+    pub const A6: Self = Self::from(40);
+    pub const B6: Self = Self::from(41);
+    pub const C6: Self = Self::from(42);
+    pub const D6: Self = Self::from(43);
+    pub const E6: Self = Self::from(44);
+    pub const F6: Self = Self::from(45);
+    pub const G6: Self = Self::from(46);
+    pub const H6: Self = Self::from(47);
+    pub const A7: Self = Self::from(48);
+    pub const B7: Self = Self::from(49);
+    pub const C7: Self = Self::from(50);
+    pub const D7: Self = Self::from(51);
+    pub const E7: Self = Self::from(52);
+    pub const F7: Self = Self::from(53);
+    pub const G7: Self = Self::from(54);
+    pub const H7: Self = Self::from(55);
     pub const A8: Self = Self::from(56);
+    pub const B8: Self = Self::from(57);
+    pub const C8: Self = Self::from(58);
+    pub const D8: Self = Self::from(59);
     pub const E8: Self = Self::from(60);
+    pub const F8: Self = Self::from(61);
+    pub const G8: Self = Self::from(62);
     pub const H8: Self = Self::from(63);
     pub const NONE: Self = Self::from(64);
 }

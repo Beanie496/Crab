@@ -11,6 +11,9 @@ mod search;
 /// Master object that contains all the other major objects.
 #[non_exhaustive]
 pub struct Engine {
+    /// The internal board.
+    ///
+    /// See [`Board`].
     pub board: Board,
 }
 
@@ -126,18 +129,10 @@ impl Engine {
         if let Some(cr) = castling_rights {
             for right in cr.chars() {
                 match right {
-                    'K' => self
-                        .board
-                        .add_castling_right(CastlingRights::CASTLE_FLAGS_K),
-                    'Q' => self
-                        .board
-                        .add_castling_right(CastlingRights::CASTLE_FLAGS_Q),
-                    'k' => self
-                        .board
-                        .add_castling_right(CastlingRights::CASTLE_FLAGS_k),
-                    'q' => self
-                        .board
-                        .add_castling_right(CastlingRights::CASTLE_FLAGS_q),
+                    'K' => self.board.add_castling_right(CastlingRights::K),
+                    'Q' => self.board.add_castling_right(CastlingRights::Q),
+                    'k' => self.board.add_castling_right(CastlingRights::k),
+                    'q' => self.board.add_castling_right(CastlingRights::q),
                     '-' => (),
                     _ => {
                         self.board.set_startpos();
