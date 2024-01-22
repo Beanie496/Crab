@@ -2,6 +2,7 @@ use super::Board;
 use crate::{
     board::CastlingRights,
     defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
+    out_of_bounds_is_unreachable,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
@@ -366,7 +367,7 @@ impl Board {
                 // SAFETY: Instantiating `self` initialises `LOOKUP`.
                 unsafe { LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq) }
             } else {
-                // SAFETY: Instantiating `self` initialises `LOOKUP`.
+                // SAFETY: Same thing.
                 unsafe { LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq) }
             };
             let normal_captures = all_captures & them_bb;
@@ -434,17 +435,20 @@ impl Board {
     fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
         let us = self.side_to_move();
-        let them_bb = self.sides[us.flip().to_index()];
+        let them = us.flip();
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(them.to_index(), self.sides.len()) };
+        let them_bb = self.sides[them.to_index()];
 
         // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
-        // SAFETY: Instantiating `self` initialises `LOOKUP`.
+        // SAFETY: Ditto.
         let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
-        // SAFETY: Instantiating `self` initialises `LOOKUP`.
+        // SAFETY: Ditto.
         let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
-        // SAFETY: Instantiating `self` initialises `LOOKUP`.
+        // SAFETY: Ditto.
         let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
-        // SAFETY: Instantiating `self` initialises `LOOKUP`.
+        // SAFETY: Ditto.
         let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
 
         let pawns = self.piece::<{ Piece::PAWN.to_index() }>();
@@ -471,6 +475,8 @@ impl Board {
 
     /// Calculates the square the king is on.
     fn king_square(&self) -> Square {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
         (self.piece::<{ Piece::KING.to_index() }>() & self.sides[self.side_to_move().to_index()])
             .to_square()
     }
@@ -515,6 +521,8 @@ impl Board {
 
     /// Sets the piece on `square` in the piece array to [`Square::NONE`].
     fn unset_piece(&mut self, square: Square) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
         self.piece_board[square.to_index()] = Piece::NONE;
     }
 }
@@ -539,24 +547,37 @@ impl Lookup {
     /// Finds the bishop attacks from `square` with the given blockers.
     #[inline]
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_magic_table[self.bishop_magics[square.to_index()].get_table_index(blockers)]
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
+        let index = self.bishop_magics[square.to_index()].get_table_index(blockers);
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(index, self.bishop_magic_table.len()) };
+        self.bishop_magic_table[index]
     }
 
     /// Finds the king attacks from `square`.
     #[inline]
-    pub const fn king_attacks(&self, square: Square) -> Bitboard {
+    pub fn king_attacks(&self, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.king_attacks.len()) };
         self.king_attacks[square.to_index()]
     }
 
     /// Finds the knight attacks from `square`.
     #[inline]
-    pub const fn knight_attacks(&self, square: Square) -> Bitboard {
+    pub fn knight_attacks(&self, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.knight_attacks.len()) };
         self.knight_attacks[square.to_index()]
     }
 
     /// Finds the pawn attacks from `square`.
     #[inline]
-    pub const fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
         self.pawn_attacks[side.to_index()][square.to_index()]
     }
 
@@ -569,7 +590,12 @@ impl Lookup {
     /// Finds the rook attacks from `square` with the given blockers.
     #[inline]
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.rook_magic_table[self.rook_magics[square.to_index()].get_table_index(blockers)]
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
+        let index = self.rook_magics[square.to_index()].get_table_index(blockers);
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(index, self.rook_magic_table.len()) };
+        self.rook_magic_table[index]
     }
 
     /// Returns a [`Lookup`] with empty tables.
@@ -868,6 +894,8 @@ impl Moves {
     pub fn pop_move(&mut self) -> Option<Move> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
+            // SAFETY: If it does get reached, it will panic in debug.
+            unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
             self.moves[self.first_empty]
         })
     }
@@ -875,6 +903,8 @@ impl Moves {
     /// Pushes `mv` onto itself. Assumes `self` is not full.
     #[inline]
     pub fn push_move(&mut self, mv: Move) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
         self.moves[self.first_empty] = mv;
         self.first_empty += 1;
     }

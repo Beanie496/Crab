@@ -1,6 +1,9 @@
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 
-use crate::defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square};
+use crate::{
+    defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
+    out_of_bounds_is_unreachable,
+};
 use movegen::Lookup;
 
 pub use movegen::{magic::find_magics, Move, Moves};
@@ -153,7 +156,9 @@ impl Board {
     /// Returns the piece on `square`.
     #[inline]
     #[must_use]
-    pub const fn piece_on(&self, square: Square) -> Piece {
+    pub fn piece_on(&self, square: Square) -> Piece {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
         self.piece_board[square.to_index()]
     }
 
@@ -346,6 +351,8 @@ impl Board {
 
     /// Sets the piece on `square` in the piece array to `piece`.
     fn set_piece(&mut self, square: Square, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
         self.piece_board[square.to_index()] = piece;
     }
 
@@ -360,11 +367,15 @@ impl Board {
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
     fn toggle_piece_bb(&mut self, piece: Piece, bb: Bitboard) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.pieces.len()) };
         self.pieces[piece.to_index()] ^= bb;
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
         self.sides[side.to_index()] ^= bb;
     }
 }
