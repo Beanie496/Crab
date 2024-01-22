@@ -1,6 +1,7 @@
 use crate::{
+    bitboard::Bitboard,
     board::movegen::magic::MAX_BLOCKERS,
-    defs::{Bitboard, Direction, File, Piece, Rank, Square},
+    defs::{Direction, File, Piece, Rank, Square},
 };
 
 /// Generates all combinations of attacks from `square` and puts them in

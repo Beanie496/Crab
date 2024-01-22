@@ -1,7 +1,8 @@
 use super::Board;
 use crate::{
+    bitboard::Bitboard,
     board::CastlingRights,
-    defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
+    defs::{piece_to_char, File, Nums, Piece, Rank, Side, Square},
     out_of_bounds_is_unreachable,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};

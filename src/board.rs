@@ -1,7 +1,8 @@
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
 
 use crate::{
-    defs::{piece_to_char, Bitboard, File, Nums, Piece, Rank, Side, Square},
+    bitboard::Bitboard,
+    defs::{piece_to_char, File, Nums, Piece, Rank, Side, Square},
     out_of_bounds_is_unreachable,
 };
 use movegen::Lookup;

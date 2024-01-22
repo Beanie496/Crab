@@ -3,6 +3,8 @@
 
 /// For unit testing.
 mod bench;
+/// A container for [`Bitboard`](bitboard::Bitboard).
+pub mod bitboard;
 /// Items related to the board. Mainly [`Board`](board::Board).
 pub mod board;
 /// Definitions and enumerations.

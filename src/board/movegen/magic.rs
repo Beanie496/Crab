@@ -3,7 +3,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use oorandom::Rand64;
 
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
-use crate::defs::{Bitboard, File, Nums, Piece, Rank, Square};
+use crate::{
+    bitboard::Bitboard,
+    defs::{File, Nums, Piece, Rank, Square},
+};
 
 /// Stores magic information for a square:
 #[derive(Clone, Copy)]
