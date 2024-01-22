@@ -1,8 +1,13 @@
 #![cfg(test)]
 
-use lazy_static::lazy_static;
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    thread::{self, available_parallelism},
+};
 
 use crate::engine::Engine;
+
+use lazy_static::lazy_static;
 
 #[derive(Clone, Copy)]
 struct TestPosition<'a> {
@@ -80,8 +85,37 @@ impl TestPosition<'_> {
 
 #[test]
 fn test_positions() {
-    let mut engine = Engine::new();
+    let engine = Engine::new();
+    let (tx, rx) = mpsc::channel();
+    let rx = Arc::new(Mutex::new(rx));
+    let mut handles = Vec::new();
+
+    // add all test positions to the queue
     for position in TEST_POSITIONS.iter() {
-        position.run_test(&mut engine);
+        tx.send(position).unwrap();
+    }
+
+    // create as many threads as is optimal. If no threads available, the test
+    // positions won't be able to be run, so panic.
+    for _ in 0..available_parallelism().unwrap().get() {
+        // I'm manually doing `.clone()` because deriving `Copy` for `Engine`
+        // (and by extension `Board`) results in a noticeable slowdown in
+        // `perft`, for some goddamn reason.
+        let mut engine = engine.clone();
+        let rx = Arc::clone(&rx);
+        // Spawn a thread that dequeues and runs the test positions from the
+        // receiver until there are no positions left
+        handles.push(thread::spawn(move || loop {
+            let test_pos = rx.lock().unwrap().try_recv();
+            if let Ok(test_pos) = test_pos {
+                test_pos.run_test(&mut engine)
+            } else {
+                return;
+            }
+        }));
+    }
+
+    for handle in handles {
+        let _ = handle.join();
     }
 }

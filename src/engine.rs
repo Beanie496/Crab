@@ -10,6 +10,7 @@ mod search;
 
 /// Master object that contains all the other major objects.
 #[non_exhaustive]
+#[derive(Clone)]
 pub struct Engine {
     /// The internal board.
     ///
