@@ -159,7 +159,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             "perft" => {
                 if let Some(depth) = line.next() {
                     match depth.parse::<u8>() {
-                        Ok(result) => _ = engine.perft::<true>(result),
+                        Ok(result) => _ = engine.perft::<true, true>(result),
                         Err(result) => println!("{result}; must give 0-255"),
                     }
                 }

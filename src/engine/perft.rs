@@ -9,10 +9,10 @@ impl Engine {
     ///
     /// If `IS_TIMED`, it will also output the time taken and the average NPS.
     #[inline]
-    pub fn perft<const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
+    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&mut self, depth: u8) -> u64 {
         if IS_TIMED {
             let time = Instant::now();
-            let result = self.perft::<false>(depth);
+            let result = self.perft::<SHOULD_PRINT, false>(depth);
             let elapsed_us = time.elapsed().as_micros() as u64;
             println!(
                 "Time taken: {} ms; NPS: {}",
@@ -22,10 +22,12 @@ impl Engine {
             return result;
         }
 
-        println!("Result:");
-        if depth == 0 {
-            println!("1");
-            return 1;
+        if SHOULD_PRINT {
+            println!("Result:");
+            if depth == 0 {
+                println!("1");
+                return 1;
+            }
         }
 
         let mut moves = Moves::new();
@@ -41,9 +43,13 @@ impl Engine {
                 Self::perft_inner(depth - 1, &copy)
             };
             total += moves;
-            println!("{}: {moves}", mv.stringify());
+            if SHOULD_PRINT {
+                println!("{}: {moves}", mv.stringify());
+            }
         }
-        println!("Total: {total}");
+        if SHOULD_PRINT {
+            println!("Total: {total}");
+        }
         total
     }
 
