@@ -10,6 +10,7 @@ The order for each file should be as shown:
 - `extern`s
 - `use`s
 - `mod`s
+- Macros
 - Types
 - Enums/unions/structs in that order, unless needed otherwise
 - Consts/statics

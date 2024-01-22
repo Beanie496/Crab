@@ -4,6 +4,29 @@
 
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl};
 
+/// Tells the compiler that `index` cannot match or exceed `bound`.
+///
+/// # Panics
+///
+/// Will panic _in debug mode_ if `index >= bound`.
+///
+/// If `index >= bound` in release mode, it is undefined behaviour. Be careful
+/// with this macro!
+#[macro_export]
+macro_rules! out_of_bounds_is_unreachable {
+    ($index: expr, $bound: expr) => {{
+        if $index >= $bound {
+            #[cfg(debug_assertions)]
+            panic!(
+                "Unreachable code reached: index {} out of bound {}",
+                $index, $bound
+            );
+            #[allow(unreachable_code)]
+            std::hint::unreachable_unchecked()
+        }
+    }};
+}
+
 // the idea for wrapping these types in structs and implementing a tonne of
 // methods/associated functions is taken from viridithas, so thanks cosmo
 /// A wrapper for a `u64`, since a bitboard is 64 bits.
@@ -684,29 +707,6 @@ impl Square {
     pub const fn to_index(self) -> usize {
         self.inner() as usize
     }
-}
-
-/// Tells the compiler that `index` cannot match or exceed `bound`.
-///
-/// # Panics
-///
-/// Will panic _in debug mode_ if `index >= bound`.
-///
-/// If `index >= bound` in release mode, it is undefined behaviour. Be careful
-/// with this macro!
-#[macro_export]
-macro_rules! out_of_bounds_is_unreachable {
-    ($index: expr, $bound: expr) => {{
-        if $index >= $bound {
-            #[cfg(debug_assertions)]
-            panic!(
-                "Unreachable code reached: index {} out of bound {}",
-                $index, $bound
-            );
-            #[allow(unreachable_code)]
-            std::hint::unreachable_unchecked()
-        }
-    }};
 }
 
 /// Converts the piece `piece` on side `side` to a character.
