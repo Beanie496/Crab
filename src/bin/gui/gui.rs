@@ -4,6 +4,7 @@ use backend::{
     defs::{Nums, Piece, Side, Square},
     engine::Engine,
 };
+use clipboard::{ClipboardContext, ClipboardProvider};
 use eframe::{
     egui::{load::Bytes, Color32, Context},
     CreationContext,
@@ -133,6 +134,17 @@ impl Gui {
     fn set_position_to_entered_fen(&mut self) {
         self.engine.set_position(&self.state.entered_fen_string, "");
         self.regenerate_mailboxes();
+    }
+
+    /// Copies the current FEN representation of the board to the system
+    /// clipboard.
+    fn copy_fen_to_clipboard(&self) {
+        match ClipboardContext::new() {
+            Ok(mut clipboard) => clipboard
+                .set_contents(self.engine.current_fen_string())
+                .unwrap_or_else(|error| println!("{error}")),
+            Err(error) => println!("{error}"),
+        };
     }
 
     /// Stops `self` from responding to input.

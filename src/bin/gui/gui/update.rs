@@ -132,10 +132,13 @@ impl Gui {
                     Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 130.0)),
                     Pos2::new(points_to_pixels(ctx, 640.0), points_to_pixels(ctx, 200.0)),
                 ),
-                Layout::left_to_right(Align::Center)
+                Layout::left_to_right(Align::Center),
             );
 
-            if child.text_edit_singleline(self.entered_fen_string_mut()).lost_focus() {
+            if child
+                .text_edit_singleline(self.entered_fen_string_mut())
+                .lost_focus()
+            {
                 self.set_position_to_entered_fen();
                 self.stop_importing_fen();
             }
@@ -194,7 +197,9 @@ impl Gui {
         if child.add(import_fen).clicked() {
             self.start_importing_fen();
         }
-        child.add(copy_fen);
+        if child.add(copy_fen).clicked() {
+            self.copy_fen_to_clipboard();
+        };
     }
 
     /// Draws the labels on the board [`SidePanel`].

@@ -37,6 +37,13 @@ impl Engine {
         self.play_moves(moves);
     }
 
+    /// Gets the current FEN representation of the board state.
+    #[inline]
+    #[must_use]
+    pub fn current_fen_string(&self) -> String {
+        todo!()
+    }
+
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
     #[allow(clippy::unused_self)]
