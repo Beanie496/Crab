@@ -1,3 +1,5 @@
+use update::FrameState;
+
 use backend::{
     defs::{Nums, Piece, Side, Square},
     engine::Engine,
@@ -33,10 +35,8 @@ pub struct Gui {
     side_mailbox: [Side; Nums::SQUARES],
     /// The internal engine, used for calculating legal moves and searching.
     engine: Engine,
-    /// Which square is selected, if any.
-    selected_square: Option<Square>,
-    /// Set to `true` when `Stop` is clicked.
-    has_stopped: bool,
+    /// See documentation for [`FrameState`].
+    state: FrameState,
 }
 
 /// The 4 colors that each square can take.
@@ -80,30 +80,64 @@ impl Gui {
             piece_mailbox: engine.board.clone_piece_board(),
             side_mailbox,
             engine,
-            selected_square: None,
-            has_stopped: false,
+            state: FrameState::default(),
         }
     }
 
     /// Returns the selected square of `self`.
     const fn selected_square(&self) -> Option<Square> {
-        self.selected_square
+        self.state.selected_square
     }
 
     /// Sets the selected square of `self`.
     fn set_selected_square(&mut self, square: Option<Square>) {
-        self.selected_square = square;
+        self.state.selected_square = square;
     }
 
     /// Checks if `self` has stopped running (i.e. the `Stop` button has been
     /// clicked).
     const fn has_stopped(&self) -> bool {
-        self.has_stopped
+        self.state.has_stopped
+    }
+
+    /// Checks if we're in the process of importing a FEN.
+    const fn is_importing_fen(&self) -> bool {
+        self.state.is_importing_fen
+    }
+
+    /// Returns a mutable reference to the buffer used to store the FEN string
+    /// entered by the user.
+    fn entered_fen_string_mut(&mut self) -> &mut String {
+        &mut self.state.entered_fen_string
+    }
+
+    /// Clears the string buffer for the entered FEN string.
+    fn clear_entered_fen(&mut self) {
+        self.state.entered_fen_string.clear();
+    }
+
+    /// Stop importing a FEN string (i.e.) show the buttons again and clear the
+    /// string buffer.
+    fn stop_importing_fen(&mut self) {
+        self.state.is_importing_fen = false;
+        self.clear_entered_fen();
+    }
+
+    /// Start importing a FEN string (i.e. hide the buttons and show a text
+    /// field).
+    fn start_importing_fen(&mut self) {
+        self.state.is_importing_fen = true;
+    }
+
+    /// Sets the board position to the string that the user entered.
+    fn set_position_to_entered_fen(&mut self) {
+        self.engine.set_position(&self.state.entered_fen_string, "");
+        self.regenerate_mailboxes();
     }
 
     /// Stops `self` from responding to input.
     fn stop(&mut self) {
-        self.has_stopped = true;
+        self.state.has_stopped = true;
     }
 
     /// Resets the state of `self`.
@@ -113,7 +147,7 @@ impl Gui {
     fn restart(&mut self) {
         self.engine.board.set_startpos();
         self.set_selected_square(None);
-        self.has_stopped = false;
+        self.state.has_stopped = false;
         self.regenerate_mailboxes();
     }
 }

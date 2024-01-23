@@ -10,6 +10,20 @@ use eframe::{
     App,
 };
 
+/// Information about the current frame that the next frame needs to know.
+#[derive(Default)]
+pub struct FrameState {
+    /// Whether or not the user is entering a FEN string.
+    pub is_importing_fen: bool,
+    /// The FEN string that the user is entering. Not defined if
+    /// `is_importing_fen` is false.
+    pub entered_fen_string: String,
+    /// Set to `true` when `Stop` is clicked.
+    pub has_stopped: bool,
+    /// Which square is selected, if any.
+    pub selected_square: Option<Square>,
+}
+
 impl App for Gui {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         // board width with 40 px margin
@@ -111,9 +125,26 @@ impl Gui {
     // I'm using `self` in a few commits' time, hence the lint allow
     #[allow(clippy::unused_self)]
     fn update_buttons(&mut self, ctx: &Context, ui: &mut Ui) {
+        if self.is_importing_fen() {
+            let mut child = ui.child_ui(
+                // this is the region that the two bottom buttons cover
+                Rect::from_min_max(
+                    Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 130.0)),
+                    Pos2::new(points_to_pixels(ctx, 640.0), points_to_pixels(ctx, 200.0)),
+                ),
+                Layout::left_to_right(Align::Center)
+            );
+
+            if child.text_edit_singleline(self.entered_fen_string_mut()).lost_focus() {
+                self.set_position_to_entered_fen();
+                self.stop_importing_fen();
+            }
+            return;
+        }
+
         // I need child UI's to lay out the buttons exactly where I want them
         let mut child = ui.child_ui(
-            Rect {
+            Rect::from_min_max(
                 // this is REALLY fucked. The width of the child UI is the width of
                 // two buttons, plus the spacing between. Ok. The HEIGHT is the
                 // height of ONE button so `Align::Center` causes the button to
@@ -121,18 +152,19 @@ impl Gui {
                 // nice 2x2 grid. Why am I doing this? So the text is in the centre
                 // of the buttons. Because aligning the text within the buttons is
                 // not a feature for SOME GOD DAMN REASON.
-                min: Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
+                Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
                 // buttons won't lay out correctly because of floating-point
                 // imprecision so I have to do this
                 // oh, and any value smaller than or equal to 0.00003 will
                 // break. That includes `f32::EPSILON`.
-                max: Pos2::new(
+                Pos2::new(
                     points_to_pixels(ctx, 640.0 + 0.00004),
                     points_to_pixels(ctx, 110.0),
                 ),
-            },
+            ),
             Layout::left_to_right(Align::Center).with_main_wrap(true),
         );
+
         child.spacing_mut().item_spacing =
             Vec2::new(points_to_pixels(ctx, 20.0), points_to_pixels(ctx, 20.0));
 
@@ -159,7 +191,9 @@ impl Gui {
         if child.add(restart).clicked() {
             self.restart();
         }
-        child.add(import_fen);
+        if child.add(import_fen).clicked() {
+            self.start_importing_fen();
+        }
         child.add(copy_fen);
     }
 
