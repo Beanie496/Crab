@@ -55,8 +55,10 @@ impl Engine {
         ret_str.push_str(&self.board.stringify_ep_square());
         ret_str.push(' ');
 
-        // halfmoves and fullmoves are not implemented yet
-        ret_str.push_str("0 1");
+        ret_str.push_str(&self.board.halfmoves().to_string());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.board.fullmoves().to_string());
 
         ret_str
     }
@@ -182,7 +184,7 @@ impl Engine {
 
         // 5. halfmoves
         self.board.set_halfmoves(if let Some(hm) = halfmoves {
-            if let Ok(hm) = hm.parse::<u32>() {
+            if let Ok(hm) = hm.parse::<u8>() {
                 hm
             } else {
                 self.board.set_startpos();
@@ -194,7 +196,7 @@ impl Engine {
 
         // 6. fullmoves
         self.board.set_fullmoves(if let Some(fm) = fullmoves {
-            if let Ok(fm) = fm.parse::<u32>() {
+            if let Ok(fm) = fm.parse::<u16>() {
                 fm
             } else {
                 return println!("Error: Invalid number (\"fm\") given for fullmove counter");

@@ -43,6 +43,11 @@ pub struct Board {
     /// The current en passant square. Is [`Square::NONE`] if there is no ep
     /// square.
     ep_square: Square,
+    /// The number of halfmoves since the last capture or pawn move.
+    halfmoves: u8,
+    /// Which move number the current move is. Starts at 1 and is incremented
+    /// when Black moves.
+    fullmoves: u16,
 }
 
 impl BitAnd for CastlingRights {
@@ -117,6 +122,8 @@ impl Board {
             side_to_move: Self::default_side_to_move(),
             castling_rights: CastlingRights::new(),
             ep_square: Self::default_ep_square(),
+            halfmoves: 0,
+            fullmoves: 1,
         }
     }
 
@@ -281,6 +288,8 @@ impl Board {
         self.side_to_move = Self::default_side_to_move();
         self.castling_rights = CastlingRights::new();
         self.ep_square = Self::default_ep_square();
+        self.halfmoves = 0;
+        self.fullmoves = 1;
     }
 
     /// Returns the piece on `square`.
@@ -445,16 +454,30 @@ impl Board {
         }
     }
 
-    /// Sets fullmoves. Currently does nothing.
+    /// Returns halfmoves since last capture or pawn move.
     #[inline]
-    pub fn set_fullmoves(&mut self, _count: u32) {
-        /* unused */
+    #[must_use]
+    pub const fn halfmoves(&self) -> u8 {
+        self.halfmoves
     }
 
     /// Sets halfmoves. Currently does nothing.
     #[inline]
-    pub fn set_halfmoves(&mut self, _count: u32) {
-        /* unused */
+    pub fn set_halfmoves(&mut self, count: u8) {
+        self.halfmoves = count;
+    }
+
+    /// Returns the current move number.
+    #[inline]
+    #[must_use]
+    pub const fn fullmoves(&self) -> u16 {
+        self.fullmoves
+    }
+
+    /// Sets fullmoves. Currently does nothing.
+    #[inline]
+    pub fn set_fullmoves(&mut self, count: u16) {
+        self.fullmoves = count;
     }
 
     /// Finds the piece on the given rank and file and converts it to its

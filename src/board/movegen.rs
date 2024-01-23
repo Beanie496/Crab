@@ -305,6 +305,19 @@ impl Board {
         let start_bb = Bitboard::from_square(start);
         let end_bb = Bitboard::from_square(end);
 
+        self.halfmoves += 1;
+        if us == Side::BLACK {
+            self.fullmoves += 1;
+        }
+
+        if piece == Piece::PAWN || captured != Piece::NONE {
+            self.halfmoves = 0;
+        // 75-move rule: if 75 moves have been made by both players, the game
+        // is adjucated as a draw. So the 151st move is illegal.
+        } else if self.halfmoves > 150 {
+            return false;
+        }
+
         self.move_piece(start, end, us, piece);
         self.clear_ep_square();
 
