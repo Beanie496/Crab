@@ -144,21 +144,8 @@ impl Board {
     }
 
     /// Returns an empty [`Piece`] board.
-    #[rustfmt::skip]
     const fn empty_piece_board() -> [Piece; Nums::SQUARES] {
-        // technically [Piece::NONE; 64] would be the same but this is more
-        // clear
-        let e = Piece::NONE;
-        [
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-        ]
+        [Piece::NONE; Nums::SQUARES]
     }
 
     /// Returns the piece [`Bitboard`]s of the starting position.
@@ -175,14 +162,7 @@ impl Board {
 
     /// Returns the piece [`Bitboard`]s of an empty board.
     const fn no_pieces() -> [Bitboard; Nums::PIECES] {
-        [
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-        ]
+        [Bitboard::EMPTY; Nums::PIECES]
     }
 
     /// Returns the side [`Bitboard`]s of the starting position.
@@ -195,10 +175,7 @@ impl Board {
 
     /// Returns the side [`Bitboard`]s of an empty board.
     const fn no_sides() -> [Bitboard; Nums::SIDES] {
-        [
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-        ]
+        [Bitboard::EMPTY; Nums::SIDES]
     }
 
     /// Returns the side to move from the starting position. Unless chess 1.1
