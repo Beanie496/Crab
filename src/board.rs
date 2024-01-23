@@ -114,7 +114,7 @@ impl Board {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
-            side_to_move: Self::default_side(),
+            side_to_move: Self::default_side_to_move(),
             castling_rights: CastlingRights::new(),
             ep_square: Self::default_ep_square(),
         }
@@ -180,7 +180,7 @@ impl Board {
 
     /// Returns the side to move from the starting position. Unless chess 1.1
     /// has been released, this will be [`Side::WHITE`].
-    const fn default_side() -> Side {
+    const fn default_side_to_move() -> Side {
         Side::WHITE
     }
 
@@ -278,9 +278,9 @@ impl Board {
         self.piece_board = Self::default_piece_board();
         self.pieces = Self::default_pieces();
         self.sides = Self::default_sides();
+        self.side_to_move = Self::default_side_to_move();
         self.castling_rights = CastlingRights::new();
         self.ep_square = Self::default_ep_square();
-        self.side_to_move = Self::default_side();
     }
 
     /// Returns the piece on `square`.
@@ -342,7 +342,7 @@ impl Board {
     /// Sets side to move to the default side.
     #[inline]
     pub fn set_default_side_to_move(&mut self) {
-        self.side_to_move = Self::default_side();
+        self.side_to_move = Self::default_side_to_move();
     }
 
     /// Sets side to move to `side`.
