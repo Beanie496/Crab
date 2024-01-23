@@ -21,6 +21,15 @@ pub struct CastlingRights {
 /// Items related to move generation.
 mod movegen;
 
+/// Calls the method `set_startpos()` on `board`, prints `msg` using
+/// `println!()`, then returns.
+macro_rules! reset_board_print_return {
+    ($board:expr, $msg:expr) => {{
+        $board.set_startpos();
+        return println!($msg);
+    }};
+}
+
 /// The board. It contains information about the current board state and can
 /// generate pseudo-legal moves. It is small (131 bytes) so it uses copy-make.
 #[derive(Clone)]
@@ -272,8 +281,7 @@ impl Board {
 
         let mut iter = position.split(' ');
         let Some(board) = iter.next() else {
-            self.set_startpos();
-            return println!("Need to pass a board");
+            reset_board_print_return!(self, "Error: need to pass a board");
         };
         let side_to_move = iter.next();
         let castling_rights = iter.next();
@@ -302,8 +310,7 @@ impl Board {
                 } else {
                     let piece_num = Piece::from_char(piece.to_ascii_lowercase());
                     let Some(piece_num) = piece_num else {
-                        self.set_startpos();
-                        return println!("Error: \"{piece}\" is not a valid piece.");
+                        reset_board_print_return!(self, "Error: \"{piece}\" is not a valid piece.");
                     };
                     // 1 if White, 0 if Black
                     let side = Side::from(u8::from(piece.is_ascii_uppercase()));
@@ -319,16 +326,14 @@ impl Board {
             }
             // if there are too few/many files in that rank, reset and return
             if file_idx != 8 {
-                self.set_startpos();
-                return println!("Error: FEN is invalid");
+                reset_board_print_return!(self, "Error: FEN is invalid");
             }
 
             file_idx = 0;
         }
         // if there are too many/few ranks in the board, reset and return
         if rank_idx != 0 {
-            self.set_startpos();
-            return println!("Error: FEN is invalid (incorrect number of ranks)");
+            reset_board_print_return!(self, "Error: FEN is invalid (incorrect number of ranks)");
         }
 
         // 2. side to move
@@ -338,8 +343,10 @@ impl Board {
             } else if stm == "b" {
                 self.set_side_to_move(Side::BLACK);
             } else {
-                self.set_startpos();
-                return println!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
+                reset_board_print_return!(
+                    self,
+                    "Error: Side to move \"{stm}\" is not \"w\" or \"b\""
+                );
             }
         } else {
             // I've decided that everything apart from the board can be omitted
@@ -358,8 +365,10 @@ impl Board {
                     'q' => self.add_castling_right(CastlingRights::q),
                     '-' => (),
                     _ => {
-                        self.set_startpos();
-                        return println!("Error: castling right \"{right}\" is not valid");
+                        reset_board_print_return!(
+                            self,
+                            "Error: castling right \"{right}\" is not valid"
+                        );
                     }
                 }
             }
@@ -375,8 +384,10 @@ impl Board {
             } else if let Some(square) = Square::from_string(ep) {
                 square
             } else {
-                self.set_startpos();
-                return println!("Error: En passant square \"{ep}\" is not a valid square");
+                reset_board_print_return!(
+                    self,
+                    "Error: En passant square \"{ep}\" is not a valid square"
+                );
             }
         } else {
             Square::NONE
@@ -387,8 +398,10 @@ impl Board {
             if let Ok(hm) = hm.parse::<u8>() {
                 hm
             } else {
-                self.set_startpos();
-                return println!("Error: Invalid number (\"hm\") given for halfmove counter");
+                reset_board_print_return!(
+                    self,
+                    "Error: Invalid number (\"hm\") given for halfmove counter"
+                );
             }
         } else {
             0
@@ -399,7 +412,10 @@ impl Board {
             if let Ok(fm) = fm.parse::<u16>() {
                 fm
             } else {
-                return println!("Error: Invalid number (\"fm\") given for fullmove counter");
+                reset_board_print_return!(
+                    self,
+                    "Error: Invalid number (\"fm\") given for fullmove counter"
+                );
             }
         } else {
             0
