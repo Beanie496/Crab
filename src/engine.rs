@@ -41,7 +41,24 @@ impl Engine {
     #[inline]
     #[must_use]
     pub fn current_fen_string(&self) -> String {
-        todo!()
+        let mut ret_str = String::new();
+
+        ret_str.push_str(&self.board.stringify_board());
+        ret_str.push(' ');
+
+        ret_str.push(self.board.side_to_move_as_char());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.board.stringify_castling_rights());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.board.stringify_ep_square());
+        ret_str.push(' ');
+
+        // halfmoves and fullmoves are not implemented yet
+        ret_str.push_str("0 1");
+
+        ret_str
     }
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and

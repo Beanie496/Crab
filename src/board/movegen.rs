@@ -260,31 +260,6 @@ impl Board {
         true
     }
 
-    /// Calculates if the given side can castle kingside.
-    fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_kingside::<IS_WHITE>()
-    }
-
-    /// Calculates if the given side can castle queenside.
-    fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_queenside::<IS_WHITE>()
-    }
-
-    /// Sets the en passant square to [`Square::NONE`].
-    fn clear_ep_square(&mut self) {
-        self.ep_square = Square::NONE;
-    }
-
-    /// Returns the en passant square, which might be [`Square::NONE`].
-    const fn ep_square(&self) -> Square {
-        self.ep_square
-    }
-
-    /// Flip the side to move.
-    fn flip_side(&mut self) {
-        self.side_to_move = self.side_to_move.flip();
-    }
-
     /// Generates the castling moves for the given side.
     fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let occupancies = self.occupancies();
@@ -503,28 +478,6 @@ impl Board {
     /// Returns the piece bitboard given by `piece`.
     const fn piece<const PIECE: usize>(&self) -> Bitboard {
         self.pieces[PIECE]
-    }
-
-    /// Returns the side to move.
-    const fn side_to_move(&self) -> Side {
-        self.side_to_move
-    }
-
-    /// Unsets right `right` for side `side`.
-    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
-        self.castling_rights.remove_right(side, right);
-    }
-
-    /// Clears the castling rights for `side`.
-    fn unset_castling_rights(&mut self, side: Side) {
-        self.castling_rights.clear_side(side);
-    }
-
-    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
-    fn unset_piece(&mut self, square: Square) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()] = Piece::NONE;
     }
 }
 

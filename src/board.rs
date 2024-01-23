@@ -120,10 +120,134 @@ impl Board {
         }
     }
 
+    /// Pretty-prints the current state of the board.
+    #[inline]
+    pub fn pretty_print(&self) {
+        for r in (0..Nums::RANKS as u8).rev() {
+            print!("{} | ", r + 1);
+            for f in 0..Nums::FILES as u8 {
+                print!(
+                    "{} ",
+                    self.char_piece_from_pos(Rank::from(r), File::from(f))
+                );
+            }
+            println!();
+        }
+        println!("    ---------------");
+        println!("    a b c d e f g h");
+    }
+
+    /// Converts the current board to a string.
+    ///
+    /// e.g. the starting position would be
+    /// "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".
+    // the unwraps are called on values that logically can not be `None`, so
+    // this can not panic
+    #[allow(clippy::missing_panics_doc)]
+    #[inline]
+    #[must_use]
+    pub fn stringify_board(&self) -> String {
+        let mut ret_str = String::new();
+        let mut empty_squares = 0;
+        // I can't just iterate over the piece board normally: the board goes
+        // from a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
+        // rank-file
+        for rank in (0..Nums::RANKS).rev() {
+            for file in 0..Nums::FILES {
+                let square = Square::from_pos(Rank::from(rank as u8), File::from(file as u8));
+                let piece = self.piece_on(square);
+
+                if piece == Piece::NONE {
+                    empty_squares += 1;
+                } else {
+                    if empty_squares != 0 {
+                        // `empty_squares` logically can not be greater than 8,
+                        // so it's impossible for this to panic
+                        #[allow(clippy::unwrap_used)]
+                        ret_str.push(char::from_digit(empty_squares, 10).unwrap());
+                        empty_squares = 0;
+                    }
+                    let side = self.side_of(square);
+                    ret_str.push(piece_to_char(side, piece));
+                }
+            }
+            if empty_squares != 0 {
+                // same reason as before - this can not panic
+                #[allow(clippy::unwrap_used)]
+                ret_str.push(char::from_digit(empty_squares, 10).unwrap());
+                empty_squares = 0;
+            }
+            ret_str.push('/');
+        }
+        // remove the trailing slash
+        ret_str.pop();
+
+        ret_str
+    }
+
+    /// Calculates if the given side can castle kingside.
+    #[inline]
+    #[must_use]
+    pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_kingside::<IS_WHITE>()
+    }
+
+    /// Calculates if the given side can castle queenside.
+    #[inline]
+    #[must_use]
+    pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_queenside::<IS_WHITE>()
+    }
+
     /// Adds the given right to the castling rights.
     #[inline]
     pub fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
+    }
+
+    /// Unsets right `right` for side `side`.
+    #[inline]
+    pub fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
+        self.castling_rights.remove_right(side, right);
+    }
+
+    /// Clears the castling rights for `side`.
+    #[inline]
+    pub fn unset_castling_rights(&mut self, side: Side) {
+        self.castling_rights.clear_side(side);
+    }
+
+    /// Sets the default castling rights.
+    #[inline]
+    pub fn set_default_castling_rights(&mut self) {
+        self.castling_rights.set_to_default();
+    }
+
+    /// Converts the current castling rights into their string representation.
+    ///
+    /// E.g. `KQq` if the White king can castle both ways and the Black king
+    /// can only castle queenside.
+    #[inline]
+    #[must_use]
+    pub fn stringify_castling_rights(&self) -> String {
+        self.castling_rights.stringify()
+    }
+
+    /// Returns the piece on `square`.
+    #[inline]
+    #[must_use]
+    pub fn piece_on(&self, square: Square) -> Piece {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
+        self.piece_board[square.to_index()]
+    }
+
+    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
+    #[inline]
+    pub fn unset_piece(&mut self, square: Square) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
+        self.piece_board[square.to_index()] = Piece::NONE;
     }
 
     /// Adds a piece to square `square` for side `side`. Assumes there is no
@@ -154,36 +278,10 @@ impl Board {
         self.piece_board
     }
 
-    /// Returns the piece on `square`.
+    /// Sets the en passant square to [`Square::NONE`].
     #[inline]
-    #[must_use]
-    pub fn piece_on(&self, square: Square) -> Piece {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()]
-    }
-
-    /// Pretty-prints the current state of the board.
-    #[inline]
-    pub fn pretty_print(&self) {
-        for r in (0..Nums::RANKS as u8).rev() {
-            print!("{} | ", r + 1);
-            for f in 0..Nums::FILES as u8 {
-                print!(
-                    "{} ",
-                    self.char_piece_from_pos(Rank::from(r), File::from(f))
-                );
-            }
-            println!();
-        }
-        println!("    ---------------");
-        println!("    a b c d e f g h");
-    }
-
-    /// Sets the default castling rights.
-    #[inline]
-    pub fn set_default_castling_rights(&mut self) {
-        self.castling_rights.set_to_default();
+    pub fn clear_ep_square(&mut self) {
+        self.ep_square = Square::NONE;
     }
 
     /// Sets the en passant square to `square`.
@@ -192,10 +290,44 @@ impl Board {
         self.ep_square = square;
     }
 
+    /// Returns the string representation of the current en passant square: the
+    /// square if there is one (e.g. "b3") or "-" if there is none.
+    #[inline]
+    #[must_use]
+    pub fn stringify_ep_square(&self) -> String {
+        let ep_square = self.ep_square();
+        if ep_square == Square::NONE {
+            "-".to_string()
+        } else {
+            ep_square.stringify()
+        }
+    }
+
+    /// Returns the side to move.
+    #[inline]
+    #[must_use]
+    pub const fn side_to_move(&self) -> Side {
+        self.side_to_move
+    }
+
     /// Sets side to move to the default side.
     #[inline]
     pub fn set_default_side_to_move(&mut self) {
         self.side_to_move = Self::default_side();
+    }
+
+    /// Returns the string representation of the current side to move: 'w' if
+    /// White and 'b' if Black.
+    #[inline]
+    #[must_use]
+    pub const fn side_to_move_as_char(&self) -> char {
+        (b'b' + self.side_to_move().inner() * 21) as char
+    }
+
+    /// Flip the side to move.
+    #[inline]
+    pub fn flip_side(&mut self) {
+        self.side_to_move = self.side_to_move.flip();
     }
 
     /// Sets fullmoves. Currently does nothing.
@@ -239,6 +371,13 @@ impl Board {
         } else {
             Side::NONE
         }
+    }
+
+    /// Returns the en passant square, which might be [`Square::NONE`].
+    #[inline]
+    #[must_use]
+    pub const fn ep_square(&self) -> Square {
+        self.ep_square
     }
 
     /// Returns the default en passant square.
@@ -337,7 +476,9 @@ impl Board {
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
-    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
+    #[inline]
+    #[must_use]
+    pub fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let sq_bb = Bitboard::from_pos(rank, file);
         let piece = self.piece_on(Square::from_pos(rank, file));
         if piece == Piece::NONE {
@@ -351,7 +492,8 @@ impl Board {
     }
 
     /// Sets the piece on `square` in the piece array to `piece`.
-    fn set_piece(&mut self, square: Square, piece: Piece) {
+    #[inline]
+    pub fn set_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
         self.piece_board[square.to_index()] = piece;
@@ -450,5 +592,23 @@ impl CastlingRights {
     /// Sets the rights of `self` to default.
     fn set_to_default(&mut self) {
         *self = Self::new();
+    }
+
+    /// Converts `self` to its string representation.
+    fn stringify(self) -> String {
+        let mut ret_str = String::new();
+        if self.can_castle_kingside::<true>() {
+            ret_str.push('K');
+        }
+        if self.can_castle_queenside::<true>() {
+            ret_str.push('Q');
+        }
+        if self.can_castle_kingside::<false>() {
+            ret_str.push('k');
+        }
+        if self.can_castle_queenside::<false>() {
+            ret_str.push('q');
+        }
+        ret_str
     }
 }

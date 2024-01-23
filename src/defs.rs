@@ -461,6 +461,11 @@ impl Square {
 ///
 /// e.g. `Side::WHITE, Piece::KNIGHT -> 'N'`;
 /// `Side::BLACK, Piece::KING -> 'k'`.
+///
+/// # Panics
+///
+/// Panics if `piece` isn't a piece or `side` isn't [`White`](Side::WHITE) or
+/// [`Black`](Side::BLACK).
 #[inline]
 #[must_use]
 pub const fn piece_to_char(side: Side, piece: Piece) -> char {
