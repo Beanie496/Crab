@@ -108,6 +108,22 @@ impl CastlingRights {
     pub const NONE: Self = Self::from(0b0000);
 }
 
+impl Default for Board {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            piece_board: Self::default_piece_board(),
+            pieces: Self::default_pieces(),
+            sides: Self::default_sides(),
+            side_to_move: Side::WHITE,
+            castling_rights: CastlingRights::new(),
+            ep_square: Square::NONE,
+            halfmoves: 0,
+            fullmoves: 1,
+        }
+    }
+}
+
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
@@ -115,16 +131,7 @@ impl Board {
     #[must_use]
     pub fn new() -> Self {
         Lookup::init();
-        Self {
-            piece_board: Self::default_piece_board(),
-            pieces: Self::default_pieces(),
-            sides: Self::default_sides(),
-            side_to_move: Self::default_side_to_move(),
-            castling_rights: CastlingRights::new(),
-            ep_square: Self::default_ep_square(),
-            halfmoves: 0,
-            fullmoves: 1,
-        }
+        Self::default()
     }
 
     /// Returns the [`Piece`] board of the starting position.
@@ -185,17 +192,6 @@ impl Board {
         [Bitboard::EMPTY; Nums::SIDES]
     }
 
-    /// Returns the side to move from the starting position. Unless chess 1.1
-    /// has been released, this will be [`Side::WHITE`].
-    const fn default_side_to_move() -> Side {
-        Side::WHITE
-    }
-
-    /// Returns the default en passant square.
-    const fn default_ep_square() -> Square {
-        Square::NONE
-    }
-
     /// Copies and returns its mailbox board array.
     #[inline]
     #[must_use]
@@ -209,9 +205,9 @@ impl Board {
         self.piece_board = Self::empty_piece_board();
         self.pieces = Self::no_pieces();
         self.sides = Self::no_sides();
+        self.side_to_move = Side::NONE;
         self.castling_rights = CastlingRights::none();
         self.ep_square = Square::NONE;
-        self.side_to_move = Side::NONE;
     }
 
     /// Pretty-prints the current state of the board.
@@ -282,14 +278,7 @@ impl Board {
     /// Resets the board.
     #[inline]
     pub fn set_startpos(&mut self) {
-        self.piece_board = Self::default_piece_board();
-        self.pieces = Self::default_pieces();
-        self.sides = Self::default_sides();
-        self.side_to_move = Self::default_side_to_move();
-        self.castling_rights = CastlingRights::new();
-        self.ep_square = Self::default_ep_square();
-        self.halfmoves = 0;
-        self.fullmoves = 1;
+        *self = Self::default();
     }
 
     /// Returns the piece on `square`.
@@ -346,12 +335,6 @@ impl Board {
     #[must_use]
     pub const fn side_to_move(&self) -> Side {
         self.side_to_move
-    }
-
-    /// Sets side to move to the default side.
-    #[inline]
-    pub fn set_default_side_to_move(&mut self) {
-        self.side_to_move = Self::default_side_to_move();
     }
 
     /// Sets side to move to `side`.

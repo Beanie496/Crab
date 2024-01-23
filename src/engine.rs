@@ -145,7 +145,7 @@ impl Engine {
             // I've decided that everything apart from the board can be omitted
             // and guessed, so if there's nothing given, default to White to
             // move.
-            self.board.set_default_side_to_move();
+            self.board.set_side_to_move(Side::WHITE);
         }
 
         // 3. castling rights
