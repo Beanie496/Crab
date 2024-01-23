@@ -267,6 +267,13 @@ impl File {
 }
 
 impl Piece {
+    /// Wraps a `u8` in a [`Piece`].
+    #[inline]
+    #[must_use]
+    pub const fn from(piece: u8) -> Self {
+        Self { p: piece }
+    }
+
     /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
     /// piece is not valid.
     #[inline]
@@ -281,13 +288,6 @@ impl Piece {
             'k' => Some(Self::KING),
             _ => None,
         }
-    }
-
-    /// Wraps a `u8` in a [`Piece`].
-    #[inline]
-    #[must_use]
-    pub const fn from(piece: u8) -> Self {
-        Self { p: piece }
     }
 
     /// Returns the contents of `self`.
@@ -329,6 +329,13 @@ impl Side {
         Self { s: side }
     }
 
+    /// Returns the contents of `self`.
+    #[inline]
+    #[must_use]
+    pub const fn inner(self) -> u8 {
+        self.s
+    }
+
     /// Flips the contents of `self`.
     ///
     /// e.g. `Side::WHITE.flip() == Side::BLACK`.
@@ -338,13 +345,6 @@ impl Side {
     #[must_use]
     pub const fn flip(self) -> Self {
         Self::from(self.inner() ^ 1)
-    }
-
-    /// Returns the contents of `self`.
-    #[inline]
-    #[must_use]
-    pub const fn inner(self) -> u8 {
-        self.s
     }
 
     /// Returns the contents of `self` as a bool: White is `true`, Black is
@@ -402,11 +402,25 @@ impl Square {
         Some(Self::from(square))
     }
 
+    /// Returns the contents of `self`.
+    #[inline]
+    #[must_use]
+    pub const fn inner(self) -> u8 {
+        self.sq
+    }
+
     /// Calculates the file that `self` is on.
     #[inline]
     #[must_use]
     pub const fn file_of(self) -> File {
         File::from(self.inner() & 7)
+    }
+
+    /// Calculates the rank that `self` is on.
+    #[inline]
+    #[must_use]
+    pub const fn rank_of(self) -> Rank {
+        Rank::from(self.inner() >> 3)
     }
 
     /// Finds the horizontal distance between `self` and `other_square`
@@ -417,13 +431,6 @@ impl Square {
         (self.file_of().inner() as i8 - other_square.file_of().inner() as i8).unsigned_abs()
     }
 
-    /// Returns the contents of `self`.
-    #[inline]
-    #[must_use]
-    pub const fn inner(self) -> u8 {
-        self.sq
-    }
-
     /// Checks if `self` is within the board.
     #[inline]
     #[must_use]
@@ -432,11 +439,11 @@ impl Square {
         self <= Self::H8
     }
 
-    /// Calculates the rank that `self` is on.
+    /// Returns the contents of `self` as a `usize`.
     #[inline]
     #[must_use]
-    pub const fn rank_of(self) -> Rank {
-        Rank::from(self.inner() >> 3)
+    pub const fn to_index(self) -> usize {
+        self.inner() as usize
     }
 
     /// Converts `self` into its string representation.
@@ -447,13 +454,6 @@ impl Square {
         ret.push((b'a' + self.file_of().inner()) as char);
         ret.push((b'1' + self.rank_of().inner()) as char);
         ret
-    }
-
-    /// Returns the contents of `self` as a `usize`.
-    #[inline]
-    #[must_use]
-    pub const fn to_index(self) -> usize {
-        self.inner() as usize
     }
 }
 

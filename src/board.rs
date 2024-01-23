@@ -25,6 +25,10 @@ mod movegen;
 /// generate pseudo-legal moves. It is small (131 bytes) so it uses copy-make.
 #[derive(Clone)]
 pub struct Board {
+    /// An array of piece values, used for seeing which pieces are on the start
+    /// and end square.
+    /// `piece_board[SQUARE] == piece on that square`.
+    piece_board: [Piece; Nums::SQUARES],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     /// is the knights, and so on, as according to the order set by
     /// [`Piece`].
@@ -32,17 +36,13 @@ pub struct Board {
     /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     /// is is the intersection of all Black piece bitboards.
     sides: [Bitboard; Nums::SIDES],
-    /// An array of piece values, used for seeing which pieces are on the start
-    /// and end square.
-    /// `piece_board[SQUARE] == piece on that square`.
-    piece_board: [Piece; Nums::SQUARES],
+    /// The current side to move.
+    side_to_move: Side,
     /// Castling rights.
     castling_rights: CastlingRights,
     /// The current en passant square. Is [`Square::NONE`] if there is no ep
     /// square.
     ep_square: Square,
-    /// The current side to move.
-    side_to_move: Side,
 }
 
 impl BitAnd for CastlingRights {
@@ -114,10 +114,120 @@ impl Board {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
+            side_to_move: Self::default_side(),
             castling_rights: CastlingRights::new(),
             ep_square: Self::default_ep_square(),
-            side_to_move: Self::default_side(),
         }
+    }
+
+    /// Returns the [`Piece`] board of the starting position.
+    #[rustfmt::skip]
+    #[allow(clippy::many_single_char_names)]
+    const fn default_piece_board() -> [Piece; Nums::SQUARES] {
+        let p = Piece::PAWN;
+        let n = Piece::KNIGHT;
+        let b = Piece::BISHOP;
+        let r = Piece::ROOK;
+        let q = Piece::QUEEN;
+        let k = Piece::KING;
+        let e = Piece::NONE;
+        [
+            r, n, b, q, k, b, n, r,
+            p, p, p, p, p, p, p, p,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            p, p, p, p, p, p, p, p,
+            r, n, b, q, k, b, n, r,
+        ]
+    }
+
+    /// Returns an empty [`Piece`] board.
+    #[rustfmt::skip]
+    const fn empty_piece_board() -> [Piece; Nums::SQUARES] {
+        // technically [Piece::NONE; 64] would be the same but this is more
+        // clear
+        let e = Piece::NONE;
+        [
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+            e, e, e, e, e, e, e, e,
+        ]
+    }
+
+    /// Returns the piece [`Bitboard`]s of the starting position.
+    const fn default_pieces() -> [Bitboard; Nums::PIECES] {
+        [
+            Bitboard::from(0x00ff_0000_0000_ff00), // Pawns
+            Bitboard::from(0x4200_0000_0000_0042), // Knights
+            Bitboard::from(0x2400_0000_0000_0024), // Bishops
+            Bitboard::from(0x8100_0000_0000_0081), // Rooks
+            Bitboard::from(0x0800_0000_0000_0008), // Queens
+            Bitboard::from(0x1000_0000_0000_0010), // Kings
+        ]
+    }
+
+    /// Returns the piece [`Bitboard`]s of an empty board.
+    const fn no_pieces() -> [Bitboard; Nums::PIECES] {
+        [
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+        ]
+    }
+
+    /// Returns the side [`Bitboard`]s of the starting position.
+    const fn default_sides() -> [Bitboard; Nums::SIDES] {
+        [
+            Bitboard::from(0xffff_0000_0000_0000), // Black
+            Bitboard::from(0x0000_0000_0000_ffff), // White
+        ]
+    }
+
+    /// Returns the side [`Bitboard`]s of an empty board.
+    const fn no_sides() -> [Bitboard; Nums::SIDES] {
+        [
+            Bitboard::from(0x0000_0000_0000_0000),
+            Bitboard::from(0x0000_0000_0000_0000),
+        ]
+    }
+
+    /// Returns the side to move from the starting position. Unless chess 1.1
+    /// has been released, this will be [`Side::WHITE`].
+    const fn default_side() -> Side {
+        Side::WHITE
+    }
+
+    /// Returns the default en passant square.
+    const fn default_ep_square() -> Square {
+        Square::NONE
+    }
+
+    /// Copies and returns its mailbox board array.
+    #[inline]
+    #[must_use]
+    pub const fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
+        self.piece_board
+    }
+
+    /// Clears `self`.
+    #[inline]
+    pub fn clear_board(&mut self) {
+        self.piece_board = Self::empty_piece_board();
+        self.pieces = Self::no_pieces();
+        self.sides = Self::no_sides();
+        self.castling_rights = CastlingRights::none();
+        self.ep_square = Square::NONE;
+        self.side_to_move = Side::NONE;
     }
 
     /// Pretty-prints the current state of the board.
@@ -185,6 +295,99 @@ impl Board {
         ret_str
     }
 
+    /// Resets the board.
+    #[inline]
+    pub fn set_startpos(&mut self) {
+        self.piece_board = Self::default_piece_board();
+        self.pieces = Self::default_pieces();
+        self.sides = Self::default_sides();
+        self.castling_rights = CastlingRights::new();
+        self.ep_square = Self::default_ep_square();
+        self.side_to_move = Self::default_side();
+    }
+
+    /// Returns the piece on `square`.
+    #[inline]
+    #[must_use]
+    pub fn piece_on(&self, square: Square) -> Piece {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
+        self.piece_board[square.to_index()]
+    }
+
+    /// Returns the [`Side`] of `square`.
+    #[inline]
+    #[must_use]
+    pub fn side_of(&self, square: Square) -> Side {
+        let square_bb = Bitboard::from_square(square);
+        if !(self.side::<{ Side::WHITE.to_bool() }>() & square_bb).is_empty() {
+            Side::WHITE
+        } else if !(self.side::<{ Side::BLACK.to_bool() }>() & square_bb).is_empty() {
+            Side::BLACK
+        } else {
+            Side::NONE
+        }
+    }
+
+    /// Adds a piece to square `square` for side `side`. Assumes there is no
+    /// piece on the square to be written to.
+    #[inline]
+    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
+        let square_bb = Bitboard::from_square(square);
+        self.set_piece(square, piece);
+        self.toggle_piece_bb(piece, square_bb);
+        self.toggle_side_bb(side, square_bb);
+    }
+
+    /// Sets the piece on `square` in the piece array to `piece`.
+    #[inline]
+    pub fn set_piece(&mut self, square: Square, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
+        self.piece_board[square.to_index()] = piece;
+    }
+
+    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
+    #[inline]
+    pub fn unset_piece(&mut self, square: Square) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
+        self.piece_board[square.to_index()] = Piece::NONE;
+    }
+
+    /// Returns the side to move.
+    #[inline]
+    #[must_use]
+    pub const fn side_to_move(&self) -> Side {
+        self.side_to_move
+    }
+
+    /// Sets side to move to the default side.
+    #[inline]
+    pub fn set_default_side_to_move(&mut self) {
+        self.side_to_move = Self::default_side();
+    }
+
+    /// Sets side to move to `side`.
+    #[inline]
+    pub fn set_side_to_move(&mut self, side: Side) {
+        self.side_to_move = side;
+    }
+
+    /// Flip the side to move.
+    #[inline]
+    pub fn flip_side(&mut self) {
+        self.side_to_move = self.side_to_move.flip();
+    }
+
+    /// Returns the string representation of the current side to move: 'w' if
+    /// White and 'b' if Black.
+    #[inline]
+    #[must_use]
+    pub const fn side_to_move_as_char(&self) -> char {
+        (b'b' + self.side_to_move().inner() * 21) as char
+    }
+
     /// Calculates if the given side can castle kingside.
     #[inline]
     #[must_use]
@@ -205,22 +408,22 @@ impl Board {
         self.castling_rights.add_right(right);
     }
 
-    /// Unsets right `right` for side `side`.
+    /// Sets the default castling rights.
+    #[inline]
+    pub fn set_default_castling_rights(&mut self) {
+        self.castling_rights.set_to_default();
+    }
+
+    /// Unsets castling the given right for the given side.
     #[inline]
     pub fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
         self.castling_rights.remove_right(side, right);
     }
 
-    /// Clears the castling rights for `side`.
+    /// Clears the castling rights for the given side.
     #[inline]
     pub fn unset_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
-    }
-
-    /// Sets the default castling rights.
-    #[inline]
-    pub fn set_default_castling_rights(&mut self) {
-        self.castling_rights.set_to_default();
     }
 
     /// Converts the current castling rights into their string representation.
@@ -233,49 +436,11 @@ impl Board {
         self.castling_rights.stringify()
     }
 
-    /// Returns the piece on `square`.
+    /// Returns the en passant square, which might be [`Square::NONE`].
     #[inline]
     #[must_use]
-    pub fn piece_on(&self, square: Square) -> Piece {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()]
-    }
-
-    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
-    #[inline]
-    pub fn unset_piece(&mut self, square: Square) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()] = Piece::NONE;
-    }
-
-    /// Adds a piece to square `square` for side `side`. Assumes there is no
-    /// piece on the square to be written to.
-    #[inline]
-    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
-        let square_bb = Bitboard::from_square(square);
-        self.set_piece(square, piece);
-        self.toggle_piece_bb(piece, square_bb);
-        self.toggle_side_bb(side, square_bb);
-    }
-
-    /// Clears `self`.
-    #[inline]
-    pub fn clear_board(&mut self) {
-        self.piece_board = Self::empty_piece_board();
-        self.pieces = Self::no_pieces();
-        self.sides = Self::no_sides();
-        self.castling_rights = CastlingRights::none();
-        self.ep_square = Square::NONE;
-        self.side_to_move = Side::NONE;
-    }
-
-    /// Copies and returns its mailbox board array.
-    #[inline]
-    #[must_use]
-    pub const fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
-        self.piece_board
+    pub const fn ep_square(&self) -> Square {
+        self.ep_square
     }
 
     /// Sets the en passant square to [`Square::NONE`].
@@ -303,33 +468,6 @@ impl Board {
         }
     }
 
-    /// Returns the side to move.
-    #[inline]
-    #[must_use]
-    pub const fn side_to_move(&self) -> Side {
-        self.side_to_move
-    }
-
-    /// Sets side to move to the default side.
-    #[inline]
-    pub fn set_default_side_to_move(&mut self) {
-        self.side_to_move = Self::default_side();
-    }
-
-    /// Returns the string representation of the current side to move: 'w' if
-    /// White and 'b' if Black.
-    #[inline]
-    #[must_use]
-    pub const fn side_to_move_as_char(&self) -> char {
-        (b'b' + self.side_to_move().inner() * 21) as char
-    }
-
-    /// Flip the side to move.
-    #[inline]
-    pub fn flip_side(&mut self) {
-        self.side_to_move = self.side_to_move.flip();
-    }
-
     /// Sets fullmoves. Currently does nothing.
     #[inline]
     pub fn set_fullmoves(&mut self, _count: u32) {
@@ -342,143 +480,12 @@ impl Board {
         /* unused */
     }
 
-    /// Sets side to move to `side`.
-    #[inline]
-    pub fn set_side_to_move(&mut self, side: Side) {
-        self.side_to_move = side;
-    }
-
-    /// Resets the board.
-    #[inline]
-    pub fn set_startpos(&mut self) {
-        self.piece_board = Self::default_piece_board();
-        self.pieces = Self::default_pieces();
-        self.sides = Self::default_sides();
-        self.castling_rights = CastlingRights::new();
-        self.ep_square = Self::default_ep_square();
-        self.side_to_move = Self::default_side();
-    }
-
-    /// Returns the [`Side`] of `square`.
-    #[inline]
-    #[must_use]
-    pub fn side_of(&self, square: Square) -> Side {
-        let square_bb = Bitboard::from_square(square);
-        if !(self.side::<{ Side::WHITE.to_bool() }>() & square_bb).is_empty() {
-            Side::WHITE
-        } else if !(self.side::<{ Side::BLACK.to_bool() }>() & square_bb).is_empty() {
-            Side::BLACK
-        } else {
-            Side::NONE
-        }
-    }
-
-    /// Returns the en passant square, which might be [`Square::NONE`].
-    #[inline]
-    #[must_use]
-    pub const fn ep_square(&self) -> Square {
-        self.ep_square
-    }
-
-    /// Returns the default en passant square.
-    const fn default_ep_square() -> Square {
-        Square::NONE
-    }
-
-    /// Returns the [`Piece`] board of the starting position.
-    #[rustfmt::skip]
-    #[allow(clippy::many_single_char_names)]
-    const fn default_piece_board() -> [Piece; Nums::SQUARES] {
-        let p = Piece::PAWN;
-        let n = Piece::KNIGHT;
-        let b = Piece::BISHOP;
-        let r = Piece::ROOK;
-        let q = Piece::QUEEN;
-        let k = Piece::KING;
-        let e = Piece::NONE;
-        [
-            r, n, b, q, k, b, n, r,
-            p, p, p, p, p, p, p, p,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            p, p, p, p, p, p, p, p,
-            r, n, b, q, k, b, n, r,
-        ]
-    }
-
-    /// Returns the piece [`Bitboard`]s of the starting position.
-    const fn default_pieces() -> [Bitboard; Nums::PIECES] {
-        [
-            Bitboard::from(0x00ff_0000_0000_ff00), // Pawns
-            Bitboard::from(0x4200_0000_0000_0042), // Knights
-            Bitboard::from(0x2400_0000_0000_0024), // Bishops
-            Bitboard::from(0x8100_0000_0000_0081), // Rooks
-            Bitboard::from(0x0800_0000_0000_0008), // Queens
-            Bitboard::from(0x1000_0000_0000_0010), // Kings
-        ]
-    }
-
-    /// Returns the side to move from the starting position. Unless chess 1.1
-    /// has been released, this will be [`Side::WHITE`].
-    const fn default_side() -> Side {
-        Side::WHITE
-    }
-
-    /// Returns the side [`Bitboard`]s of the starting position.
-    const fn default_sides() -> [Bitboard; Nums::SIDES] {
-        [
-            Bitboard::from(0xffff_0000_0000_0000), // Black
-            Bitboard::from(0x0000_0000_0000_ffff), // White
-        ]
-    }
-
-    /// Returns an empty [`Piece`] board.
-    #[rustfmt::skip]
-    const fn empty_piece_board() -> [Piece; Nums::SQUARES] {
-        // technically [Piece::NONE; 64] would be the same but this is more
-        // clear
-        let e = Piece::NONE;
-        [
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-        ]
-    }
-
-    /// Returns the piece [`Bitboard`]s of an empty board.
-    const fn no_pieces() -> [Bitboard; Nums::PIECES] {
-        [
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-        ]
-    }
-
-    /// Returns the side [`Bitboard`]s of an empty board.
-    #[rustfmt::skip]
-    const fn no_sides() -> [Bitboard; Nums::SIDES] {
-        [
-            Bitboard::from(0x0000_0000_0000_0000),
-            Bitboard::from(0x0000_0000_0000_0000),
-        ]
-    }
-
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
     #[inline]
     #[must_use]
-    pub fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
+    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let sq_bb = Bitboard::from_pos(rank, file);
         let piece = self.piece_on(Square::from_pos(rank, file));
         if piece == Piece::NONE {
@@ -489,14 +496,6 @@ impl Board {
         } else {
             piece_to_char(Side::WHITE, piece)
         }
-    }
-
-    /// Sets the piece on `square` in the piece array to `piece`.
-    #[inline]
-    pub fn set_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()] = piece;
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
@@ -539,9 +538,9 @@ impl CastlingRights {
         Self::NONE
     }
 
-    /// Adds the given right to `self`.
-    fn add_right(&mut self, right: Self) {
-        *self |= right;
+    /// Returns the contents of `self`.
+    const fn inner(self) -> u8 {
+        self.cr
     }
 
     /// Calculates if the given side can castle kingside.
@@ -562,22 +561,14 @@ impl CastlingRights {
         }
     }
 
-    /// Clears the rights for `side`.
-    fn clear_side(&mut self, side: Side) {
-        debug_assert_eq!(
-            Side::WHITE.inner(),
-            1,
-            "This function relies on White being 1 and Black 0"
-        );
-        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
-        // a mask for the bits for White or Black. `&`ing the rights with
-        // `!(0b11 << (side * 2))` will clear the bits on the given side.
-        *self &= Self::from(!(0b11 << (side.inner() * 2)));
+    /// Adds the given right to `self`.
+    fn add_right(&mut self, right: Self) {
+        *self |= right;
     }
 
-    /// Returns the contents of `self`.
-    const fn inner(self) -> u8 {
-        self.cr
+    /// Sets the rights of `self` to default.
+    fn set_to_default(&mut self) {
+        *self = Self::new();
     }
 
     /// Removes the given right from `self`. `right` does not already have to
@@ -589,9 +580,17 @@ impl CastlingRights {
         *self &= !(right << (side.inner() * 2));
     }
 
-    /// Sets the rights of `self` to default.
-    fn set_to_default(&mut self) {
-        *self = Self::new();
+    /// Clears the rights for `side`.
+    fn clear_side(&mut self, side: Side) {
+        debug_assert_eq!(
+            Side::WHITE.inner(),
+            1,
+            "This function relies on White being 1 and Black 0"
+        );
+        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
+        // a mask for the bits for White or Black. `&`ing the rights with
+        // `!(0b11 << (side * 2))` will clear the bits on the given side.
+        *self &= Self::from(!(0b11 << (side.inner() * 2)));
     }
 
     /// Converts `self` to its string representation.

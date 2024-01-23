@@ -144,122 +144,6 @@ impl Board {
         }
     }
 
-    /// Makes the given move on the internal board. `mv` is assumed to be a
-    /// valid move. Returns `true` if the given move is legal, `false`
-    /// otherwise.
-    #[inline]
-    pub fn make_move(&mut self, mv: Move) -> bool {
-        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
-            mv.decompose();
-        let piece = self.piece_on(start);
-        let captured = self.piece_on(end);
-        let us = self.side_to_move();
-        let them = us.flip();
-        let start_bb = Bitboard::from_square(start);
-        let end_bb = Bitboard::from_square(end);
-
-        self.move_piece(start, end, us, piece);
-        self.clear_ep_square();
-
-        // these two `if` statements have to be lumped together, annoyingly -
-        // otherwise the second one would trigger incorrectly (since the the
-        // target square, containing a rook, would count)
-        if is_castling {
-            // if the king is castling out of check
-            if self.is_square_attacked(start) {
-                return false;
-            }
-            let king_square = Square::from((start.inner() + end.inner() + 1) >> 1);
-            let rook_square = Square::from((start.inner() + king_square.inner()) >> 1);
-
-            // if the king is castling through check
-            if self.is_square_attacked(rook_square) {
-                return false;
-            }
-            // if the king is castling into check
-            if self.is_square_attacked(king_square) {
-                return false;
-            }
-
-            self.move_piece(end, king_square, us, Piece::KING);
-            self.move_piece(end, rook_square, us, Piece::ROOK);
-
-            self.unset_castling_rights(us);
-        } else if captured != Piece::NONE {
-            // if we're capturing a piece, unset the bitboard of the captured
-            // piece.
-            // By a happy accident, we don't need to check if we're capturing
-            // the same piece as we are currently - the bit would have been
-            // (wrongly) unset earlier, so this would (wrongly) re-set it.
-            // Looks like two wrongs do make a right in binary.
-            self.toggle_piece_bb(captured, end_bb);
-            self.toggle_side_bb(them, end_bb);
-
-            // check if we need to unset the castling rights if we're capturing
-            // a rook
-            if captured == Piece::ROOK {
-                let us_inner = us.inner();
-                // this will be 0x81 if we're White (0x81 << 0) and
-                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
-                // the starting position of our rooks.
-                let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
-                if !(end_bb & rook_squares).is_empty() {
-                    // 0 or 56 for queenside -> 0
-                    // 7 or 63 for kingside -> 1
-                    let is_kingside = end.inner() & 1;
-                    // queenside -> 0b01
-                    // kingside -> 0b10
-                    // this replies upon knowing the internal representation of
-                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
-                    let flag = is_kingside + 1;
-                    self.unset_castling_right(them, CastlingRights::from(flag));
-                }
-            }
-        }
-
-        if is_en_passant {
-            let dest = Square::from(if us == Side::WHITE {
-                end.inner() - 8
-            } else {
-                end.inner() + 8
-            });
-            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
-            self.toggle_side_bb(them, Bitboard::from_square(dest));
-            self.unset_piece(dest);
-        } else if is_double_pawn_push(start, end, piece) {
-            self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
-        } else if is_promotion {
-            self.set_piece(end, promotion_piece);
-            // unset the pawn on the promotion square...
-            self.toggle_piece_bb(Piece::PAWN, end_bb);
-            // ...and set the promotion piece on that square
-            self.toggle_piece_bb(promotion_piece, end_bb);
-        }
-
-        if self.is_square_attacked(self.king_square()) {
-            return false;
-        }
-
-        // this is basically the same as a few lines ago but with start square
-        // instead of end
-        if piece == Piece::ROOK {
-            let them_inner = them.inner();
-            let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
-            if !(start_bb & rook_squares).is_empty() {
-                let is_kingside = start.inner() & 1;
-                let flag = is_kingside + 1;
-                self.unset_castling_right(us, CastlingRights::from(flag));
-            }
-        }
-        if piece == Piece::KING {
-            self.unset_castling_rights(us);
-        }
-
-        self.flip_side();
-
-        true
-    }
-
     /// Generates the castling moves for the given side.
     fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let occupancies = self.occupancies();
@@ -407,6 +291,122 @@ impl Board {
         }
     }
 
+    /// Makes the given move on the internal board. `mv` is assumed to be a
+    /// valid move. Returns `true` if the given move is legal, `false`
+    /// otherwise.
+    #[inline]
+    pub fn make_move(&mut self, mv: Move) -> bool {
+        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
+            mv.decompose();
+        let piece = self.piece_on(start);
+        let captured = self.piece_on(end);
+        let us = self.side_to_move();
+        let them = us.flip();
+        let start_bb = Bitboard::from_square(start);
+        let end_bb = Bitboard::from_square(end);
+
+        self.move_piece(start, end, us, piece);
+        self.clear_ep_square();
+
+        // these two `if` statements have to be lumped together, annoyingly -
+        // otherwise the second one would trigger incorrectly (since the the
+        // target square, containing a rook, would count)
+        if is_castling {
+            // if the king is castling out of check
+            if self.is_square_attacked(start) {
+                return false;
+            }
+            let king_square = Square::from((start.inner() + end.inner() + 1) >> 1);
+            let rook_square = Square::from((start.inner() + king_square.inner()) >> 1);
+
+            // if the king is castling through check
+            if self.is_square_attacked(rook_square) {
+                return false;
+            }
+            // if the king is castling into check
+            if self.is_square_attacked(king_square) {
+                return false;
+            }
+
+            self.move_piece(end, king_square, us, Piece::KING);
+            self.move_piece(end, rook_square, us, Piece::ROOK);
+
+            self.unset_castling_rights(us);
+        } else if captured != Piece::NONE {
+            // if we're capturing a piece, unset the bitboard of the captured
+            // piece.
+            // By a happy accident, we don't need to check if we're capturing
+            // the same piece as we are currently - the bit would have been
+            // (wrongly) unset earlier, so this would (wrongly) re-set it.
+            // Looks like two wrongs do make a right in binary.
+            self.toggle_piece_bb(captured, end_bb);
+            self.toggle_side_bb(them, end_bb);
+
+            // check if we need to unset the castling rights if we're capturing
+            // a rook
+            if captured == Piece::ROOK {
+                let us_inner = us.inner();
+                // this will be 0x81 if we're White (0x81 << 0) and
+                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
+                // the starting position of our rooks.
+                let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
+                if !(end_bb & rook_squares).is_empty() {
+                    // 0 or 56 for queenside -> 0
+                    // 7 or 63 for kingside -> 1
+                    let is_kingside = end.inner() & 1;
+                    // queenside -> 0b01
+                    // kingside -> 0b10
+                    // this replies upon knowing the internal representation of
+                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
+                    let flag = is_kingside + 1;
+                    self.unset_castling_right(them, CastlingRights::from(flag));
+                }
+            }
+        }
+
+        if is_en_passant {
+            let dest = Square::from(if us == Side::WHITE {
+                end.inner() - 8
+            } else {
+                end.inner() + 8
+            });
+            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
+            self.toggle_side_bb(them, Bitboard::from_square(dest));
+            self.unset_piece(dest);
+        } else if is_double_pawn_push(start, end, piece) {
+            self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
+        } else if is_promotion {
+            self.set_piece(end, promotion_piece);
+            // unset the pawn on the promotion square...
+            self.toggle_piece_bb(Piece::PAWN, end_bb);
+            // ...and set the promotion piece on that square
+            self.toggle_piece_bb(promotion_piece, end_bb);
+        }
+
+        if self.is_square_attacked(self.king_square()) {
+            return false;
+        }
+
+        // this is basically the same as a few lines ago but with start square
+        // instead of end
+        if piece == Piece::ROOK {
+            let them_inner = them.inner();
+            let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
+            if !(start_bb & rook_squares).is_empty() {
+                let is_kingside = start.inner() & 1;
+                let flag = is_kingside + 1;
+                self.unset_castling_right(us, CastlingRights::from(flag));
+            }
+        }
+        if piece == Piece::KING {
+            self.unset_castling_rights(us);
+        }
+
+        self.flip_side();
+
+        true
+    }
+
     /// Tests if `square` is attacked by an enemy piece.
     fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
@@ -498,60 +498,6 @@ impl Lookup {
         };
     }
 
-    /// Finds the bishop attacks from `square` with the given blockers.
-    #[inline]
-    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
-        let index = self.bishop_magics[square.to_index()].get_table_index(blockers);
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.bishop_magic_table.len()) };
-        self.bishop_magic_table[index]
-    }
-
-    /// Finds the king attacks from `square`.
-    #[inline]
-    pub fn king_attacks(&self, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.king_attacks.len()) };
-        self.king_attacks[square.to_index()]
-    }
-
-    /// Finds the knight attacks from `square`.
-    #[inline]
-    pub fn knight_attacks(&self, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.knight_attacks.len()) };
-        self.knight_attacks[square.to_index()]
-    }
-
-    /// Finds the pawn attacks from `square`.
-    #[inline]
-    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
-        self.pawn_attacks[side.to_index()][square.to_index()]
-    }
-
-    /// Finds the queen attacks from `square` with the given blockers.
-    #[inline]
-    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
-    }
-
-    /// Finds the rook attacks from `square` with the given blockers.
-    #[inline]
-    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
-        let index = self.rook_magics[square.to_index()].get_table_index(blockers);
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.rook_magic_table.len()) };
-        self.rook_magic_table[index]
-    }
-
     /// Returns a [`Lookup`] with empty tables.
     // used to initialise a static `Lookup` variable
     #[allow(clippy::large_stack_frames)]
@@ -569,15 +515,23 @@ impl Lookup {
         }
     }
 
-    /// Initialises king attack lookup table.
-    fn init_king_attacks(&mut self) {
-        for (square, bb) in self.king_attacks.iter_mut().enumerate() {
-            let square = Square::from(square as u8);
-            let king = Bitboard::from_square(square);
-            let mut attacks = king.east() | king.west() | king;
-            attacks |= attacks.north() | attacks.south();
-            attacks ^= king;
-            *bb = attacks;
+    /// Initialises pawn attack lookup table. First and last rank are ignored.
+    fn init_pawn_attacks(&mut self) {
+        for (square, bb) in self.pawn_attacks[Side::WHITE.to_index()]
+            .iter_mut()
+            .enumerate()
+            .take(Nums::SQUARES - Nums::FILES)
+        {
+            let pushed = Bitboard::from_square(Square::from(square as u8 + 8));
+            *bb = pushed.east() | pushed.west();
+        }
+        for (square, bb) in self.pawn_attacks[Side::BLACK.to_index()]
+            .iter_mut()
+            .enumerate()
+            .skip(Nums::FILES)
+        {
+            let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
+            *bb = pushed.east() | pushed.west();
         }
     }
 
@@ -595,6 +549,18 @@ impl Lookup {
             w = w.west();
             attacks |= (e | w).north();
             attacks |= (e | w).south();
+            *bb = attacks;
+        }
+    }
+
+    /// Initialises king attack lookup table.
+    fn init_king_attacks(&mut self) {
+        for (square, bb) in self.king_attacks.iter_mut().enumerate() {
+            let square = Square::from(square as u8);
+            let king = Bitboard::from_square(square);
+            let mut attacks = king.east() | king.west() | king;
+            attacks |= attacks.north() | attacks.south();
+            attacks ^= king;
             *bb = attacks;
         }
     }
@@ -658,24 +624,58 @@ impl Lookup {
         }
     }
 
-    /// Initialises pawn attack lookup table. First and last rank are ignored.
-    fn init_pawn_attacks(&mut self) {
-        for (square, bb) in self.pawn_attacks[Side::WHITE.to_index()]
-            .iter_mut()
-            .enumerate()
-            .take(Nums::SQUARES - Nums::FILES)
-        {
-            let pushed = Bitboard::from_square(Square::from(square as u8 + 8));
-            *bb = pushed.east() | pushed.west();
-        }
-        for (square, bb) in self.pawn_attacks[Side::BLACK.to_index()]
-            .iter_mut()
-            .enumerate()
-            .skip(Nums::FILES)
-        {
-            let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
-            *bb = pushed.east() | pushed.west();
-        }
+    /// Finds the pawn attacks from `square`.
+    #[inline]
+    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
+        self.pawn_attacks[side.to_index()][square.to_index()]
+    }
+
+    /// Finds the knight attacks from `square`.
+    #[inline]
+    pub fn knight_attacks(&self, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.knight_attacks.len()) };
+        self.knight_attacks[square.to_index()]
+    }
+
+    /// Finds the king attacks from `square`.
+    #[inline]
+    pub fn king_attacks(&self, square: Square) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.king_attacks.len()) };
+        self.king_attacks[square.to_index()]
+    }
+
+    /// Finds the bishop attacks from `square` with the given blockers.
+    #[inline]
+    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
+        let index = self.bishop_magics[square.to_index()].get_table_index(blockers);
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(index, self.bishop_magic_table.len()) };
+        self.bishop_magic_table[index]
+    }
+
+    /// Finds the rook attacks from `square` with the given blockers.
+    #[inline]
+    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
+        let index = self.rook_magics[square.to_index()].get_table_index(blockers);
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(index, self.rook_magic_table.len()) };
+        self.rook_magic_table[index]
+    }
+
+    /// Finds the queen attacks from `square` with the given blockers.
+    #[inline]
+    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
     }
 }
 
@@ -809,13 +809,6 @@ impl Moves {
         }
     }
 
-    /// Clears `self`. This doesn't actually zero any bits: it just resets the
-    /// head pointer, so it's O(1).
-    #[inline]
-    pub fn clear(&mut self) {
-        self.first_empty = 0;
-    }
-
     /// Returns if it's empty
     #[inline]
     #[must_use]
@@ -842,27 +835,6 @@ impl Moves {
             .find(|&mv| mv.is_moving_from_to(start, end))
     }
 
-    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
-    /// moves, otherwise returns `None`.
-    #[inline]
-    pub fn pop_move(&mut self) -> Option<Move> {
-        (self.first_empty > 0).then(|| {
-            self.first_empty -= 1;
-            // SAFETY: If it does get reached, it will panic in debug.
-            unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
-            self.moves[self.first_empty]
-        })
-    }
-
-    /// Pushes `mv` onto itself. Assumes `self` is not full.
-    #[inline]
-    pub fn push_move(&mut self, mv: Move) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
-        self.moves[self.first_empty] = mv;
-        self.first_empty += 1;
-    }
-
     /// Returns a random move.
     ///
     /// # Panics
@@ -882,5 +854,33 @@ impl Moves {
         } else {
             self.moves[0]
         }
+    }
+
+    /// Pushes `mv` onto itself. Assumes `self` is not full.
+    #[inline]
+    pub fn push_move(&mut self, mv: Move) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
+        self.moves[self.first_empty] = mv;
+        self.first_empty += 1;
+    }
+
+    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
+    /// moves, otherwise returns `None`.
+    #[inline]
+    pub fn pop_move(&mut self) -> Option<Move> {
+        (self.first_empty > 0).then(|| {
+            self.first_empty -= 1;
+            // SAFETY: If it does get reached, it will panic in debug.
+            unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
+            self.moves[self.first_empty]
+        })
+    }
+
+    /// Clears `self`. This doesn't actually zero any bits: it just resets the
+    /// head pointer, so it's O(1).
+    #[inline]
+    pub fn clear(&mut self) {
+        self.first_empty = 0;
     }
 }

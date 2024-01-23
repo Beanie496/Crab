@@ -114,28 +114,11 @@ impl Bitboard {
 }
 
 impl Bitboard {
-    /// Returns the given file represented on a bitboard.
-    ///
-    /// e.g. `file_bb(File::FILE2) == 0x0202020202020202`.
-    #[inline]
-    #[must_use]
-    pub const fn file_bb(file: File) -> Self {
-        Self::from(0x0101_0101_0101_0101 << file.inner())
-    }
-
     /// Wraps a `u64` in a [`Bitboard`].
     #[inline]
     #[must_use]
     pub const fn from(bb: u64) -> Self {
         Self { bb }
-    }
-
-    /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
-    /// given position set.
-    #[inline]
-    #[must_use]
-    pub const fn from_pos(rank: Rank, file: File) -> Self {
-        Self::from(1 << (rank.inner() * 8 + file.inner()))
     }
 
     /// Converts a [`Square`] into a [`Bitboard`] with the bit in the given
@@ -146,6 +129,23 @@ impl Bitboard {
         Self::from(1 << square.inner())
     }
 
+    /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
+    /// given position set.
+    #[inline]
+    #[must_use]
+    pub const fn from_pos(rank: Rank, file: File) -> Self {
+        Self::from(1 << (rank.inner() * 8 + file.inner()))
+    }
+
+    /// Returns the given file represented on a bitboard.
+    ///
+    /// e.g. `file_bb(File::FILE2) == 0x0202020202020202`.
+    #[inline]
+    #[must_use]
+    pub const fn file_bb(file: File) -> Self {
+        Self::from(0x0101_0101_0101_0101 << file.inner())
+    }
+
     /// Returns the given rank represented on a bitboard.
     ///
     /// e.g. `rank_bb(Rank::RANK2) == 0x000000000000ff00`.
@@ -153,13 +153,6 @@ impl Bitboard {
     #[must_use]
     pub const fn rank_bb(rank: Rank) -> Self {
         Self::from(0xff << (rank.inner() * 8))
-    }
-
-    /// Shifts `self` one square east without wrapping.
-    #[inline]
-    #[must_use]
-    pub fn east(self) -> Self {
-        Self::from(self.inner() << 1) & !Self::file_bb(File::FILE1)
     }
 
     /// Returns the contents of `self`.
@@ -176,13 +169,6 @@ impl Bitboard {
         self == Self::EMPTY
     }
 
-    /// Shifts `self` one square north without wrapping.
-    #[inline]
-    #[must_use]
-    pub const fn north(self) -> Self {
-        Self::from(self.inner() << 8)
-    }
-
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
     /// `self` one square south.
     #[inline]
@@ -193,6 +179,34 @@ impl Bitboard {
         } else {
             self.south()
         }
+    }
+
+    /// Shifts `self` one square north without wrapping.
+    #[inline]
+    #[must_use]
+    pub const fn north(self) -> Self {
+        Self::from(self.inner() << 8)
+    }
+
+    /// Shifts `self` one square east without wrapping.
+    #[inline]
+    #[must_use]
+    pub fn east(self) -> Self {
+        Self::from(self.inner() << 1) & !Self::file_bb(File::FILE1)
+    }
+
+    /// Shifts `self` one square south without wrapping.
+    #[inline]
+    #[must_use]
+    pub const fn south(self) -> Self {
+        Self::from(self.inner() >> 8)
+    }
+
+    /// Shifts `self` one square west without wrapping.
+    #[inline]
+    #[must_use]
+    pub fn west(self) -> Self {
+        Self::from(self.inner() >> 1) & !Self::file_bb(File::FILE8)
     }
 
     /// Clears the least significant bit of `self` and returns it.
@@ -214,6 +228,14 @@ impl Bitboard {
         Square::from(shift as u8)
     }
 
+    /// Converts the position of the least significant bit of `self` to a
+    /// [`Square`].
+    #[inline]
+    #[must_use]
+    pub const fn to_square(self) -> Square {
+        Square::from(self.inner().trailing_zeros() as u8)
+    }
+
     /// Pretty prints `self`.
     // Allowed dead code because this is occasionally useful for debugging.
     #[allow(dead_code)]
@@ -229,27 +251,5 @@ impl Bitboard {
             println!();
         }
         println!();
-    }
-
-    /// Shifts `self` one square south without wrapping.
-    #[inline]
-    #[must_use]
-    pub const fn south(self) -> Self {
-        Self::from(self.inner() >> 8)
-    }
-
-    /// Converts the position of the least significant bit of `self` to a
-    /// [`Square`].
-    #[inline]
-    #[must_use]
-    pub const fn to_square(self) -> Square {
-        Square::from(self.inner().trailing_zeros() as u8)
-    }
-
-    /// Shifts `self` one square west without wrapping.
-    #[inline]
-    #[must_use]
-    pub fn west(self) -> Self {
-        Self::from(self.inner() >> 1) & !Self::file_bb(File::FILE8)
     }
 }
