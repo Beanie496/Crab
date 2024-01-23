@@ -105,6 +105,17 @@ impl Gui {
     fn stop(&mut self) {
         self.has_stopped = true;
     }
+
+    /// Resets the state of `self`.
+    ///
+    /// Sets the board to the starting position and starts running if `self`
+    /// had been stopped.
+    fn restart(&mut self) {
+        self.engine.board.set_startpos();
+        self.set_selected_square(None);
+        self.has_stopped = false;
+        self.regenerate_mailboxes();
+    }
 }
 
 impl SquareColor {

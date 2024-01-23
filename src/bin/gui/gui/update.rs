@@ -152,10 +152,13 @@ impl Gui {
             points_to_pixels(ctx, 190.0),
             points_to_pixels(ctx, 70.0),
         ));
+
         if child.add(stop).clicked() {
             self.stop();
         }
-        child.add(restart);
+        if child.add(restart).clicked() {
+            self.restart();
+        }
         child.add(import_fen);
         child.add(copy_fen);
     }
