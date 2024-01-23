@@ -225,6 +225,185 @@ impl Board {
         }
         println!("    ---------------");
         println!("    a b c d e f g h");
+        println!();
+        println!("FEN: {}", self.current_fen_string());
+    }
+
+    /// Gets the current FEN representation of the board state.
+    #[inline]
+    #[must_use]
+    pub fn current_fen_string(&self) -> String {
+        let mut ret_str = String::new();
+
+        ret_str.push_str(&self.stringify());
+        ret_str.push(' ');
+
+        ret_str.push(self.side_to_move_as_char());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.stringify_castling_rights());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.stringify_ep_square());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.halfmoves().to_string());
+        ret_str.push(' ');
+
+        ret_str.push_str(&self.fullmoves().to_string());
+
+        ret_str
+    }
+
+    /// Takes a sequence of moves and feeds them to the board. Will stop and
+    /// return if any of the moves are incorrect. Not implemented yet.
+    #[allow(clippy::unused_self)]
+    #[inline]
+    pub const fn play_moves(&self, _moves: &str) {}
+
+    /// Sets `self.board` to the given FEN. It will check for basic errors,
+    /// like the board having too many ranks, but not many more.
+    // this function cannot panic as the only unwrap is on a hardcoded value
+    #[allow(clippy::missing_panics_doc)]
+    #[allow(clippy::too_many_lines)]
+    #[inline]
+    pub fn set_pos_to_fen(&mut self, position: &str) {
+        self.clear_board();
+
+        let mut iter = position.split(' ');
+        let Some(board) = iter.next() else {
+            self.set_startpos();
+            return println!("Need to pass a board");
+        };
+        let side_to_move = iter.next();
+        let castling_rights = iter.next();
+        let ep_square = iter.next();
+        let halfmoves = iter.next();
+        let fullmoves = iter.next();
+
+        // 1. the board itself. 1 of each king isn't checked. Hey, garbage in,
+        // garbage out!
+        // split into 2 to check for overflow easily
+        let mut rank_idx = 8u8;
+        let mut file_idx = 0;
+        let ranks = board.split('/');
+        for rank in ranks {
+            // if the board has too many ranks, this would eventually underflow
+            // and panic, so wrapping sub needed
+            rank_idx = rank_idx.wrapping_sub(1);
+            for piece in rank.chars() {
+                // if it's a number, skip over that many files
+                if ('0'..='8').contains(&piece) {
+                    // `piece` is from 0 to 8 inclusive so the unwrap cannot
+                    // panic
+                    #[allow(clippy::unwrap_used)]
+                    let empty_squares = piece.to_digit(10).unwrap() as u8;
+                    file_idx += empty_squares;
+                } else {
+                    let piece_num = Piece::from_char(piece.to_ascii_lowercase());
+                    let Some(piece_num) = piece_num else {
+                        self.set_startpos();
+                        return println!("Error: \"{piece}\" is not a valid piece.");
+                    };
+                    // 1 if White, 0 if Black
+                    let side = Side::from(u8::from(piece.is_ascii_uppercase()));
+
+                    self.add_piece(
+                        side,
+                        Square::from_pos(Rank::from(rank_idx), File::from(file_idx)),
+                        piece_num,
+                    );
+
+                    file_idx += 1;
+                }
+            }
+            // if there are too few/many files in that rank, reset and return
+            if file_idx != 8 {
+                self.set_startpos();
+                return println!("Error: FEN is invalid");
+            }
+
+            file_idx = 0;
+        }
+        // if there are too many/few ranks in the board, reset and return
+        if rank_idx != 0 {
+            self.set_startpos();
+            return println!("Error: FEN is invalid (incorrect number of ranks)");
+        }
+
+        // 2. side to move
+        if let Some(stm) = side_to_move {
+            if stm == "w" {
+                self.set_side_to_move(Side::WHITE);
+            } else if stm == "b" {
+                self.set_side_to_move(Side::BLACK);
+            } else {
+                self.set_startpos();
+                return println!("Error: Side to move \"{stm}\" is not \"w\" or \"b\"");
+            }
+        } else {
+            // I've decided that everything apart from the board can be omitted
+            // and guessed, so if there's nothing given, default to White to
+            // move.
+            self.set_side_to_move(Side::WHITE);
+        }
+
+        // 3. castling rights
+        if let Some(cr) = castling_rights {
+            for right in cr.chars() {
+                match right {
+                    'K' => self.add_castling_right(CastlingRights::K),
+                    'Q' => self.add_castling_right(CastlingRights::Q),
+                    'k' => self.add_castling_right(CastlingRights::k),
+                    'q' => self.add_castling_right(CastlingRights::q),
+                    '-' => (),
+                    _ => {
+                        self.set_startpos();
+                        return println!("Error: castling right \"{right}\" is not valid");
+                    }
+                }
+            }
+        } else {
+            // KQkq if nothing is given.
+            self.set_default_castling_rights();
+        }
+
+        // 4. en passant
+        self.set_ep_square(if let Some(ep) = ep_square {
+            if ep == "-" {
+                Square::NONE
+            } else if let Some(square) = Square::from_string(ep) {
+                square
+            } else {
+                self.set_startpos();
+                return println!("Error: En passant square \"{ep}\" is not a valid square");
+            }
+        } else {
+            Square::NONE
+        });
+
+        // 5. halfmoves
+        self.set_halfmoves(if let Some(hm) = halfmoves {
+            if let Ok(hm) = hm.parse::<u8>() {
+                hm
+            } else {
+                self.set_startpos();
+                return println!("Error: Invalid number (\"hm\") given for halfmove counter");
+            }
+        } else {
+            0
+        });
+
+        // 6. fullmoves
+        self.set_fullmoves(if let Some(fm) = fullmoves {
+            if let Ok(fm) = fm.parse::<u16>() {
+                fm
+            } else {
+                return println!("Error: Invalid number (\"fm\") given for fullmove counter");
+            }
+        } else {
+            0
+        });
     }
 
     /// Converts the current board to a string.

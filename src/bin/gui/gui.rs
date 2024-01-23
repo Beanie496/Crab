@@ -141,7 +141,7 @@ impl Gui {
     fn copy_fen_to_clipboard(&self) {
         match ClipboardContext::new() {
             Ok(mut clipboard) => clipboard
-                .set_contents(self.engine.current_fen_string())
+                .set_contents(self.engine.board.current_fen_string())
                 .unwrap_or_else(|error| println!("{error}")),
             Err(error) => println!("{error}"),
         };
