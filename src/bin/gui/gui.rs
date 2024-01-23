@@ -35,6 +35,8 @@ pub struct Gui {
     engine: Engine,
     /// Which square is selected, if any.
     selected_square: Option<Square>,
+    /// Set to `true` when `Stop` is clicked.
+    has_stopped: bool,
 }
 
 /// The 4 colors that each square can take.
@@ -79,6 +81,7 @@ impl Gui {
             side_mailbox,
             engine,
             selected_square: None,
+            has_stopped: false,
         }
     }
 
@@ -90,6 +93,17 @@ impl Gui {
     /// Sets the selected square of `self`.
     fn set_selected_square(&mut self, square: Option<Square>) {
         self.selected_square = square;
+    }
+
+    /// Checks if `self` has stopped running (i.e. the `Stop` button has been
+    /// clicked).
+    const fn has_stopped(&self) -> bool {
+        self.has_stopped
+    }
+
+    /// Stops `self` from responding to input.
+    fn stop(&mut self) {
+        self.has_stopped = true;
     }
 }
 

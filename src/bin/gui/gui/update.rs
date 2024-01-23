@@ -110,7 +110,7 @@ impl Gui {
     /// Currently only draws them.
     // I'm using `self` in a few commits' time, hence the lint allow
     #[allow(clippy::unused_self)]
-    fn update_buttons(&self, ctx: &Context, ui: &mut Ui) {
+    fn update_buttons(&mut self, ctx: &Context, ui: &mut Ui) {
         // I need child UI's to lay out the buttons exactly where I want them
         let mut child = ui.child_ui(
             Rect {
@@ -152,7 +152,9 @@ impl Gui {
             points_to_pixels(ctx, 190.0),
             points_to_pixels(ctx, 70.0),
         ));
-        child.add(stop);
+        if child.add(stop).clicked() {
+            self.stop();
+        }
         child.add(restart);
         child.add(import_fen);
         child.add(copy_fen);
@@ -170,6 +172,12 @@ impl Gui {
     ///
     /// It will update the selected square of `self` if `ui` is clicked.
     fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, color: SquareColor) {
+        if self.has_stopped() {
+            paint_area_with_color(ui, region, color.unselected);
+            self.update_piece(ui, square);
+            return;
+        }
+
         if ui.interact(region, ui.id(), Sense::click()).clicked() {
             if let Some(selected) = self.selected_square() {
                 self.set_selected_square(None);
@@ -184,6 +192,7 @@ impl Gui {
                 self.set_selected_square(Some(square));
             }
         }
+
         if self.selected_square() == Some(square) {
             paint_area_with_color(ui, region, color.selected);
         } else {
