@@ -43,7 +43,7 @@ impl Engine {
     pub fn current_fen_string(&self) -> String {
         let mut ret_str = String::new();
 
-        ret_str.push_str(&self.board.stringify_board());
+        ret_str.push_str(&self.board.stringify());
         ret_str.push(' ');
 
         ret_str.push(self.board.side_to_move_as_char());

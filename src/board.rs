@@ -233,7 +233,7 @@ impl Board {
     #[allow(clippy::missing_panics_doc)]
     #[inline]
     #[must_use]
-    pub fn stringify_board(&self) -> String {
+    pub fn stringify(&self) -> String {
         let mut ret_str = String::new();
         let mut empty_squares = 0;
         // I can't just iterate over the piece board normally: the board goes
