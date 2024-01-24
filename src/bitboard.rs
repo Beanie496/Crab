@@ -12,6 +12,13 @@ pub struct Bitboard {
     bb: u64,
 }
 
+/// An iterator over the bits of a [`Bitboard`].
+// The inner value of a wrapper does not need to be documented.
+#[allow(clippy::missing_docs_in_private_items)]
+pub struct BitIter {
+    bb: u64,
+}
+
 impl BitAnd for Bitboard {
     type Output = Self;
 
@@ -60,20 +67,13 @@ impl BitXorAssign for Bitboard {
     }
 }
 
-// TODO: `impl IntoIterator for Bitboard`
-#[allow(clippy::copy_iterator)]
-impl Iterator for Bitboard {
+impl IntoIterator for Bitboard {
     type Item = Square;
+    type IntoIter = BitIter;
 
-    /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
-    /// that bit. Returns [`None`] if there are no set bits.
     #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.inner() == 0 {
-            None
-        } else {
-            Some(self.pop_next_square())
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        BitIter::new(self.inner())
     }
 }
 
@@ -92,6 +92,21 @@ impl Shl<u8> for Bitboard {
     #[inline]
     fn shl(self, rhs: u8) -> Self::Output {
         Self::from(self.inner() << rhs)
+    }
+}
+
+impl Iterator for BitIter {
+    type Item = Square;
+
+    /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
+    /// that bit. Returns [`None`] if there are no set bits.
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.bb == 0 {
+            None
+        } else {
+            Some(self.pop_next_square())
+        }
     }
 }
 
@@ -218,16 +233,6 @@ impl Bitboard {
         Self::from(popped_bit)
     }
 
-    /// Clears the least significant bit of `self` and converts the position of
-    /// that bit to a [`Square`].
-    #[inline]
-    #[must_use]
-    pub fn pop_next_square(&mut self) -> Square {
-        let shift = self.inner().trailing_zeros();
-        self.bb ^= 1 << shift;
-        Square::from(shift as u8)
-    }
-
     /// Converts the position of the least significant bit of `self` to a
     /// [`Square`].
     #[inline]
@@ -251,5 +256,24 @@ impl Bitboard {
             println!();
         }
         println!();
+    }
+}
+
+impl BitIter {
+    /// Creates a new [`BitIter`] from a [`Bitboard`].
+    #[inline]
+    #[must_use]
+    pub const fn new(bb: u64) -> Self {
+        Self { bb }
+    }
+
+    /// Clears the least significant bit of `self` and converts the position of
+    /// that bit to a [`Square`].
+    #[inline]
+    #[must_use]
+    pub fn pop_next_square(&mut self) -> Square {
+        let shift = self.bb.trailing_zeros();
+        self.bb ^= 1 << shift;
+        Square::from(shift as u8)
     }
 }
