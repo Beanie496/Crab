@@ -34,9 +34,8 @@ macro_rules! reset_board_print_return {
 /// generate pseudo-legal moves. It is small (134 bytes) so it uses copy-make.
 #[derive(Clone)]
 pub struct Board {
-    /// An array of piece values, used for seeing which pieces are on the start
-    /// and end square.
-    /// `piece_board[SQUARE] == piece on that square`.
+    /// An array of piece values, used for quick lookup of which piece is on a
+    /// given square.
     piece_board: [Piece; Nums::SQUARES],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     /// is the knights, and so on, as according to the order set by
