@@ -427,7 +427,9 @@ impl Square {
     #[inline]
     #[must_use]
     pub const fn horizontal_distance(self, other_square: Self) -> u8 {
-        self.file_of().inner().abs_diff(other_square.file_of().inner())
+        self.file_of()
+            .inner()
+            .abs_diff(other_square.file_of().inner())
     }
 
     /// Checks if `self` is within the board.
