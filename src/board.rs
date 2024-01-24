@@ -31,7 +31,7 @@ macro_rules! reset_board_print_return {
 }
 
 /// The board. It contains information about the current board state and can
-/// generate pseudo-legal moves. It is small (131 bytes) so it uses copy-make.
+/// generate pseudo-legal moves. It is small (134 bytes) so it uses copy-make.
 #[derive(Clone)]
 pub struct Board {
     /// An array of piece values, used for seeing which pieces are on the start
