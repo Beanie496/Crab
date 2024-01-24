@@ -123,7 +123,6 @@ impl Gui {
     ///
     /// Currently only draws them.
     // I'm using `self` in a few commits' time, hence the lint allow
-    #[allow(clippy::unused_self)]
     fn update_buttons(&mut self, ctx: &Context, ui: &mut Ui) {
         if self.is_importing_fen() {
             let mut child = ui.child_ui(

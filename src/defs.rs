@@ -427,8 +427,7 @@ impl Square {
     #[inline]
     #[must_use]
     pub const fn horizontal_distance(self, other_square: Self) -> u8 {
-        #[allow(clippy::cast_possible_wrap)]
-        (self.file_of().inner() as i8 - other_square.file_of().inner() as i8).unsigned_abs()
+        self.file_of().inner().abs_diff(other_square.file_of().inner())
     }
 
     /// Checks if `self` is within the board.

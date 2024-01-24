@@ -243,7 +243,6 @@ impl Bitboard {
 
     /// Pretty prints `self`.
     // Allowed dead code because this is occasionally useful for debugging.
-    #[allow(dead_code)]
     #[inline]
     pub fn pretty_print(self) {
         for r in (Rank::RANK1.inner()..=Rank::RANK8.inner()).rev() {
