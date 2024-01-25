@@ -2,6 +2,8 @@
 // documentation isn't necessary
 #![allow(clippy::missing_docs_in_private_items)]
 
+use std::fmt::{self, Display, Formatter};
+
 /// Tells the compiler that `index` cannot match or exceed `bound`.
 ///
 /// # Panics
@@ -72,6 +74,18 @@ const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
     ['p', 'n', 'b', 'r', 'q', 'k'],
     ['P', 'N', 'B', 'R', 'Q', 'K'],
 ];
+
+impl Display for Square {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{}",
+            ((b'a' + self.file_of().inner()) as char),
+            ((b'1' + self.rank_of().inner()) as char),
+        )
+    }
+}
 
 /// The square difference in each of the 8 directions.
 impl Direction {
@@ -445,16 +459,6 @@ impl Square {
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.inner() as usize
-    }
-
-    /// Converts `self` into its string representation.
-    #[inline]
-    #[must_use]
-    pub fn stringify(self) -> String {
-        let mut ret = String::with_capacity(2);
-        ret.push((b'a' + self.file_of().inner()) as char);
-        ret.push((b'1' + self.rank_of().inner()) as char);
-        ret
     }
 }
 

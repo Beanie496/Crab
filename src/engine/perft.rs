@@ -44,7 +44,7 @@ impl Engine {
             };
             total += moves;
             if SHOULD_PRINT {
-                println!("{}: {moves}", mv.stringify());
+                println!("{mv}: {moves}");
             }
         }
         if SHOULD_PRINT {

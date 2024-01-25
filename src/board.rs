@@ -1,4 +1,7 @@
-use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl},
+};
 
 use crate::{
     bitboard::Bitboard,
@@ -58,6 +61,22 @@ pub struct Board {
     fullmoves: u16,
 }
 
+impl Display for Board {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {} {}",
+            &self.stringify_board(),
+            &self.side_to_move_as_char(),
+            &self.stringify_castling_rights(),
+            &self.stringify_ep_square(),
+            &self.halfmoves(),
+            &self.fullmoves(),
+        )
+    }
+}
+
 impl BitAnd for CastlingRights {
     type Output = Self;
 
@@ -78,6 +97,26 @@ impl BitOrAssign for CastlingRights {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         self.cr |= rhs.inner();
+    }
+}
+
+impl Display for CastlingRights {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut ret_str = String::new();
+        if self.can_castle_kingside::<true>() {
+            ret_str.push('K');
+        }
+        if self.can_castle_queenside::<true>() {
+            ret_str.push('Q');
+        }
+        if self.can_castle_kingside::<false>() {
+            ret_str.push('k');
+        }
+        if self.can_castle_queenside::<false>() {
+            ret_str.push('q');
+        }
+        f.write_str(&ret_str)
     }
 }
 
@@ -241,26 +280,7 @@ impl Board {
     #[inline]
     #[must_use]
     pub fn current_fen_string(&self) -> String {
-        let mut ret_str = String::new();
-
-        ret_str.push_str(&self.stringify());
-        ret_str.push(' ');
-
-        ret_str.push(self.side_to_move_as_char());
-        ret_str.push(' ');
-
-        ret_str.push_str(&self.stringify_castling_rights());
-        ret_str.push(' ');
-
-        ret_str.push_str(&self.stringify_ep_square());
-        ret_str.push(' ');
-
-        ret_str.push_str(&self.halfmoves().to_string());
-        ret_str.push(' ');
-
-        ret_str.push_str(&self.fullmoves().to_string());
-
-        ret_str
+        self.to_string()
     }
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
@@ -430,7 +450,7 @@ impl Board {
     #[allow(clippy::missing_panics_doc)]
     #[inline]
     #[must_use]
-    pub fn stringify(&self) -> String {
+    pub fn stringify_board(&self) -> String {
         let mut ret_str = String::new();
         let mut empty_squares = 0;
         // I can't just iterate over the piece board normally: the board goes
@@ -628,7 +648,7 @@ impl Board {
     #[inline]
     #[must_use]
     pub fn stringify_castling_rights(&self) -> String {
-        self.castling_rights.stringify()
+        self.castling_rights.to_string()
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
@@ -659,7 +679,7 @@ impl Board {
         if ep_square == Square::NONE {
             "-".to_string()
         } else {
-            ep_square.stringify()
+            ep_square.to_string()
         }
     }
 
@@ -791,23 +811,5 @@ impl CastlingRights {
         // a mask for the bits for White or Black. `&`ing the rights with
         // `!(0b11 << (side * 2))` will clear the bits on the given side.
         *self &= Self::from(!(0b11 << (side.inner() * 2)));
-    }
-
-    /// Converts `self` to its string representation.
-    fn stringify(self) -> String {
-        let mut ret_str = String::new();
-        if self.can_castle_kingside::<true>() {
-            ret_str.push('K');
-        }
-        if self.can_castle_queenside::<true>() {
-            ret_str.push('Q');
-        }
-        if self.can_castle_kingside::<false>() {
-            ret_str.push('k');
-        }
-        if self.can_castle_queenside::<false>() {
-            ret_str.push('q');
-        }
-        ret_str
     }
 }

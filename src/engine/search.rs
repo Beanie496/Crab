@@ -48,8 +48,7 @@ impl Engine {
         let nps = 1_000_000 * nodes / elapsed_us;
 
         println!(
-            "info depth {depth} score {max} nodes {nodes} nps {nps} time {elapsed_ms} pv {}",
-            best_move.stringify()
+            "info depth {depth} score {max} nodes {nodes} nps {nps} time {elapsed_ms} pv {best_move}"
         );
     }
 

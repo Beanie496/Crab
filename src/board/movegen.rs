@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use super::Board;
 use crate::{
     bitboard::Bitboard,
@@ -83,6 +85,24 @@ const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables used at runtime.
 // initialised at runtime
 pub static mut LOOKUPS: Lookup = Lookup::empty();
+
+impl Display for Move {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            write!(
+                f,
+                "{start}{end}{}",
+                piece_to_char(Side::BLACK, self.promotion_piece())
+            )
+        } else {
+            write!(f, "{start}{end}")
+        }
+    }
+}
 
 impl Iterator for Moves {
     type Item = Move;
@@ -787,22 +807,6 @@ impl Move {
     #[must_use]
     pub const fn promotion_piece(&self) -> Piece {
         Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
-    }
-
-    /// Converts `mv` into its string representation.
-    #[inline]
-    #[must_use]
-    pub fn stringify(&self) -> String {
-        let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
-        let mut ret = String::with_capacity(5);
-        ret += &start.stringify();
-        ret += &end.stringify();
-        if self.is_promotion() {
-            // we want the lowercase letter here
-            ret.push(piece_to_char(Side::BLACK, self.promotion_piece()));
-        }
-        ret
     }
 }
 
