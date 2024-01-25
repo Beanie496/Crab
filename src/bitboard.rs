@@ -149,7 +149,7 @@ impl Bitboard {
     #[inline]
     #[must_use]
     pub const fn from_pos(rank: Rank, file: File) -> Self {
-        Self::from(1 << (rank.inner() * 8 + file.inner()))
+        Self::from_square(Square::from_pos(rank, file))
     }
 
     /// Returns the given file represented on a bitboard.
