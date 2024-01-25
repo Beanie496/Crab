@@ -487,11 +487,6 @@ impl Board {
     fn occupancies(&self) -> Bitboard {
         self.side::<true>() | self.side::<false>()
     }
-
-    /// Returns the piece bitboard given by `piece`.
-    const fn piece<const PIECE: usize>(&self) -> Bitboard {
-        self.pieces[PIECE]
-    }
 }
 
 impl Lookup {

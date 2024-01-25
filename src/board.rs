@@ -484,6 +484,20 @@ impl Board {
         self.piece_board[square.to_index()]
     }
 
+    /// Returns the piece bitboard of the given piece.
+    #[inline]
+    #[must_use]
+    pub const fn piece_any(&self, piece: Piece) -> Bitboard {
+        self.pieces[piece.to_index()]
+    }
+
+    /// Returns the piece bitboard given by `PIECE`.
+    #[inline]
+    #[must_use]
+    pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
+        self.pieces[PIECE]
+    }
+
     /// Returns the [`Side`] of `square`.
     #[inline]
     #[must_use]
@@ -541,6 +555,24 @@ impl Board {
     #[inline]
     pub fn flip_side(&mut self) {
         self.side_to_move = self.side_to_move.flip();
+    }
+
+    /// Returns the bitboard of the given side.
+    #[inline]
+    #[must_use]
+    pub const fn side_any(&self, side: Side) -> Bitboard {
+        self.sides[side.to_index()]
+    }
+
+    /// Returns the board of the side according to `IS_WHITE`.
+    #[inline]
+    #[must_use]
+    pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
+        if IS_WHITE {
+            self.sides[Side::WHITE.to_index()]
+        } else {
+            self.sides[Side::BLACK.to_index()]
+        }
     }
 
     /// Returns the string representation of the current side to move: 'w' if
@@ -672,15 +704,6 @@ impl Board {
             piece_to_char(Side::BLACK, piece)
         } else {
             piece_to_char(Side::WHITE, piece)
-        }
-    }
-
-    /// Returns the board of the side according to `IS_WHITE`.
-    const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
-        if IS_WHITE {
-            self.sides[Side::WHITE.to_index()]
-        } else {
-            self.sides[Side::BLACK.to_index()]
         }
     }
 

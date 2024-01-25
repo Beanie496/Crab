@@ -96,7 +96,13 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
                     }
                     if let Some(depth) = line.next() {
                         match depth.parse::<u8>() {
-                            Ok(result) => engine.search(Some(result)),
+                            Ok(result) => {
+                                if result == 0 {
+                                    engine.search(None);
+                                } else {
+                                    engine.search(Some(result));
+                                }
+                            }
                             Err(result) => println!("{result}; must give 0-255"),
                         }
                     }
