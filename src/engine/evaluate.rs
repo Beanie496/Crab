@@ -20,7 +20,7 @@ impl Engine {
         let mut material = 0;
         let white_bb = self.board.side::<{ Side::WHITE.to_bool() }>();
         let black_bb = self.board.side::<{ Side::BLACK.to_bool() }>();
-        // TODO: incrementally update instead of recalculating every time
+
         for piece in 0..Nums::PIECES as u8 {
             let piece = Piece::from(piece);
             if piece == Piece::NONE {
