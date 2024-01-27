@@ -1,7 +1,7 @@
 use update::FrameState;
 
 use backend::{
-    defs::{Nums, Piece, Side, Square},
+    defs::{Nums, Piece, Square},
     engine::Engine,
 };
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -31,9 +31,6 @@ enum SquareColorType {
 pub struct Gui {
     /// A redundant piece mailbox to separate it from the internal board.
     piece_mailbox: [Piece; Nums::SQUARES],
-    /// A redundant side mailbox to easily see which side a piece on a square
-    /// belongs to.
-    side_mailbox: [Side; Nums::SQUARES],
     /// The internal engine, used for calculating legal moves and searching.
     engine: Engine,
     /// See documentation for [`FrameState`].
@@ -72,14 +69,9 @@ impl Gui {
         include_piece_images(&cc.egui_ctx);
 
         let engine = Engine::new();
-        let mut side_mailbox = [Side::NONE; Nums::SQUARES];
-        for (square, side) in side_mailbox.iter_mut().enumerate() {
-            *side = engine.board.side_of(Square::from(square as u8));
-        }
 
         Self {
             piece_mailbox: engine.board.clone_piece_board(),
-            side_mailbox,
             engine,
             state: FrameState::default(),
         }

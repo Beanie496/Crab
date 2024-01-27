@@ -39,13 +39,26 @@ pub struct File {
 }
 
 /// Miscellaneous constants associated with chess (`SIDES == 2`, etc.)
+// TODO: this struct doesn't need to exist. Put its constants with the pieces.
 #[allow(clippy::exhaustive_structs)]
 pub struct Nums;
 
-/// A wrapper for a `u8`, since a piece can go from 0 to 12.
+/// A piece, containing the type of piece and side.
+///
+/// The internal order of pieces is the same as [`PieceType`], but the exact
+/// constants are not.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Piece {
     p: u8,
+}
+
+/// A type of piece.
+///
+/// The internal order of pieces is the same as [`Piece`], but the exact
+/// constants are not.
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct PieceType {
+    pt: u8,
 }
 
 /// A wrapper for a `u8`, since a rank can go from 0 to 7.
@@ -70,10 +83,8 @@ pub struct Square {
 ///
 /// e.g. `PIECE_CHARS[Side::WHITE][Piece::KNIGHT] == 'N'`;
 /// `PIECE_CHARS[Side::BLACK][Piece::KING] == 'k'`.
-const PIECE_CHARS: [[char; Nums::PIECES]; Nums::SIDES] = [
-    ['p', 'n', 'b', 'r', 'q', 'k'],
-    ['P', 'N', 'B', 'R', 'Q', 'K'],
-];
+const PIECE_CHARS: [char; Nums::PIECES * Nums::SIDES] =
+    ['P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k'];
 
 impl Display for Square {
     #[inline]
@@ -133,13 +144,31 @@ impl Nums {
     pub const PIECES: usize = 6;
     /// The number of sides.
     pub const SIDES: usize = 2;
+    /// The total different number of pieces (including no piece).
+    pub const TOTAL_PIECE_VARIANTS: usize = 13;
+}
+
+/// Enumerates pieces for White and Black.
+#[allow(missing_docs)]
+impl Piece {
+    pub const WPAWN: Self = Self::from(PieceType::PAWN, Side::WHITE);
+    pub const WKNIGHT: Self = Self::from(PieceType::KNIGHT, Side::WHITE);
+    pub const WBISHOP: Self = Self::from(PieceType::BISHOP, Side::WHITE);
+    pub const WROOK: Self = Self::from(PieceType::ROOK, Side::WHITE);
+    pub const WQUEEN: Self = Self::from(PieceType::QUEEN, Side::WHITE);
+    pub const WKING: Self = Self::from(PieceType::KING, Side::WHITE);
+    pub const BPAWN: Self = Self::from(PieceType::PAWN, Side::BLACK);
+    pub const BKNIGHT: Self = Self::from(PieceType::KNIGHT, Side::BLACK);
+    pub const BBISHOP: Self = Self::from(PieceType::BISHOP, Side::BLACK);
+    pub const BROOK: Self = Self::from(PieceType::ROOK, Side::BLACK);
+    pub const BQUEEN: Self = Self::from(PieceType::QUEEN, Side::BLACK);
+    pub const BKING: Self = Self::from(PieceType::KING, Side::BLACK);
+    pub const NONE: Self = Self { p: 12 };
 }
 
 /// Enumerates pieces.
-///
-/// To avoid casting everywhere, this isn't an enum.
 #[allow(missing_docs)]
-impl Piece {
+impl PieceType {
     pub const PAWN: Self = Self::from(0);
     pub const KNIGHT: Self = Self::from(1);
     pub const BISHOP: Self = Self::from(2);
@@ -281,11 +310,13 @@ impl File {
 }
 
 impl Piece {
-    /// Wraps a `u8` in a [`Piece`].
+    /// Creates a [`Piece`] from a value and a side.
     #[inline]
     #[must_use]
-    pub const fn from(piece: u8) -> Self {
-        Self { p: piece }
+    pub const fn from(piece: PieceType, side: Side) -> Self {
+        Self {
+            p: (piece.inner() << 1) + side.inner(),
+        }
     }
 
     /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
@@ -293,6 +324,81 @@ impl Piece {
     #[inline]
     #[must_use]
     pub const fn from_char(piece: char) -> Option<Self> {
+        match piece {
+            'P' => Some(Self::WPAWN),
+            'N' => Some(Self::WKNIGHT),
+            'B' => Some(Self::WBISHOP),
+            'R' => Some(Self::WROOK),
+            'Q' => Some(Self::WQUEEN),
+            'K' => Some(Self::WKING),
+            'p' => Some(Self::BPAWN),
+            'n' => Some(Self::BKNIGHT),
+            'b' => Some(Self::BBISHOP),
+            'r' => Some(Self::BROOK),
+            'q' => Some(Self::BQUEEN),
+            'k' => Some(Self::BKING),
+            _ => None,
+        }
+    }
+
+    /// Converts `self` to a character.
+    ///
+    /// e.g. `Piece::WKNIGHT -> 'N'`; `Piece::BKING -> 'k'`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` isn't a piece.
+    #[inline]
+    #[must_use]
+    pub const fn to_char(self) -> char {
+        PIECE_CHARS[self.to_index()]
+    }
+
+    /// Returns the type of `self`.
+    // this relies on the LSB being the side
+    #[inline]
+    #[must_use]
+    pub const fn to_type(self) -> PieceType {
+        PieceType::from(self.inner() >> 1)
+    }
+
+    /// Returns the side of `self`.
+    // this relies on the LSB being the side
+    #[inline]
+    #[must_use]
+    pub const fn side(self) -> Side {
+        Side::from(self.inner() & 1)
+    }
+
+    /// Returns the contents of `self`.
+    #[inline]
+    #[must_use]
+    pub const fn inner(self) -> u8 {
+        self.p
+    }
+
+    /// Returns the contents of `self` as a `usize`.
+    #[inline]
+    #[must_use]
+    pub const fn to_index(self) -> usize {
+        self.inner() as usize
+    }
+}
+
+impl PieceType {
+    /// Wraps a `u8` in a [`PieceType`].
+    #[inline]
+    #[must_use]
+    pub const fn from(piece: u8) -> Self {
+        Self { pt: piece }
+    }
+
+    /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
+    /// piece is not valid.
+    #[inline]
+    #[must_use]
+    pub const fn from_char(piece: char) -> Option<Self> {
+        let piece = piece.to_ascii_lowercase();
         match piece {
             'p' => Some(Self::PAWN),
             'n' => Some(Self::KNIGHT),
@@ -304,11 +410,26 @@ impl Piece {
         }
     }
 
+    /// Converts `self` to a character.
+    ///
+    /// e.g. `PieceType::KNIGHT -> 'n'`; `PieceType::KING -> 'k'`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` isn't a piece.
+    #[inline]
+    #[must_use]
+    pub const fn to_char(self) -> char {
+        // default to lowercase, or Black
+        let piece = Piece::from(self, Side::BLACK);
+        piece.to_char()
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
     pub const fn inner(self) -> u8 {
-        self.p
+        self.pt
     }
 
     /// Returns the contents of `self` as a `usize`.
@@ -460,19 +581,14 @@ impl Square {
     pub const fn to_index(self) -> usize {
         self.inner() as usize
     }
-}
 
-/// Converts the piece `piece` on side `side` to a character.
-///
-/// e.g. `Side::WHITE, Piece::KNIGHT -> 'N'`;
-/// `Side::BLACK, Piece::KING -> 'k'`.
-///
-/// # Panics
-///
-/// Panics if `piece` isn't a piece or `side` isn't [`White`](Side::WHITE) or
-/// [`Black`](Side::BLACK).
-#[inline]
-#[must_use]
-pub const fn piece_to_char(side: Side, piece: Piece) -> char {
-    PIECE_CHARS[side.to_index()][piece.to_index()]
+    /// Flips the square of `self`.
+    ///
+    /// E.g. `a1` (`0`) -> `a8` (`56`), `b2` (`1`) -> `b7` (`57`), `b2` (`9`)
+    /// -> `g7` (`49`).
+    #[inline]
+    #[must_use]
+    pub const fn flip(self) -> Self {
+        Self::from(self.inner() ^ 56)
+    }
 }

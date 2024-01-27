@@ -2,7 +2,7 @@ use super::Gui;
 
 use backend::{
     board::Moves,
-    defs::{Piece, Side, Square},
+    defs::{Piece, Square},
 };
 
 impl Gui {
@@ -62,20 +62,11 @@ impl Gui {
         self.piece_mailbox[square.to_index()]
     }
 
-    /// Finds the side of the piece on `square`. If there is no piece on
-    /// `square`, it returns [`Side::NONE`].
-    pub const fn side_of(&self, square: Square) -> Side {
-        self.side_mailbox[square.to_index()]
-    }
-
     /// Refreshes the piece and side mailboxes of `self` from
     /// `self.engine.board`. The piece mailbox probably takes a matter of
     /// cycles but the side mailbox is a little more expensive due to the 64
     /// unpredictable branches.
     pub fn regenerate_mailboxes(&mut self) {
         self.piece_mailbox = self.engine.board.clone_piece_board();
-        for (square, side) in self.side_mailbox.iter_mut().enumerate() {
-            *side = self.engine.board.side_of(Square::from(square as u8));
-        }
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     bitboard::Bitboard,
     board::movegen::magic::MAX_BLOCKERS,
-    defs::{Direction, File, Piece, Rank, Square},
+    defs::{Direction, File, Piece, PieceType, Rank, Square},
 };
 
 /// Generates all combinations of attacks from `square` and puts them in
@@ -31,7 +31,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
 
 /// Checks if the move is a double pawn push.
 pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
-    if piece != Piece::PAWN {
+    if piece.to_type() != PieceType::PAWN {
         return false;
     }
     let start_bb = Bitboard::from_square(start);
@@ -76,9 +76,9 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
 /// Generates the attack set for `piece` on `square` up to and including the
 /// given blockers. Includes the edge.
 pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
-    let piece = Piece::from(PIECE);
+    let piece = PieceType::from(PIECE);
     let mut ray = Bitboard::EMPTY;
-    if piece == Piece::BISHOP {
+    if piece == PieceType::BISHOP {
         ray |= ray_attack::<{ Direction::NE.inner() }>(square, blockers);
         ray |= ray_attack::<{ Direction::SE.inner() }>(square, blockers);
         ray |= ray_attack::<{ Direction::SW.inner() }>(square, blockers);

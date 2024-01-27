@@ -4,7 +4,7 @@ use super::Board;
 use crate::{
     bitboard::Bitboard,
     board::CastlingRights,
-    defs::{piece_to_char, File, Nums, Piece, Rank, Side, Square},
+    defs::{File, Nums, Piece, PieceType, Rank, Side, Square},
     out_of_bounds_is_unreachable,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
@@ -93,11 +93,7 @@ impl Display for Move {
         let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         if self.is_promotion() {
             // we want the lowercase letter here
-            write!(
-                f,
-                "{start}{end}{}",
-                piece_to_char(Side::BLACK, self.promotion_piece())
-            )
+            write!(f, "{start}{end}{}", self.promotion_piece().to_char())
         } else {
             write!(f, "{start}{end}")
         }
@@ -198,7 +194,7 @@ impl Board {
     fn generate_non_sliding_moves<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let us_bb = self.side::<IS_WHITE>();
 
-        let knights = self.piece::<{ Piece::KNIGHT.to_index() }>() & us_bb;
+        let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
         for knight in knights {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & !us_bb;
@@ -207,7 +203,7 @@ impl Board {
             }
         }
 
-        let kings = self.piece::<{ Piece::KING.to_index() }>() & us_bb;
+        let kings = self.piece::<{ PieceType::KING.to_index() }>() & us_bb;
         for king in kings {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.king_attacks(king) } & !us_bb;
@@ -229,7 +225,7 @@ impl Board {
         };
         let empty = !occupancies;
 
-        let mut pawns = self.piece::<{ Piece::PAWN.to_index() }>() & us_bb;
+        let mut pawns = self.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
         while !pawns.is_empty() {
             let pawn = pawns.pop_lsb();
             let pawn_sq = pawn.to_square();
@@ -262,14 +258,18 @@ impl Board {
                 moves.push_move(Move::new::<{ Move::NORMAL }>(pawn_sq, target));
             }
             for target in promotion_targets {
-                moves.push_move(Move::new_promo::<{ Piece::KNIGHT.inner() }>(
+                moves.push_move(Move::new_promo::<{ PieceType::KNIGHT.inner() }>(
                     pawn_sq, target,
                 ));
-                moves.push_move(Move::new_promo::<{ Piece::BISHOP.inner() }>(
+                moves.push_move(Move::new_promo::<{ PieceType::BISHOP.inner() }>(
                     pawn_sq, target,
                 ));
-                moves.push_move(Move::new_promo::<{ Piece::ROOK.inner() }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ Piece::QUEEN.inner() }>(pawn_sq, target));
+                moves.push_move(Move::new_promo::<{ PieceType::ROOK.inner() }>(
+                    pawn_sq, target,
+                ));
+                moves.push_move(Move::new_promo::<{ PieceType::QUEEN.inner() }>(
+                    pawn_sq, target,
+                ));
             }
             for target in ep_captures {
                 moves.push_move(Move::new::<{ Move::EN_PASSANT }>(pawn_sq, target));
@@ -283,7 +283,7 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
 
-        let bishops = self.piece::<{ Piece::BISHOP.to_index() }>() & us_bb;
+        let bishops = self.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
         for bishop in bishops {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & !us_bb;
@@ -292,7 +292,7 @@ impl Board {
             }
         }
 
-        let rooks = self.piece::<{ Piece::ROOK.to_index() }>() & us_bb;
+        let rooks = self.piece::<{ PieceType::ROOK.to_index() }>() & us_bb;
         for rook in rooks {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & !us_bb;
@@ -301,7 +301,7 @@ impl Board {
             }
         }
 
-        let queens = self.piece::<{ Piece::QUEEN.to_index() }>() & us_bb;
+        let queens = self.piece::<{ PieceType::QUEEN.to_index() }>() & us_bb;
         for queen in queens {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & !us_bb;
@@ -316,11 +316,13 @@ impl Board {
     /// otherwise.
     #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
-        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece) =
+        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece_type) =
             mv.decompose();
         let piece = self.piece_on(start);
+        let piece_type = piece.to_type();
         let captured = self.piece_on(end);
-        let us = self.side_to_move();
+        let captured_type = captured.to_type();
+        let us = piece.side();
         let them = us.flip();
         let start_bb = Bitboard::from_square(start);
         let end_bb = Bitboard::from_square(end);
@@ -330,7 +332,7 @@ impl Board {
             self.fullmoves += 1;
         }
 
-        if piece == Piece::PAWN || captured != Piece::NONE {
+        if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
             self.halfmoves = 0;
         // 75-move rule: if 75 moves have been made by both players, the game
         // is adjucated as a draw. So the 151st move is illegal.
@@ -361,23 +363,23 @@ impl Board {
                 return false;
             }
 
-            self.move_piece(end, king_square, us, Piece::KING);
-            self.move_piece(end, rook_square, us, Piece::ROOK);
+            self.move_piece(end, king_square, us, Piece::from(PieceType::KING, us));
+            self.move_piece(end, rook_square, us, Piece::from(PieceType::ROOK, us));
 
             self.unset_castling_rights(us);
-        } else if captured != Piece::NONE {
+        } else if captured_type != PieceType::NONE {
             // if we're capturing a piece, unset the bitboard of the captured
             // piece.
             // By a happy accident, we don't need to check if we're capturing
             // the same piece as we are currently - the bit would have been
             // (wrongly) unset earlier, so this would (wrongly) re-set it.
             // Looks like two wrongs do make a right in binary.
-            self.toggle_piece_bb(captured, end_bb);
+            self.toggle_piece_bb(captured_type, end_bb);
             self.toggle_side_bb(them, end_bb);
 
             // check if we need to unset the castling rights if we're capturing
             // a rook
-            if captured == Piece::ROOK {
+            if captured_type == PieceType::ROOK {
                 let us_inner = us.inner();
                 // this will be 0x81 if we're White (0x81 << 0) and
                 // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
@@ -403,17 +405,17 @@ impl Board {
             } else {
                 end.inner() + 8
             });
-            self.toggle_piece_bb(Piece::PAWN, Bitboard::from_square(dest));
+            self.toggle_piece_bb(PieceType::PAWN, Bitboard::from_square(dest));
             self.toggle_side_bb(them, Bitboard::from_square(dest));
             self.unset_piece(dest);
         } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
         } else if is_promotion {
-            self.set_piece(end, promotion_piece);
+            self.set_piece(end, Piece::from(promotion_piece_type, us));
             // unset the pawn on the promotion square...
-            self.toggle_piece_bb(Piece::PAWN, end_bb);
+            self.toggle_piece_bb(PieceType::PAWN, end_bb);
             // ...and set the promotion piece on that square
-            self.toggle_piece_bb(promotion_piece, end_bb);
+            self.toggle_piece_bb(promotion_piece_type, end_bb);
         }
 
         if self.is_square_attacked(self.king_square()) {
@@ -422,7 +424,7 @@ impl Board {
 
         // this is basically the same as a few lines ago but with start square
         // instead of end
-        if piece == Piece::ROOK {
+        if piece_type == PieceType::ROOK {
             let them_inner = them.inner();
             let rook_squares = Bitboard::from(0x81) << (them_inner * 56);
             if !(start_bb & rook_squares).is_empty() {
@@ -431,7 +433,7 @@ impl Board {
                 self.unset_castling_right(us, CastlingRights::from(flag));
             }
         }
-        if piece == Piece::KING {
+        if piece_type == PieceType::KING {
             self.unset_castling_rights(us);
         }
 
@@ -460,12 +462,12 @@ impl Board {
         // SAFETY: Ditto.
         let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
 
-        let pawns = self.piece::<{ Piece::PAWN.to_index() }>();
-        let knights = self.piece::<{ Piece::KNIGHT.to_index() }>();
-        let bishops = self.piece::<{ Piece::BISHOP.to_index() }>();
-        let rooks = self.piece::<{ Piece::ROOK.to_index() }>();
-        let queens = self.piece::<{ Piece::QUEEN.to_index() }>();
-        let kings = self.piece::<{ Piece::KING.to_index() }>();
+        let pawns = self.piece::<{ PieceType::PAWN.to_index() }>();
+        let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>();
+        let bishops = self.piece::<{ PieceType::BISHOP.to_index() }>();
+        let rooks = self.piece::<{ PieceType::ROOK.to_index() }>();
+        let queens = self.piece::<{ PieceType::QUEEN.to_index() }>();
+        let kings = self.piece::<{ PieceType::KING.to_index() }>();
 
         let is_attacked_by_pawns = pawn_attacks & pawns;
         let is_attacked_by_knights = knight_attacks & knights;
@@ -486,8 +488,9 @@ impl Board {
     fn king_square(&self) -> Square {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
-        (self.piece::<{ Piece::KING.to_index() }>() & self.sides[self.side_to_move().to_index()])
-            .to_square()
+        (self.piece::<{ PieceType::KING.to_index() }>()
+            & self.sides[self.side_to_move().to_index()])
+        .to_square()
     }
 
     /// Toggles the side and piece bitboard on both `start` and `end`, sets
@@ -497,7 +500,7 @@ impl Board {
         let start_bb = Bitboard::from_square(start);
         let end_bb = Bitboard::from_square(end);
 
-        self.toggle_piece_bb(piece, start_bb | end_bb);
+        self.toggle_piece_bb(piece.to_type(), start_bb | end_bb);
         self.toggle_side_bb(side, start_bb | end_bb);
         self.unset_piece(start);
         self.set_piece(end, piece);
@@ -610,9 +613,9 @@ impl Lookup {
                 & !Bitboard::rank_bb(square.rank_of());
             let edges = excluded_ranks_bb | excluded_files_bb;
             let b_mask =
-                sliding_attacks::<{ Piece::BISHOP.inner() }>(square, Bitboard::EMPTY) & !edges;
+                sliding_attacks::<{ PieceType::BISHOP.inner() }>(square, Bitboard::EMPTY) & !edges;
             let r_mask =
-                sliding_attacks::<{ Piece::ROOK.inner() }>(square, Bitboard::EMPTY) & !edges;
+                sliding_attacks::<{ PieceType::ROOK.inner() }>(square, Bitboard::EMPTY) & !edges;
             let b_mask_bits = b_mask.inner().count_ones();
             let r_mask_bits = r_mask.inner().count_ones();
             let b_perms = 2usize.pow(b_mask_bits);
@@ -630,7 +633,7 @@ impl Lookup {
                 64 - r_mask_bits,
             );
 
-            gen_all_sliding_attacks::<{ Piece::BISHOP.inner() }>(square, &mut attacks);
+            gen_all_sliding_attacks::<{ PieceType::BISHOP.inner() }>(square, &mut attacks);
             let mut blockers = b_mask;
             for attack in attacks.iter().take(b_perms) {
                 let index = b_magic.get_table_index(blockers);
@@ -640,7 +643,7 @@ impl Lookup {
             self.bishop_magics[square.to_index()] = b_magic;
             b_offset += b_perms;
 
-            gen_all_sliding_attacks::<{ Piece::ROOK.inner() }>(square, &mut attacks);
+            gen_all_sliding_attacks::<{ PieceType::ROOK.inner() }>(square, &mut attacks);
             let mut blockers = r_mask;
             for attack in attacks.iter().take(r_perms) {
                 let index = r_magic.get_table_index(blockers);
@@ -733,11 +736,11 @@ impl Move {
     #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
         debug_assert!(
-            PIECE != Piece::PAWN.inner(),
+            PIECE != PieceType::PAWN.inner(),
             "Tried to make a new promotion `Move` into a pawn"
         );
         debug_assert!(
-            PIECE != Piece::KING.inner(),
+            PIECE != PieceType::KING.inner(),
             "Tried to make a new promotion `Move` into a king"
         );
         Self {
@@ -760,14 +763,21 @@ impl Move {
     /// `is_promotion`), in that order.
     #[inline]
     #[must_use]
-    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, Piece) {
+    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, PieceType) {
         let start = Square::from(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
         let end = Square::from(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let is_promotion = self.is_promotion();
         let is_castling = self.is_castling();
         let is_en_passant = self.is_en_passant();
-        let piece = Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
-        (start, end, is_castling, is_en_passant, is_promotion, piece)
+        let piece_type = PieceType::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        (
+            start,
+            end,
+            is_castling,
+            is_en_passant,
+            is_promotion,
+            piece_type,
+        )
     }
 
     /// Checks if the move is castling.
@@ -805,8 +815,8 @@ impl Move {
     /// only return a value from 1 to 4.
     #[inline]
     #[must_use]
-    pub const fn promotion_piece(&self) -> Piece {
-        Piece::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+    pub const fn promotion_piece(&self) -> PieceType {
+        PieceType::from((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
     }
 }
 

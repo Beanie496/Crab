@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::Engine;
+use super::{evaluate::Eval, Engine};
 use crate::board::{Board, Move, Moves};
 
 /// Information about a search.
@@ -21,7 +21,7 @@ struct SearchInfo {
     pub pv: Move,
     //_multipv: [[Move]],
     /// The score of the position from the perspective of the side to move.
-    pub score: i16,
+    pub score: Eval,
     /// Which move is currently being searched at root.
     pub _currmove: Move,
     /// Which move number is currently being searched at root.
@@ -32,8 +32,8 @@ struct SearchInfo {
     pub nps: u64,
 }
 
-/// Infinity, for an `i16` at least.
-const INF: i16 = i16::MAX;
+/// The highest possible (positive) evaluation.
+const INF_EVAL: Eval = i32::MAX;
 
 impl Display for SearchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -61,7 +61,7 @@ impl Engine {
     pub fn search(&self, depth: Option<u8>) {
         let time = Instant::now();
         let depth = depth.unwrap_or(u8::MAX);
-        let mut max = -INF;
+        let mut max = -INF_EVAL;
         let mut search_info = SearchInfo::new(depth);
 
         let mut moves = Moves::new();
@@ -90,13 +90,13 @@ impl Engine {
 
     /// Performs negamax on `board`. Returns the evaluation of after searching
     /// to the given depth.
-    fn negamax(&self, search_info: &mut SearchInfo, board: &Board, depth: u8) -> i16 {
+    fn negamax(&self, search_info: &mut SearchInfo, board: &Board, depth: u8) -> Eval {
         search_info.nodes += 1;
         if depth == 0 {
-            return self.evaluate_board();
+            return self.evaluate_board(board);
         }
 
-        let mut max = -INF;
+        let mut max = -INF_EVAL;
         let mut moves = Moves::new();
         board.generate_moves(&mut moves);
 

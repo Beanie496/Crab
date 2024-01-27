@@ -1,11 +1,12 @@
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl},
+    slice::Iter,
 };
 
 use crate::{
     bitboard::Bitboard,
-    defs::{piece_to_char, File, Nums, Piece, Rank, Side, Square},
+    defs::{File, Nums, Piece, PieceType, Rank, Side, Square},
     out_of_bounds_is_unreachable,
 };
 use movegen::Lookup;
@@ -183,18 +184,24 @@ impl Board {
 
     /// Returns the [`Piece`] board of the starting position.
     #[rustfmt::skip]
-    #[allow(clippy::many_single_char_names)]
+    #[allow(clippy::many_single_char_names, non_snake_case)]
     const fn default_piece_board() -> [Piece; Nums::SQUARES] {
-        let p = Piece::PAWN;
-        let n = Piece::KNIGHT;
-        let b = Piece::BISHOP;
-        let r = Piece::ROOK;
-        let q = Piece::QUEEN;
-        let k = Piece::KING;
+        let p = Piece::BPAWN;
+        let n = Piece::BKNIGHT;
+        let b = Piece::BBISHOP;
+        let r = Piece::BROOK;
+        let q = Piece::BQUEEN;
+        let k = Piece::BKING;
+        let P = Piece::WPAWN;
+        let N = Piece::WKNIGHT;
+        let B = Piece::WBISHOP;
+        let R = Piece::WROOK;
+        let Q = Piece::WQUEEN;
+        let K = Piece::WKING;
         let e = Piece::NONE;
         [
-            r, n, b, q, k, b, n, r,
-            p, p, p, p, p, p, p, p,
+            R, N, B, Q, K, B, N, R,
+            P, P, P, P, P, P, P, P,
             e, e, e, e, e, e, e, e,
             e, e, e, e, e, e, e, e,
             e, e, e, e, e, e, e, e,
@@ -237,6 +244,12 @@ impl Board {
     /// Returns the side [`Bitboard`]s of an empty board.
     const fn no_sides() -> [Bitboard; Nums::SIDES] {
         [Bitboard::EMPTY; Nums::SIDES]
+    }
+
+    /// Returns an iterator over the internal piece board. a1 b1, etc.
+    #[inline]
+    pub fn piece_board_iter(&self) -> Iter<'_, Piece> {
+        self.piece_board.iter()
     }
 
     /// Copies and returns its mailbox board array.
@@ -327,15 +340,12 @@ impl Board {
                     let empty_squares = piece.to_digit(10).unwrap() as u8;
                     file_idx += empty_squares;
                 } else {
-                    let piece_num = Piece::from_char(piece.to_ascii_lowercase());
+                    let piece_num = Piece::from_char(piece);
                     let Some(piece_num) = piece_num else {
                         reset_board_print_return!(self, "Error: \"{piece}\" is not a valid piece.");
                     };
-                    // 1 if White, 0 if Black
-                    let side = Side::from(u8::from(piece.is_ascii_uppercase()));
 
                     self.add_piece(
-                        side,
                         Square::from_pos(Rank::from(rank_idx), File::from(file_idx)),
                         piece_num,
                     );
@@ -471,8 +481,7 @@ impl Board {
                         ret_str.push(char::from_digit(empty_squares, 10).unwrap());
                         empty_squares = 0;
                     }
-                    let side = self.side_of(square);
-                    ret_str.push(piece_to_char(side, piece));
+                    ret_str.push(piece.to_char());
                 }
             }
             if empty_squares != 0 {
@@ -508,7 +517,7 @@ impl Board {
     #[inline]
     #[must_use]
     pub const fn piece_any(&self, piece: Piece) -> Bitboard {
-        self.pieces[piece.to_index()]
+        self.pieces[piece.to_type().to_index()]
     }
 
     /// Returns the piece bitboard given by `PIECE`.
@@ -518,27 +527,14 @@ impl Board {
         self.pieces[PIECE]
     }
 
-    /// Returns the [`Side`] of `square`.
-    #[inline]
-    #[must_use]
-    pub fn side_of(&self, square: Square) -> Side {
-        let square_bb = Bitboard::from_square(square);
-        if !(self.side::<{ Side::WHITE.to_bool() }>() & square_bb).is_empty() {
-            Side::WHITE
-        } else if !(self.side::<{ Side::BLACK.to_bool() }>() & square_bb).is_empty() {
-            Side::BLACK
-        } else {
-            Side::NONE
-        }
-    }
-
     /// Adds a piece to square `square` for side `side`. Assumes there is no
     /// piece on the square to be written to.
     #[inline]
-    pub fn add_piece(&mut self, side: Side, square: Square, piece: Piece) {
+    pub fn add_piece(&mut self, square: Square, piece: Piece) {
         let square_bb = Bitboard::from_square(square);
+        let side = piece.side();
         self.set_piece(square, piece);
-        self.toggle_piece_bb(piece, square_bb);
+        self.toggle_piece_bb(piece.to_type(), square_bb);
         self.toggle_side_bb(side, square_bb);
     }
 
@@ -715,20 +711,15 @@ impl Board {
     #[inline]
     #[must_use]
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
-        let sq_bb = Bitboard::from_pos(rank, file);
         let piece = self.piece_on(Square::from_pos(rank, file));
         if piece == Piece::NONE {
             return '0';
         }
-        if (self.side::<{ Side::WHITE.to_bool() }>() & sq_bb).is_empty() {
-            piece_to_char(Side::BLACK, piece)
-        } else {
-            piece_to_char(Side::WHITE, piece)
-        }
+        piece.to_char()
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
-    fn toggle_piece_bb(&mut self, piece: Piece, bb: Bitboard) {
+    fn toggle_piece_bb(&mut self, piece: PieceType, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.pieces.len()) };
         self.pieces[piece.to_index()] ^= bb;

@@ -5,7 +5,7 @@ use oorandom::Rand64;
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
 use crate::{
     bitboard::Bitboard,
-    defs::{File, Nums, Piece, Rank, Square},
+    defs::{File, Nums, PieceType, Rank, Square},
 };
 
 /// Stores magic information for a square:
@@ -204,13 +204,13 @@ impl Magic {
 /// # Panics
 ///
 /// Panics if the value given for the generic parameter does not match the
-/// inner value of a [`Piece::BISHOP`] or a [`Piece::ROOK`].
+/// inner value of a [`PieceType::BISHOP`] or a [`PieceType::ROOK`].
 #[inline]
 pub fn find_magics<const PIECE: u8>() {
-    let piece = Piece::from(PIECE);
-    let piece_str = if piece == Piece::BISHOP {
+    let piece = PieceType::from(PIECE);
+    let piece_str = if piece == PieceType::BISHOP {
         "bishop"
-    } else if piece == Piece::ROOK {
+    } else if piece == PieceType::ROOK {
         "rook"
     } else {
         panic!("piece not a rook or bishop");

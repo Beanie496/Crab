@@ -1,6 +1,6 @@
 use std::{io, process::exit, str::Split};
 
-use crate::{board::find_magics, defs::Piece, engine::Engine};
+use crate::{board::find_magics, defs::PieceType, engine::Engine};
 
 /// Repeatedly waits for a command and executes it according to the UCI
 /// protocol. It is not yet concurrent, i.e. it cannot process commands
@@ -154,8 +154,8 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             /* non-standard commands */
             /* "f" - find magic numbers for each square for bishop and rook */
             "f" => {
-                find_magics::<{ Piece::BISHOP.inner() }>();
-                find_magics::<{ Piece::ROOK.inner() }>();
+                find_magics::<{ PieceType::BISHOP.inner() }>();
+                find_magics::<{ PieceType::ROOK.inner() }>();
             }
             /* "p" - prints current position */
             "p" => {

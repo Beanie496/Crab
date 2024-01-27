@@ -1,7 +1,7 @@
 use super::{Gui, SquareColor, SquareColorType};
 use crate::{gui::draw::paint_area_with_color, util::points_to_pixels};
 
-use backend::defs::{File, Nums, Piece, Rank, Side, Square};
+use backend::defs::{File, Nums, Piece, Rank, Square};
 use eframe::{
     egui::{
         self, widgets::Button, Align, Color32, Context, Direction, Id, Layout, Pos2, Rect, Sense,
@@ -245,29 +245,21 @@ impl Gui {
     /// Adds the image of the piece that is on the given square. Adds nothing
     /// if there is no piece on the given square.
     fn update_piece(&self, ui: &mut Ui, square: Square) {
-        if self.piece_on(square) == Piece::NONE {
-            return;
-        }
-        let image_path = match self.side_of(square) {
-            Side::WHITE => match self.piece_on(square) {
-                Piece::PAWN => "pieces/wp.png",
-                Piece::KNIGHT => "pieces/wn.png",
-                Piece::BISHOP => "pieces/wb.png",
-                Piece::ROOK => "pieces/wr.png",
-                Piece::QUEEN => "pieces/wq.png",
-                Piece::KING => "pieces/wk.png",
-                _ => unreachable!("There must be a piece on the square"),
-            },
-            Side::BLACK => match self.piece_on(square) {
-                Piece::PAWN => "pieces/bp.png",
-                Piece::KNIGHT => "pieces/bn.png",
-                Piece::BISHOP => "pieces/bb.png",
-                Piece::ROOK => "pieces/br.png",
-                Piece::QUEEN => "pieces/bq.png",
-                Piece::KING => "pieces/bk.png",
-                _ => unreachable!("There must be a piece on the square"),
-            },
-            _ => unreachable!("If there is a piece, it must be White or Black"),
+        let image_path = match self.piece_on(square) {
+            Piece::WPAWN => "pieces/wp.png",
+            Piece::WKNIGHT => "pieces/wn.png",
+            Piece::WBISHOP => "pieces/wb.png",
+            Piece::WROOK => "pieces/wr.png",
+            Piece::WQUEEN => "pieces/wq.png",
+            Piece::WKING => "pieces/wk.png",
+            Piece::BPAWN => "pieces/bp.png",
+            Piece::BKNIGHT => "pieces/bn.png",
+            Piece::BBISHOP => "pieces/bb.png",
+            Piece::BROOK => "pieces/br.png",
+            Piece::BQUEEN => "pieces/bq.png",
+            Piece::BKING => "pieces/bk.png",
+            // no piece
+            _ => return,
         };
         ui.image(image_path);
     }

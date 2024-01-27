@@ -1,44 +1,108 @@
+use std::{
+    cmp::min,
+    fmt::{self, Display, Formatter},
+    ops::{Add, AddAssign, Neg},
+};
+
 use super::Engine;
+use crate::{
+    defs::{Nums, Side},
+    engine::Board,
+};
+use piece_square_tables::create_piece_square_tables;
 
-use crate::defs::{Nums, Piece, Side};
+/// Items related to piece-square tables.
+mod piece_square_tables;
 
-/// Values in centipawns for each piece. Pawn, knight, bishop, rook, queen and
-/// king.
-const PIECE_VALUES: [i16; Nums::PIECES] = [100, 300, 330, 500, 900, 10_000];
+/// The result of an evaluation.
+pub type Eval = i32;
+
+/// Piece-square tables. A bonus/malus for each piece depending on its
+/// position. Copied verbatim from
+/// [`PeSTO`]<https://www.chessprogramming.org/PeSTO>.
+///
+/// Order: pawn, knight, bishop, rook, queen, king. An extra table is included
+/// so that [`Piece::NONE`] can index into this array for a value of `0`.
+const PIECE_SQUARE_TABLES: [[Score; Nums::SQUARES]; Nums::TOTAL_PIECE_VARIANTS] =
+    create_piece_square_tables();
+
+/// The weight of each piece towards a middlegame. A total weight of 0 means
+/// it's an endgame. The starting weight (24) is the middlegame. The order is
+/// Black pawn, White pawn, Black knight, etc. Kings always exist so they have
+/// weight 0; an extra 0 is added to allow [`Piece::NONE`] to index into it.
+const PHASE_WEIGHTS: [Eval; Nums::TOTAL_PIECE_VARIANTS] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+
+/// A blend between middlegame value and endgame value.
+#[derive(Clone, Copy)]
+struct Score(Eval, Eval);
+
+impl Add for Score {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
+
+impl AddAssign for Score {
+    #[inline]
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+        self.1 += rhs.1;
+    }
+}
+
+impl Display for Score {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Score({}, {})", self.0, self.1)
+    }
+}
+
+impl Neg for Score {
+    type Output = Self;
+
+    #[inline]
+    fn neg(mut self) -> Self {
+        self.0 = -self.0;
+        self.1 = -self.1;
+        self
+    }
+}
+
+impl Score {
+    /// Lerp the current score to an eval given a game phase, where `0` means
+    /// use the middlegame score and `>= 24` means use the endgame score.
+    fn lerp_to_eval(self, mut phase: Eval) -> Eval {
+        // `>= 24` can happen because of early promotion
+        phase = min(24, phase);
+        let diff = self.1 - self.0;
+        self.1 - diff * phase / 24
+    }
+}
 
 impl Engine {
     /// Calculates a static evaluation of the current board depending on
     /// various heuristics.
     ///
-    /// Currently just calculates material balance.
-    // the single-letter difference ('w' vs 'b') clearly distinguishes pieces
-    // of different sides
-    #[allow(clippy::similar_names)]
+    /// Currently just calculates material balance with piece-square tables.
     #[inline]
     #[must_use]
-    pub fn evaluate_board(&self) -> i16 {
-        let mut material = 0;
-        let white_bb = self.board.side::<{ Side::WHITE.to_bool() }>();
-        let black_bb = self.board.side::<{ Side::BLACK.to_bool() }>();
+    pub fn evaluate_board(&self, board: &Board) -> Eval {
+        let mut score = Score(0, 0);
+        let mut phase = 0;
 
-        for piece in 0..Nums::PIECES as u8 {
-            let piece = Piece::from(piece);
-            if piece == Piece::NONE {
-                break;
-            }
-            let white = (self.board.piece_any(piece) & white_bb)
-                .inner()
-                .count_ones() as i16;
-            let black = (self.board.piece_any(piece) & black_bb)
-                .inner()
-                .count_ones() as i16;
-            material += (white - black) * PIECE_VALUES[piece.to_index()];
+        for (square, piece) in board.piece_board_iter().enumerate() {
+            score += PIECE_SQUARE_TABLES[piece.to_index()][square];
+            phase += PHASE_WEIGHTS[piece.to_index()];
         }
 
+        let eval = score.lerp_to_eval(phase);
         if self.board.side_to_move() == Side::WHITE {
-            material
+            eval
         } else {
-            -material
+            -eval
         }
     }
 }
