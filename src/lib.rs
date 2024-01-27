@@ -11,5 +11,7 @@ pub mod board;
 pub mod defs;
 /// A container for [`Engine`](engine::Engine).
 pub mod engine;
+/// For evaluation.
+mod evaluation;
 /// Handles UCI input
 pub mod uci;

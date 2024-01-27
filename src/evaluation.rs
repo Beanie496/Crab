@@ -4,10 +4,9 @@ use std::{
     ops::{Add, AddAssign, Neg},
 };
 
-use super::Engine;
 use crate::{
+    board::Board,
     defs::{Nums, Side},
-    engine::Board,
 };
 use piece_square_tables::create_piece_square_tables;
 
@@ -82,27 +81,25 @@ impl Score {
     }
 }
 
-impl Engine {
-    /// Calculates a static evaluation of the current board depending on
-    /// various heuristics.
-    ///
-    /// Currently just calculates material balance with piece-square tables.
-    #[inline]
-    #[must_use]
-    pub fn evaluate_board(&self, board: &Board) -> Eval {
-        let mut score = Score(0, 0);
-        let mut phase = 0;
+/// Calculates a static evaluation of the current board depending on
+/// various heuristics.
+///
+/// Currently just calculates material balance with piece-square tables.
+#[inline]
+#[must_use]
+pub fn evaluate_board(board: &Board) -> Eval {
+    let mut score = Score(0, 0);
+    let mut phase = 0;
 
-        for (square, piece) in board.piece_board_iter().enumerate() {
-            score += PIECE_SQUARE_TABLES[piece.to_index()][square];
-            phase += PHASE_WEIGHTS[piece.to_index()];
-        }
+    for (square, piece) in board.piece_board_iter().enumerate() {
+        score += PIECE_SQUARE_TABLES[piece.to_index()][square];
+        phase += PHASE_WEIGHTS[piece.to_index()];
+    }
 
-        let eval = score.lerp_to_eval(phase);
-        if self.board.side_to_move() == Side::WHITE {
-            eval
-        } else {
-            -eval
-        }
+    let eval = score.lerp_to_eval(phase);
+    if board.side_to_move() == Side::WHITE {
+        eval
+    } else {
+        -eval
     }
 }

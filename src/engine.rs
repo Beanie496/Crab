@@ -1,7 +1,5 @@
 use crate::board::Board;
 
-/// For evaluation.
-mod evaluate;
 /// For perft, as it's counting leaf nodes, not searching.
 mod perft;
 /// For search-related code.

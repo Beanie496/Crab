@@ -3,8 +3,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::{evaluate::Eval, Engine};
-use crate::board::{Board, Move, Moves};
+use super::Engine;
+use crate::{
+    board::{Board, Move, Moves},
+    evaluation::{evaluate_board, Eval},
+};
 
 /// Information about a search.
 struct SearchInfo {
@@ -61,7 +64,8 @@ impl Engine {
     pub fn search(&self, depth: Option<u8>) {
         let time = Instant::now();
         let depth = depth.unwrap_or(u8::MAX);
-        let mut max = -INF_EVAL;
+        let mut alpha = -INF_EVAL;
+        let beta = INF_EVAL;
         let mut search_info = SearchInfo::new(depth);
 
         let mut moves = Moves::new();
@@ -70,49 +74,22 @@ impl Engine {
         for mv in moves {
             let mut copy = self.board.clone();
             if !copy.make_move(mv) {
-                break;
+                continue;
             }
 
-            let result = -self.negamax(&mut search_info, &copy, depth - 1);
-            if result > max {
-                max = result;
+            let result = -alpha_beta_search(&mut search_info, &copy, -beta, -alpha, depth - 1);
+            if result > alpha {
+                alpha = result;
                 search_info.pv = mv;
             }
         }
 
         search_info.seldepth = depth;
         search_info.time = time.elapsed();
-        search_info.score = max;
+        search_info.score = alpha;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
 
         println!("{search_info}");
-    }
-
-    /// Performs negamax on `board`. Returns the evaluation of after searching
-    /// to the given depth.
-    fn negamax(&self, search_info: &mut SearchInfo, board: &Board, depth: u8) -> Eval {
-        search_info.nodes += 1;
-        if depth == 0 {
-            return self.evaluate_board(board);
-        }
-
-        let mut max = -INF_EVAL;
-        let mut moves = Moves::new();
-        board.generate_moves(&mut moves);
-
-        for mv in moves {
-            let mut copy = board.clone();
-            if !copy.make_move(mv) {
-                break;
-            }
-
-            let result = -self.negamax(search_info, &copy, depth - 1);
-            if result > max {
-                max = result;
-            }
-        }
-
-        max
     }
 }
 
@@ -133,4 +110,44 @@ impl SearchInfo {
             nps: 0,
         }
     }
+}
+
+/// Performs negamax on `board`. Returns the evaluation of after searching
+/// to the given depth.
+fn alpha_beta_search(
+    search_info: &mut SearchInfo,
+    board: &Board,
+    mut alpha: Eval,
+    beta: Eval,
+    depth: u8,
+) -> Eval {
+    search_info.nodes += 1;
+    if depth == 0 {
+        return evaluate_board(board);
+    }
+
+    let mut moves = Moves::new();
+    board.generate_moves(&mut moves);
+
+    for mv in moves {
+        let mut copy = board.clone();
+        if !copy.make_move(mv) {
+            continue;
+        }
+
+        let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
+        if result >= beta {
+            // our opponent can play a move that makes this position worse
+            // than what we have currently, so this position is guaranteed
+            // to be worse: return
+            return beta;
+        }
+        if result > alpha {
+            // our opponent can play a move that makes this position better
+            // for them, but our position remains better overall
+            alpha = result;
+        }
+    }
+
+    alpha
 }
