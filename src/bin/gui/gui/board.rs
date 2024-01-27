@@ -67,6 +67,6 @@ impl Gui {
     /// cycles but the side mailbox is a little more expensive due to the 64
     /// unpredictable branches.
     pub fn regenerate_mailboxes(&mut self) {
-        self.piece_mailbox = self.engine.board.clone_piece_board();
+        self.piece_mailbox = self.engine.board.clone_mailbox();
     }
 }

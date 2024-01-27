@@ -41,7 +41,7 @@ macro_rules! reset_board_print_return {
 pub struct Board {
     /// An array of piece values, used for quick lookup of which piece is on a
     /// given square.
-    piece_board: [Piece; Nums::SQUARES],
+    mailbox: [Piece; Nums::SQUARES],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     /// is the knights, and so on, as according to the order set by
     /// [`Piece`].
@@ -172,7 +172,7 @@ impl Default for Board {
     #[inline]
     fn default() -> Self {
         let mut board = Self {
-            piece_board: Self::default_piece_board(),
+            mailbox: Self::default_mailbox(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
             side_to_move: Side::WHITE,
@@ -198,10 +198,10 @@ impl Board {
         Self::default()
     }
 
-    /// Returns the [`Piece`] board of the starting position.
+    /// Returns the mailbox of the starting position.
     #[rustfmt::skip]
     #[allow(clippy::many_single_char_names, non_snake_case)]
-    const fn default_piece_board() -> [Piece; Nums::SQUARES] {
+    const fn default_mailbox() -> [Piece; Nums::SQUARES] {
         let p = Piece::BPAWN;
         let n = Piece::BKNIGHT;
         let b = Piece::BBISHOP;
@@ -227,8 +227,8 @@ impl Board {
         ]
     }
 
-    /// Returns an empty [`Piece`] board.
-    const fn empty_piece_board() -> [Piece; Nums::SQUARES] {
+    /// Returns an mailbox.
+    const fn empty_mailbox() -> [Piece; Nums::SQUARES] {
         [Piece::NONE; Nums::SQUARES]
     }
 
@@ -262,23 +262,23 @@ impl Board {
         [Bitboard::EMPTY; Nums::SIDES]
     }
 
-    /// Returns an iterator over the internal piece board. a1 b1, etc.
+    /// Returns an iterator over the internal mailbox. a1 b1, etc.
     #[inline]
-    pub fn piece_board_iter(&self) -> Iter<'_, Piece> {
-        self.piece_board.iter()
+    pub fn mailbox_iter(&self) -> Iter<'_, Piece> {
+        self.mailbox.iter()
     }
 
-    /// Copies and returns its mailbox board array.
+    /// Copies and returns the mailbox of `self`.
     #[inline]
     #[must_use]
-    pub const fn clone_piece_board(&self) -> [Piece; Nums::SQUARES] {
-        self.piece_board
+    pub const fn clone_mailbox(&self) -> [Piece; Nums::SQUARES] {
+        self.mailbox
     }
 
     /// Clears `self`.
     #[inline]
     pub fn clear_board(&mut self) {
-        self.piece_board = Self::empty_piece_board();
+        self.mailbox = Self::empty_mailbox();
         self.pieces = Self::no_pieces();
         self.sides = Self::no_sides();
         self.side_to_move = Side::NONE;
@@ -525,15 +525,8 @@ impl Board {
     #[must_use]
     pub fn piece_on(&self, square: Square) -> Piece {
         // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()]
-    }
-
-    /// Returns the piece bitboard of the given piece.
-    #[inline]
-    #[must_use]
-    pub const fn piece_any(&self, piece: Piece) -> Bitboard {
-        self.pieces[piece.to_type().to_index()]
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
+        self.mailbox[square.to_index()]
     }
 
     /// Returns the piece bitboard given by `PIECE`.
@@ -549,27 +542,80 @@ impl Board {
     pub fn add_piece(&mut self, square: Square, piece: Piece) {
         let square_bb = Bitboard::from_square(square);
         let side = piece.side();
-        self.set_piece(square, piece);
-        self.add_piece_to_psq(square, piece);
-        self.add_piece_to_phase(piece);
+        self.set_mailbox_piece(square, piece);
         self.toggle_piece_bb(piece.to_type(), square_bb);
         self.toggle_side_bb(side, square_bb);
+        self.add_psq_piece(square, piece);
+        self.add_phase_piece(piece);
     }
 
-    /// Sets the piece on `square` in the piece array to `piece`.
+    /// Removes `piece` from `square`.
+    ///
+    /// Technically most of these parameters could be calculated instead of
+    /// passed by argument, but it resulted in a noticeable slowdown when they
+    /// were removed.
     #[inline]
-    pub fn set_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()] = piece;
+    pub fn remove_piece(
+        &mut self,
+        square: Square,
+        piece: Piece,
+        piece_type: PieceType,
+        side: Side,
+    ) {
+        let bb = Bitboard::from_square(square);
+        self.unset_mailbox_piece(square);
+        self.toggle_piece_bb(piece_type, bb);
+        self.toggle_side_bb(side, bb);
+        self.remove_psq_piece(square, piece);
+        self.remove_phase_piece(piece);
     }
 
-    /// Sets the piece on `square` in the piece array to [`Square::NONE`].
+    /// A wrapper over [`move_mailbox_piece`](Board::move_mailbox_piece),
+    /// [`update_bb_piece`](Board::update_bb_piece) and
+    /// [`move_psq_piece`](Board::move_psq_piece).
+    ///
+    /// Use the three different functions separately if needed.
     #[inline]
-    pub fn unset_piece(&mut self, square: Square) {
+    fn move_piece(
+        &mut self,
+        start: Square,
+        end: Square,
+        piece: Piece,
+        piece_type: PieceType,
+        side: Side,
+    ) {
+        // this _is_ faster to calculate on the fly, since the alternative is
+        // passing a full `u64` by argument
+        let bb = Bitboard::from_square(start) | Bitboard::from_square(end);
+        self.move_mailbox_piece(start, end, piece);
+        self.update_bb_piece(bb, piece_type, side);
+        self.move_psq_piece(start, end, piece);
+    }
+
+    /// Sets the piece on `square` in the mailbox to `piece`.
+    #[inline]
+    pub fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_board.len()) };
-        self.piece_board[square.to_index()] = Piece::NONE;
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
+        self.mailbox[square.to_index()] = piece;
+    }
+
+    /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
+    #[inline]
+    pub fn unset_mailbox_piece(&mut self, square: Square) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
+        self.mailbox[square.to_index()] = Piece::NONE;
+    }
+
+    /// Moves `piece` from `start` to `end` in the mailbox.
+    ///
+    /// `piece` is assumed to exist at the start square: the piece is given as
+    /// an argument instead of calculated for reasons of speed.
+    #[inline]
+    pub fn move_mailbox_piece(&mut self, start: Square, end: Square, piece: Piece) {
+        self.unset_mailbox_piece(start);
+        self.set_mailbox_piece(end, piece);
     }
 
     /// Returns the side to move.
@@ -737,6 +783,7 @@ impl Board {
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
+    #[inline]
     fn toggle_piece_bb(&mut self, piece: PieceType, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.pieces.len()) };
@@ -744,10 +791,19 @@ impl Board {
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `side`.
+    #[inline]
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
         self.sides[side.to_index()] ^= bb;
+    }
+
+    /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
+    /// the side bitboard of `side`.
+    #[inline]
+    fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
+        self.toggle_piece_bb(piece_type, bb);
+        self.toggle_side_bb(side, bb);
     }
 
     /// Recalculates the accumulators from scratch. Prefer to use functions
@@ -756,7 +812,7 @@ impl Board {
         let mut score = Score(0, 0);
         let mut phase = 0;
 
-        for (square, piece) in self.piece_board_iter().enumerate() {
+        for (square, piece) in self.mailbox_iter().enumerate() {
             score += PIECE_SQUARE_TABLES[piece.to_index()][square];
             phase += PHASE_WEIGHTS[piece.to_index()];
         }
@@ -775,8 +831,10 @@ impl Board {
         self.psq_accumulator
     }
 
-    /// Adds `piece` to `self.psq`.
-    fn add_piece_to_psq(&mut self, square: Square, piece: Piece) {
+    /// Adds the piece-square table value for `piece` at `square` to the psqt
+    /// accumulator.
+    #[inline]
+    fn add_psq_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
         // SAFETY: If it does get reached, it will panic in debug.
@@ -784,13 +842,24 @@ impl Board {
         self.psq_accumulator += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
-    /// Removes `piece` from `self.psq`.
-    fn remove_piece_from_psq(&mut self, square: Square, piece: Piece) {
+    /// Removes the piece-square table value for `piece` at `square` from the
+    /// psqt accumulator.
+    #[inline]
+    fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
         self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+    }
+
+    /// Updates the piece-square table accumulator by adding the difference
+    /// between the psqt value of the start and end square (which can be
+    /// negative).
+    #[inline]
+    fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
+        self.remove_psq_piece(start, piece);
+        self.add_psq_piece(end, piece);
     }
 
     /// Gets the phase of the game. 0 is midgame and 24 is endgame.
@@ -804,14 +873,16 @@ impl Board {
     }
 
     /// Adds `piece` to `self.phase`.
-    fn add_piece_to_phase(&mut self, piece: Piece) {
+    #[inline]
+    fn add_phase_piece(&mut self, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
         self.phase_accumulator += PHASE_WEIGHTS[piece.to_index()];
     }
 
     /// Removes `piece` from `self.phase`.
-    fn remove_piece_from_phase(&mut self, piece: Piece) {
+    #[inline]
+    fn remove_phase_piece(&mut self, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
         self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];

@@ -340,12 +340,10 @@ impl Board {
             return false;
         }
 
-        self.move_piece(start, end, us, piece);
         self.clear_ep_square();
 
-        // these two `if` statements have to be lumped together, annoyingly -
-        // otherwise the second one would trigger incorrectly (since the the
-        // target square, containing a rook, would count)
+        // since castling is encoded as king takes rook, castling has to be
+        // checked before checking for captures
         if is_castling {
             // if the king is castling out of check
             if self.is_square_attacked(start) {
@@ -363,38 +361,44 @@ impl Board {
                 return false;
             }
 
-            self.move_piece(end, king_square, us, Piece::from(PieceType::KING, us));
-            self.move_piece(end, rook_square, us, Piece::from(PieceType::ROOK, us));
+            self.move_piece(start, king_square, piece, PieceType::KING, us);
+            self.move_piece(
+                end,
+                rook_square,
+                // `captured` is equivalent but slower
+                Piece::from(PieceType::ROOK, us),
+                PieceType::ROOK,
+                us,
+            );
 
             self.unset_castling_rights(us);
-        } else if captured_type != PieceType::NONE {
-            // if we're capturing a piece, unset the bitboard of the captured
-            // piece.
-            // By a happy accident, we don't need to check if we're capturing
-            // the same piece as we are currently - the bit would have been
-            // (wrongly) unset earlier, so this would (wrongly) re-set it.
-            // Looks like two wrongs do make a right in binary.
-            self.toggle_piece_bb(captured_type, end_bb);
-            self.toggle_side_bb(them, end_bb);
+        } else {
+            self.move_piece(start, end, piece, piece_type, us);
 
-            // check if we need to unset the castling rights if we're capturing
-            // a rook
-            if captured_type == PieceType::ROOK {
-                let us_inner = us.inner();
-                // this will be 0x81 if we're White (0x81 << 0) and
-                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
-                // the starting position of our rooks.
-                let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
-                if !(end_bb & rook_squares).is_empty() {
-                    // 0 or 56 for queenside -> 0
-                    // 7 or 63 for kingside -> 1
-                    let is_kingside = end.inner() & 1;
-                    // queenside -> 0b01
-                    // kingside -> 0b10
-                    // this replies upon knowing the internal representation of
-                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
-                    let flag = is_kingside + 1;
-                    self.unset_castling_right(them, CastlingRights::from(flag));
+            if captured_type != PieceType::NONE {
+                self.update_bb_piece(end_bb, captured_type, them);
+                self.remove_psq_piece(end, captured);
+                self.remove_phase_piece(captured);
+
+                // check if we need to unset the castling rights if we're capturing
+                // a rook
+                if captured_type == PieceType::ROOK {
+                    let us_inner = us.inner();
+                    // this will be 0x81 if we're White (0x81 << 0) and
+                    // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
+                    // the starting position of our rooks.
+                    let rook_squares = Bitboard::from(0x81) << (us_inner * 56);
+                    if !(end_bb & rook_squares).is_empty() {
+                        // 0 or 56 for queenside -> 0
+                        // 7 or 63 for kingside -> 1
+                        let is_kingside = end.inner() & 1;
+                        // queenside -> 0b01
+                        // kingside -> 0b10
+                        // this replies upon knowing the internal representation of
+                        // CastlingRights - 0b01 is queenside, 0b10 is kingside
+                        let flag = is_kingside + 1;
+                        self.unset_castling_right(them, CastlingRights::from(flag));
+                    }
                 }
             }
         }
@@ -405,24 +409,25 @@ impl Board {
             } else {
                 end.inner() + 8
             });
-            self.toggle_piece_bb(PieceType::PAWN, Bitboard::from_square(dest));
-            self.toggle_side_bb(them, Bitboard::from_square(dest));
-            self.unset_piece(dest);
-            self.remove_piece_from_psq(end, Piece::from(PieceType::PAWN, them));
-            self.remove_piece_from_phase(Piece::from(PieceType::PAWN, them));
+            let captured_pawn = Piece::from(PieceType::PAWN, them);
+            self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
         } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
         } else if is_promotion {
             let promotion_piece = Piece::from(promotion_piece_type, us);
-            self.set_piece(end, promotion_piece);
-            // unset the pawn on the promotion square...
-            self.toggle_piece_bb(PieceType::PAWN, end_bb);
-            // ...and set the promotion piece on that square
+
+            // overwrite the pawn on the mailbox
+            self.set_mailbox_piece(end, promotion_piece);
+
+            // remove the pawn
+            self.toggle_piece_bb(piece_type, end_bb);
+            self.remove_psq_piece(end, piece);
+            self.remove_phase_piece(piece);
+
+            // add the promotion piece
             self.toggle_piece_bb(promotion_piece_type, end_bb);
-            self.remove_piece_from_psq(end, piece);
-            self.remove_piece_from_phase(piece);
-            self.add_piece_to_psq(end, promotion_piece);
-            self.add_piece_to_phase(promotion_piece);
+            self.add_psq_piece(end, promotion_piece);
+            self.add_phase_piece(promotion_piece);
         }
 
         if self.is_square_attacked(self.king_square()) {
@@ -498,25 +503,6 @@ impl Board {
         (self.piece::<{ PieceType::KING.to_index() }>()
             & self.sides[self.side_to_move().to_index()])
         .to_square()
-    }
-
-    /// Toggles the side and piece bitboard on both `start` and `end`, sets
-    /// `start` in the piece array to [`Square::NONE`] and sets `end` in the
-    /// piece array to `piece`.
-    // TODO: this function has stopped making sense. Remove.
-    fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
-        let start_bb = Bitboard::from_square(start);
-        let end_bb = Bitboard::from_square(end);
-        let captured = self.piece_on(end);
-
-        self.toggle_piece_bb(piece.to_type(), start_bb | end_bb);
-        self.toggle_side_bb(side, start_bb | end_bb);
-        self.unset_piece(start);
-        self.set_piece(end, piece);
-        self.remove_piece_from_psq(start, piece);
-        self.remove_piece_from_psq(end, captured);
-        self.add_piece_to_psq(end, piece);
-        self.remove_piece_from_phase(captured);
     }
 
     /// Returns all the occupied squares on the board.

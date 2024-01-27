@@ -71,7 +71,7 @@ impl Gui {
         let engine = Engine::new();
 
         Self {
-            piece_mailbox: engine.board.clone_piece_board(),
+            piece_mailbox: engine.board.clone_mailbox(),
             engine,
             state: FrameState::default(),
         }
