@@ -116,6 +116,6 @@ fn test_positions() {
     }
 
     for handle in handles {
-        let _ = handle.join();
+        handle.join().expect("Test position passes");
     }
 }
