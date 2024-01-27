@@ -36,7 +36,7 @@ struct SearchInfo {
 }
 
 /// The highest possible (positive) evaluation.
-const INF_EVAL: Eval = i32::MAX;
+const INF_EVAL: Eval = Eval::MAX;
 
 impl Display for SearchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

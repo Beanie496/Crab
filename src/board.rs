@@ -7,6 +7,7 @@ use std::{
 use crate::{
     bitboard::Bitboard,
     defs::{File, Nums, Piece, PieceType, Rank, Side, Square},
+    evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
     out_of_bounds_is_unreachable,
 };
 use movegen::Lookup;
@@ -60,6 +61,17 @@ pub struct Board {
     /// Which move number the current move is. Starts at 1 and is incremented
     /// when Black moves.
     fullmoves: u16,
+    /// The current material balance weighted with piece-square tables, from
+    /// the perspective of White.
+    ///
+    /// It is incrementally updated.
+    psq_accumulator: Score,
+    /// The current phase of the game, where 0 means the midgame and 24 means
+    /// the endgame.
+    ///
+    /// `psq_val` uses this value to lerp between its midgame and
+    /// endgame values. It is incrementally updated.
+    phase_accumulator: u8,
 }
 
 impl Display for Board {
@@ -159,7 +171,7 @@ impl CastlingRights {
 impl Default for Board {
     #[inline]
     fn default() -> Self {
-        Self {
+        let mut board = Self {
             piece_board: Self::default_piece_board(),
             pieces: Self::default_pieces(),
             sides: Self::default_sides(),
@@ -168,7 +180,11 @@ impl Default for Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-        }
+            psq_accumulator: Score(0, 0),
+            phase_accumulator: 0,
+        };
+        board.refresh_accumulators();
+        board
     }
 }
 
@@ -534,6 +550,8 @@ impl Board {
         let square_bb = Bitboard::from_square(square);
         let side = piece.side();
         self.set_piece(square, piece);
+        self.add_piece_to_psq(square, piece);
+        self.add_piece_to_phase(piece);
         self.toggle_piece_bb(piece.to_type(), square_bb);
         self.toggle_side_bb(side, square_bb);
     }
@@ -730,6 +748,73 @@ impl Board {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
         self.sides[side.to_index()] ^= bb;
+    }
+
+    /// Recalculates the accumulators from scratch. Prefer to use functions
+    /// that incrementally update both if possible.
+    fn refresh_accumulators(&mut self) {
+        let mut score = Score(0, 0);
+        let mut phase = 0;
+
+        for (square, piece) in self.piece_board_iter().enumerate() {
+            score += PIECE_SQUARE_TABLES[piece.to_index()][square];
+            phase += PHASE_WEIGHTS[piece.to_index()];
+        }
+
+        self.psq_accumulator = score;
+        self.phase_accumulator = phase;
+    }
+
+    /// Calculates the current material + piece-square table balance.
+    ///
+    /// Since this value is incrementally upadated, this function is zero-cost
+    /// to call.
+    #[inline]
+    #[must_use]
+    pub const fn psq(&self) -> Score {
+        self.psq_accumulator
+    }
+
+    /// Adds `piece` to `self.psq`.
+    fn add_piece_to_psq(&mut self, square: Square, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        self.psq_accumulator += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+    }
+
+    /// Removes `piece` from `self.psq`.
+    fn remove_piece_from_psq(&mut self, square: Square, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+    }
+
+    /// Gets the phase of the game. 0 is midgame and 24 is endgame.
+    ///
+    /// Since this value is incrementally upadated, this function is zero-cost
+    /// to call.
+    #[inline]
+    #[must_use]
+    pub const fn phase(&self) -> u8 {
+        self.phase_accumulator
+    }
+
+    /// Adds `piece` to `self.phase`.
+    fn add_piece_to_phase(&mut self, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
+        self.phase_accumulator += PHASE_WEIGHTS[piece.to_index()];
+    }
+
+    /// Removes `piece` from `self.phase`.
+    fn remove_piece_from_phase(&mut self, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
+        self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
     }
 }
 

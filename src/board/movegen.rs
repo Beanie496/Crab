@@ -408,14 +408,21 @@ impl Board {
             self.toggle_piece_bb(PieceType::PAWN, Bitboard::from_square(dest));
             self.toggle_side_bb(them, Bitboard::from_square(dest));
             self.unset_piece(dest);
+            self.remove_piece_from_psq(end, Piece::from(PieceType::PAWN, them));
+            self.remove_piece_from_phase(Piece::from(PieceType::PAWN, them));
         } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square::from((start.inner() + end.inner()) >> 1));
         } else if is_promotion {
-            self.set_piece(end, Piece::from(promotion_piece_type, us));
+            let promotion_piece = Piece::from(promotion_piece_type, us);
+            self.set_piece(end, promotion_piece);
             // unset the pawn on the promotion square...
             self.toggle_piece_bb(PieceType::PAWN, end_bb);
             // ...and set the promotion piece on that square
             self.toggle_piece_bb(promotion_piece_type, end_bb);
+            self.remove_piece_from_psq(end, piece);
+            self.remove_piece_from_phase(piece);
+            self.add_piece_to_psq(end, promotion_piece);
+            self.add_piece_to_phase(promotion_piece);
         }
 
         if self.is_square_attacked(self.king_square()) {
@@ -496,14 +503,20 @@ impl Board {
     /// Toggles the side and piece bitboard on both `start` and `end`, sets
     /// `start` in the piece array to [`Square::NONE`] and sets `end` in the
     /// piece array to `piece`.
+    // TODO: this function has stopped making sense. Remove.
     fn move_piece(&mut self, start: Square, end: Square, side: Side, piece: Piece) {
         let start_bb = Bitboard::from_square(start);
         let end_bb = Bitboard::from_square(end);
+        let captured = self.piece_on(end);
 
         self.toggle_piece_bb(piece.to_type(), start_bb | end_bb);
         self.toggle_side_bb(side, start_bb | end_bb);
         self.unset_piece(start);
         self.set_piece(end, piece);
+        self.remove_piece_from_psq(start, piece);
+        self.remove_piece_from_psq(end, captured);
+        self.add_piece_to_psq(end, piece);
+        self.remove_piece_from_phase(captured);
     }
 
     /// Returns all the occupied squares on the board.
