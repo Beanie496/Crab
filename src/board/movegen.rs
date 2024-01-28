@@ -4,7 +4,7 @@ use super::Board;
 use crate::{
     bitboard::Bitboard,
     board::CastlingRights,
-    defs::{File, Nums, Piece, PieceType, Rank, Side, Square},
+    defs::{File, Piece, PieceType, Rank, Side, Square},
     out_of_bounds_is_unreachable,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
@@ -21,13 +21,13 @@ pub mod util;
 pub struct Lookup {
     /// The pawn attack table. `pawn_attacks[side][square] == attack bitboard
     /// for that square`.
-    pawn_attacks: [[Bitboard; Nums::SQUARES]; Nums::SIDES],
+    pawn_attacks: [[Bitboard; Square::TOTAL]; Side::TOTAL],
     /// The knight attack table. `knight_attacks[square] == attack bitboard for
     /// that square`.
-    knight_attacks: [Bitboard; Nums::SQUARES],
+    knight_attacks: [Bitboard; Square::TOTAL],
     /// The king attack table. `king_attacks[square] == attack bitboard for
     /// that square`.
-    king_attacks: [Bitboard; Nums::SQUARES],
+    king_attacks: [Bitboard; Square::TOTAL],
     /// The magic lookup table for bishops. It uses the 'fancy' approach. See
     /// <https://www.chessprogramming.org/Magic_Bitboards>.
     bishop_magic_table: [Bitboard; BISHOP_SIZE],
@@ -36,10 +36,10 @@ pub struct Lookup {
     rook_magic_table: [Bitboard; ROOK_SIZE],
     /// The (wrapped) magic numbers for the bishop. One per square. See
     /// <https://www.chessprogramming.org/Magic_Bitboards>.
-    bishop_magics: [Magic; Nums::SQUARES],
+    bishop_magics: [Magic; Square::TOTAL],
     /// The (wrapped) magic numbers for the rook. One per square. See
     /// <https://www.chessprogramming.org/Magic_Bitboards>.
-    rook_magics: [Magic; Nums::SQUARES],
+    rook_magics: [Magic; Square::TOTAL],
 }
 
 /// A wrapper for a move and associated methods.
@@ -533,15 +533,15 @@ impl Lookup {
     #[allow(clippy::large_stack_frames)]
     const fn empty() -> Self {
         Self {
-            pawn_attacks: [[Bitboard::EMPTY; Nums::SQUARES]; Nums::SIDES],
-            knight_attacks: [Bitboard::EMPTY; Nums::SQUARES],
-            king_attacks: [Bitboard::EMPTY; Nums::SQUARES],
+            pawn_attacks: [[Bitboard::EMPTY; Square::TOTAL]; Side::TOTAL],
+            knight_attacks: [Bitboard::EMPTY; Square::TOTAL],
+            king_attacks: [Bitboard::EMPTY; Square::TOTAL],
             bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
             // allowed because, after testing, a vector was slightly slower
             #[allow(clippy::large_stack_arrays)]
             rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
-            bishop_magics: [Magic::default(); Nums::SQUARES],
-            rook_magics: [Magic::default(); Nums::SQUARES],
+            bishop_magics: [Magic::default(); Square::TOTAL],
+            rook_magics: [Magic::default(); Square::TOTAL],
         }
     }
 
@@ -550,7 +550,7 @@ impl Lookup {
         for (square, bb) in self.pawn_attacks[Side::WHITE.to_index()]
             .iter_mut()
             .enumerate()
-            .take(Nums::SQUARES - Nums::FILES)
+            .take(Square::TOTAL - File::TOTAL)
         {
             let pushed = Bitboard::from_square(Square::from(square as u8 + 8));
             *bb = pushed.east() | pushed.west();
@@ -558,7 +558,7 @@ impl Lookup {
         for (square, bb) in self.pawn_attacks[Side::BLACK.to_index()]
             .iter_mut()
             .enumerate()
-            .skip(Nums::FILES)
+            .skip(File::TOTAL)
         {
             let pushed = Bitboard::from_square(Square::from(square as u8 - 8));
             *bb = pushed.east() | pushed.west();
@@ -601,7 +601,7 @@ impl Lookup {
         let mut b_offset = 0;
         let mut r_offset = 0;
 
-        for square in 0..Nums::SQUARES {
+        for square in 0..Square::TOTAL {
             let square = Square::from(square as u8);
             let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
             let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1)

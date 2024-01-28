@@ -5,7 +5,7 @@ use oorandom::Rand64;
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
 use crate::{
     bitboard::Bitboard,
-    defs::{File, Nums, PieceType, Rank, Square},
+    defs::{File, PieceType, Rank, Square},
 };
 
 /// Stores magic information for a square:
@@ -27,7 +27,7 @@ pub struct Magic {
 
 /// The hardcoded magic numbers for the bishop. Generated using [`find_magics`].
 #[allow(clippy::unreadable_literal)]
-pub const BISHOP_MAGICS: [u64; Nums::SQUARES] = [
+pub const BISHOP_MAGICS: [u64; Square::TOTAL] = [
     18017181921083777,
     2459251561629761536,
     292753294555095040,
@@ -100,7 +100,7 @@ pub const MAX_BLOCKERS: usize = 4096;
 
 /// The hardcoded magic numbers for the rook. Generated using [`find_magics`].
 #[allow(clippy::unreadable_literal)]
-pub const ROOK_MAGICS: [u64; Nums::SQUARES] = [
+pub const ROOK_MAGICS: [u64; Square::TOTAL] = [
     36033333578174594,
     10394312406808535040,
     144152572550217736,
@@ -229,7 +229,7 @@ pub fn find_magics<const PIECE: u8>() {
             .as_millis(),
     );
 
-    for square in 0..Nums::SQUARES {
+    for square in 0..Square::TOTAL {
         let square = Square::from(square as u8);
         let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
             & !Bitboard::file_bb(square.file_of());

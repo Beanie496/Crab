@@ -1,5 +1,5 @@
 use super::Score;
-use crate::defs::{Nums, Piece, PieceType, Side};
+use crate::defs::{Piece, PieceType, Side, Square};
 
 /// A C-style `for` loop to allow easier looping in `const` functions.
 // idea for this is from viridithas
@@ -17,14 +17,14 @@ macro_rules! cfor {
 ///
 /// Order: pawn, knight, bishop, rook, queen, king.
 #[rustfmt::skip]
-const PIECE_VALUES: [Score; Nums::PIECES] = [
+const PIECE_VALUES: [Score; PieceType::TOTAL] = [
     Score(82, 94), Score(337, 281), Score(365, 297), Score(477, 512), Score(1025, 936), Score(10_000, 10_000),
 ];
 
 /// Piece-square tables, copied verbatim from
 /// <https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function>.
 #[rustfmt::skip]
-const INITIAL_PIECE_SQUARE_TABLES: [[Score; Nums::SQUARES]; Nums::PIECES] = [
+const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = [
 [
     Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0),
     Score(-35, 13), Score(-1, 8), Score(-20, 8), Score(-23, 10), Score(-15, 13), Score(24, 0), Score(38, 2), Score(-22, -7),
@@ -92,12 +92,12 @@ const INITIAL_PIECE_SQUARE_TABLES: [[Score; Nums::SQUARES]; Nums::PIECES] = [
 // TODO: not too sure about allowing `module_name_repetitions`...maybe rename
 // the module and/or function?
 #[allow(clippy::module_name_repetitions, clippy::similar_names)]
-pub const fn create_piece_square_tables() -> [[Score; Nums::SQUARES]; Nums::TOTAL_PIECE_VARIANTS] {
-    let mut psqt = [[Score(0, 0); Nums::SQUARES]; Nums::TOTAL_PIECE_VARIANTS];
-    cfor!(let mut piece = 0; piece < Nums::PIECES; piece += 1; {
+pub const fn create_piece_square_tables() -> [[Score; Square::TOTAL]; Piece::TOTAL + 1] {
+    let mut psqt = [[Score(0, 0); Square::TOTAL]; Piece::TOTAL + 1];
+    cfor!(let mut piece = 0; piece < PieceType::TOTAL; piece += 1; {
         let w_piece_index = Piece::from(PieceType::from(piece as u8), Side::WHITE).to_index();
         let b_piece_index = Piece::from(PieceType::from(piece as u8), Side::BLACK).to_index();
-        cfor!(let mut square = 0; square < Nums::SQUARES; square += 1; {
+        cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             let flipped_square = square ^ 56;
             let Score(mut mg, mut eg) = PIECE_VALUES[piece];
             let Score(mg_psq, eg_psq) = INITIAL_PIECE_SQUARE_TABLES[piece][square];

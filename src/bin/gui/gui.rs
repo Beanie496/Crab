@@ -1,7 +1,7 @@
 use update::FrameState;
 
 use backend::{
-    defs::{Nums, Piece, Square},
+    defs::{Piece, Square},
     engine::Engine,
 };
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -30,7 +30,7 @@ enum SquareColorType {
 /// The GUI: used to save state between frames.
 pub struct Gui {
     /// A redundant piece mailbox to separate it from the internal board.
-    piece_mailbox: [Piece; Nums::SQUARES],
+    piece_mailbox: [Piece; Square::TOTAL],
     /// The internal engine, used for calculating legal moves and searching.
     engine: Engine,
     /// See documentation for [`FrameState`].

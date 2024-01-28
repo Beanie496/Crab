@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     bitboard::Bitboard,
-    defs::{File, Nums, Piece, PieceType, Rank, Side, Square},
+    defs::{File, Piece, PieceType, Rank, Side, Square},
     evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
     out_of_bounds_is_unreachable,
 };
@@ -41,14 +41,14 @@ macro_rules! reset_board_print_return {
 pub struct Board {
     /// An array of piece values, used for quick lookup of which piece is on a
     /// given square.
-    mailbox: [Piece; Nums::SQUARES],
+    mailbox: [Piece; Square::TOTAL],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
     /// is the knights, and so on, as according to the order set by
     /// [`Piece`].
-    pieces: [Bitboard; Nums::PIECES],
+    pieces: [Bitboard; PieceType::TOTAL],
     /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     /// is is the intersection of all Black piece bitboards.
-    sides: [Bitboard; Nums::SIDES],
+    sides: [Bitboard; Side::TOTAL],
     /// The current side to move.
     side_to_move: Side,
     /// Castling rights.
@@ -201,7 +201,7 @@ impl Board {
     /// Returns the mailbox of the starting position.
     #[rustfmt::skip]
     #[allow(clippy::many_single_char_names, non_snake_case)]
-    const fn default_mailbox() -> [Piece; Nums::SQUARES] {
+    const fn default_mailbox() -> [Piece; Square::TOTAL] {
         let p = Piece::BPAWN;
         let n = Piece::BKNIGHT;
         let b = Piece::BBISHOP;
@@ -228,12 +228,12 @@ impl Board {
     }
 
     /// Returns an mailbox.
-    const fn empty_mailbox() -> [Piece; Nums::SQUARES] {
-        [Piece::NONE; Nums::SQUARES]
+    const fn empty_mailbox() -> [Piece; Square::TOTAL] {
+        [Piece::NONE; Square::TOTAL]
     }
 
     /// Returns the piece [`Bitboard`]s of the starting position.
-    const fn default_pieces() -> [Bitboard; Nums::PIECES] {
+    const fn default_pieces() -> [Bitboard; PieceType::TOTAL] {
         [
             Bitboard::from(0x00ff_0000_0000_ff00), // Pawns
             Bitboard::from(0x4200_0000_0000_0042), // Knights
@@ -245,12 +245,12 @@ impl Board {
     }
 
     /// Returns the piece [`Bitboard`]s of an empty board.
-    const fn no_pieces() -> [Bitboard; Nums::PIECES] {
-        [Bitboard::EMPTY; Nums::PIECES]
+    const fn no_pieces() -> [Bitboard; PieceType::TOTAL] {
+        [Bitboard::EMPTY; PieceType::TOTAL]
     }
 
     /// Returns the side [`Bitboard`]s of the starting position.
-    const fn default_sides() -> [Bitboard; Nums::SIDES] {
+    const fn default_sides() -> [Bitboard; Side::TOTAL] {
         [
             Bitboard::from(0xffff_0000_0000_0000), // Black
             Bitboard::from(0x0000_0000_0000_ffff), // White
@@ -258,8 +258,8 @@ impl Board {
     }
 
     /// Returns the side [`Bitboard`]s of an empty board.
-    const fn no_sides() -> [Bitboard; Nums::SIDES] {
-        [Bitboard::EMPTY; Nums::SIDES]
+    const fn no_sides() -> [Bitboard; Side::TOTAL] {
+        [Bitboard::EMPTY; Side::TOTAL]
     }
 
     /// Returns an iterator over the internal mailbox. a1 b1, etc.
@@ -271,7 +271,7 @@ impl Board {
     /// Copies and returns the mailbox of `self`.
     #[inline]
     #[must_use]
-    pub const fn clone_mailbox(&self) -> [Piece; Nums::SQUARES] {
+    pub const fn clone_mailbox(&self) -> [Piece; Square::TOTAL] {
         self.mailbox
     }
 
@@ -289,9 +289,9 @@ impl Board {
     /// Pretty-prints the current state of the board.
     #[inline]
     pub fn pretty_print(&self) {
-        for r in (0..Nums::RANKS as u8).rev() {
+        for r in (0..Rank::TOTAL as u8).rev() {
             print!("{} | ", r + 1);
-            for f in 0..Nums::FILES as u8 {
+            for f in 0..File::TOTAL as u8 {
                 print!(
                     "{} ",
                     self.char_piece_from_pos(Rank::from(r), File::from(f))
@@ -482,8 +482,8 @@ impl Board {
         // I can't just iterate over the piece board normally: the board goes
         // from a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
         // rank-file
-        for rank in (0..Nums::RANKS).rev() {
-            for file in 0..Nums::FILES {
+        for rank in (0..Rank::TOTAL).rev() {
+            for file in 0..File::TOTAL {
                 let square = Square::from_pos(Rank::from(rank as u8), File::from(file as u8));
                 let piece = self.piece_on(square);
 

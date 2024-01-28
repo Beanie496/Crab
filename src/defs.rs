@@ -38,10 +38,6 @@ pub struct File {
     f: u8,
 }
 
-/// Miscellaneous constants associated with chess (`SIDES == 2`, etc.)
-#[allow(clippy::exhaustive_structs)]
-pub struct Nums;
-
 /// A piece, containing the type of piece and side.
 ///
 /// The internal order of pieces is the same as [`PieceType`], but the exact
@@ -82,7 +78,7 @@ pub struct Square {
 ///
 /// e.g. `PIECE_CHARS[Side::WHITE][Piece::KNIGHT] == 'N'`;
 /// `PIECE_CHARS[Side::BLACK][Piece::KING] == 'k'`.
-const PIECE_CHARS: [char; Nums::PIECES * Nums::SIDES] =
+const PIECE_CHARS: [char; PieceType::TOTAL * Side::TOTAL] =
     ['P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k'];
 
 impl Display for Square {
@@ -130,21 +126,7 @@ impl File {
     pub const FILE6: Self = Self::from(5);
     pub const FILE7: Self = Self::from(6);
     pub const FILE8: Self = Self::from(7);
-}
-
-impl Nums {
-    /// The number of files.
-    pub const FILES: usize = 8;
-    /// The number of ranks.
-    pub const RANKS: usize = 8;
-    /// The number of squares.
-    pub const SQUARES: usize = 64;
-    /// The number of pieces.
-    pub const PIECES: usize = 6;
-    /// The number of sides.
-    pub const SIDES: usize = 2;
-    /// The total different number of pieces (including no piece).
-    pub const TOTAL_PIECE_VARIANTS: usize = 13;
+    pub const TOTAL: usize = 8;
 }
 
 /// Enumerates pieces for White and Black.
@@ -162,6 +144,7 @@ impl Piece {
     pub const BROOK: Self = Self::from(PieceType::ROOK, Side::BLACK);
     pub const BQUEEN: Self = Self::from(PieceType::QUEEN, Side::BLACK);
     pub const BKING: Self = Self::from(PieceType::KING, Side::BLACK);
+    pub const TOTAL: usize = 12;
     pub const NONE: Self = Self { p: 12 };
 }
 
@@ -174,6 +157,7 @@ impl PieceType {
     pub const ROOK: Self = Self::from(3);
     pub const QUEEN: Self = Self::from(4);
     pub const KING: Self = Self::from(5);
+    pub const TOTAL: usize = 6;
     pub const NONE: Self = Self::from(6);
 }
 
@@ -190,6 +174,7 @@ impl Rank {
     pub const RANK6: Self = Self::from(5);
     pub const RANK7: Self = Self::from(6);
     pub const RANK8: Self = Self::from(7);
+    pub const TOTAL: usize = 8;
 }
 
 /// Enumerates sides.
@@ -199,6 +184,7 @@ impl Rank {
 impl Side {
     pub const BLACK: Self = Self::from(0);
     pub const WHITE: Self = Self::from(1);
+    pub const TOTAL: usize = 2;
     pub const NONE: Self = Self::from(2);
 }
 
@@ -273,6 +259,7 @@ impl Square {
     pub const F8: Self = Self::from(61);
     pub const G8: Self = Self::from(62);
     pub const H8: Self = Self::from(63);
+    pub const TOTAL: usize = 64;
     pub const NONE: Self = Self::from(64);
 }
 

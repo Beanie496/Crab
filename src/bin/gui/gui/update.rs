@@ -1,7 +1,7 @@
 use super::{Gui, SquareColor, SquareColorType};
 use crate::{gui::draw::paint_area_with_color, util::points_to_pixels};
 
-use backend::defs::{File, Nums, Piece, Rank, Square};
+use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
     egui::{
         self, widgets::Button, Align, Color32, Context, Direction, Id, Layout, Pos2, Rect, Sense,
@@ -79,8 +79,8 @@ impl Gui {
         let mut color = SquareColor::new(SquareColorType::Dark);
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
-        for rank in 0..Nums::RANKS {
-            for file in 0..Nums::FILES {
+        for rank in 0..Rank::TOTAL {
+            for file in 0..File::TOTAL {
                 let square = Square::from_pos(Rank::from(rank as u8), File::from(file as u8));
                 let square_corners = Rect {
                     // the board to be drawn is 800x800 pixels and sits at the

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     board::Board,
-    defs::{Nums, Side},
+    defs::{Piece, Side, Square},
 };
 use piece_square_tables::create_piece_square_tables;
 
@@ -22,14 +22,14 @@ pub type Eval = i16;
 ///
 /// Order: pawn, knight, bishop, rook, queen, king. An extra table is included
 /// so that [`Piece::NONE`] can index into this array for a value of `0`.
-pub const PIECE_SQUARE_TABLES: [[Score; Nums::SQUARES]; Nums::TOTAL_PIECE_VARIANTS] =
+pub const PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
     create_piece_square_tables();
 
 /// The weight of each piece towards a middlegame. A total weight of 0 means
 /// it's an endgame. The starting weight (24) is the middlegame. The order is
 /// Black pawn, White pawn, Black knight, etc. Kings always exist so they have
 /// weight 0; an extra 0 is added to allow [`Piece::NONE`] to index into it.
-pub const PHASE_WEIGHTS: [u8; Nums::TOTAL_PIECE_VARIANTS] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+pub const PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
 /// A blend between middlegame value and endgame value.
 #[derive(Clone, Copy)]
