@@ -39,7 +39,6 @@ pub struct File {
 }
 
 /// Miscellaneous constants associated with chess (`SIDES == 2`, etc.)
-// TODO: this struct doesn't need to exist. Put its constants with the pieces.
 #[allow(clippy::exhaustive_structs)]
 pub struct Nums;
 

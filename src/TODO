@@ -1,0 +1,6 @@
+- look into all the variations of magic bitboards
+  - black magic is a nice table size reduction of 18% at the cost of one additional instruction
+  - byte lookup massively reduces the table size (all tables fit into my l1 cache!!) at the cost of an additional lookup
+  - sharing attacks halves the table size at the cost of one additional instruction
+    - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
+- delete `Nums`
