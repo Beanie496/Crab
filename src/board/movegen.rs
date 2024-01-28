@@ -28,12 +28,11 @@ pub struct Lookup {
     /// The king attack table. `king_attacks[square] == attack bitboard for
     /// that square`.
     king_attacks: [Bitboard; Square::TOTAL],
-    /// The magic lookup table for bishops. It uses the 'fancy' approach. See
-    /// <https://www.chessprogramming.org/Magic_Bitboards>.
-    bishop_magic_table: [Bitboard; BISHOP_SIZE],
-    /// The magic lookup table for rooks. It uses the 'fancy' approach. See
-    /// <https://www.chessprogramming.org/Magic_Bitboards>.
-    rook_magic_table: [Bitboard; ROOK_SIZE],
+    /// The magic lookup table for rooks and bishops.
+    ///
+    /// The rook attacks are before all the bishop attacks. It uses the 'fancy'
+    /// approach. See <https://www.chessprogramming.org/Magic_Bitboards>.
+    magic_table: [Bitboard; ROOK_SIZE + BISHOP_SIZE],
     /// The (wrapped) magic numbers for the bishop. One per square. See
     /// <https://www.chessprogramming.org/Magic_Bitboards>.
     bishop_magics: [Magic; Square::TOTAL],
@@ -536,10 +535,9 @@ impl Lookup {
             pawn_attacks: [[Bitboard::EMPTY; Square::TOTAL]; Side::TOTAL],
             knight_attacks: [Bitboard::EMPTY; Square::TOTAL],
             king_attacks: [Bitboard::EMPTY; Square::TOTAL],
-            bishop_magic_table: [Bitboard::EMPTY; BISHOP_SIZE],
             // allowed because, after testing, a vector was slightly slower
             #[allow(clippy::large_stack_arrays)]
-            rook_magic_table: [Bitboard::EMPTY; ROOK_SIZE],
+            magic_table: [Bitboard::EMPTY; ROOK_SIZE + BISHOP_SIZE],
             bishop_magics: [Magic::default(); Square::TOTAL],
             rook_magics: [Magic::default(); Square::TOTAL],
         }
@@ -598,7 +596,7 @@ impl Lookup {
     /// Initialises the magic lookup tables with attacks and initialises a
     /// [`Magic`] object for each square.
     fn init_magics(&mut self) {
-        let mut b_offset = 0;
+        let mut b_offset = ROOK_SIZE;
         let mut r_offset = 0;
 
         for square in 0..Square::TOTAL {
@@ -636,7 +634,7 @@ impl Lookup {
             let mut blockers = b_mask;
             for attack in attacks.iter().take(b_perms) {
                 let index = b_magic.get_table_index(blockers);
-                self.bishop_magic_table[index] = *attack;
+                self.magic_table[index] = *attack;
                 blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & b_mask;
             }
             self.bishop_magics[square.to_index()] = b_magic;
@@ -646,7 +644,7 @@ impl Lookup {
             let mut blockers = r_mask;
             for attack in attacks.iter().take(r_perms) {
                 let index = r_magic.get_table_index(blockers);
-                self.rook_magic_table[index] = *attack;
+                self.magic_table[index] = *attack;
                 blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & r_mask;
             }
             self.rook_magics[square.to_index()] = r_magic;
@@ -687,8 +685,8 @@ impl Lookup {
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
         let index = self.bishop_magics[square.to_index()].get_table_index(blockers);
         // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.bishop_magic_table.len()) };
-        self.bishop_magic_table[index]
+        unsafe { out_of_bounds_is_unreachable!(index, self.magic_table.len()) };
+        self.magic_table[index]
     }
 
     /// Finds the rook attacks from `square` with the given blockers.
@@ -698,8 +696,8 @@ impl Lookup {
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
         let index = self.rook_magics[square.to_index()].get_table_index(blockers);
         // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.rook_magic_table.len()) };
-        self.rook_magic_table[index]
+        unsafe { out_of_bounds_is_unreachable!(index, self.magic_table.len()) };
+        self.magic_table[index]
     }
 
     /// Finds the queen attacks from `square` with the given blockers.

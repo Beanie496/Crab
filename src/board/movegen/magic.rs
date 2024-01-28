@@ -21,7 +21,6 @@ pub struct Magic {
     /// difference whether or not there is a piece on the edge).
     shift: u32,
     /// Where in the table the lookups are.
-    // u16 (0-65535) is slightly too small for the rook table (102,400)
     offset: u32,
 }
 
@@ -171,20 +170,20 @@ impl Magic {
     /// Returns a [`Magic`] with the fields set to the given parameters.
     pub const fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
         Self {
-            magic,
             mask,
-            offset: offset as u32,
+            magic,
             shift,
+            offset: offset as u32,
         }
     }
 
     /// Returns a 0-initialised [`Magic`].
     pub const fn default() -> Self {
         Self {
-            magic: 0,
             mask: Bitboard::EMPTY,
-            offset: 0,
+            magic: 0,
             shift: 0,
+            offset: 0,
         }
     }
 
