@@ -1,6 +1,9 @@
-use crate::defs::{File, Rank, Square};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl},
+};
 
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl};
+use crate::defs::{File, Rank, Square};
 
 /// A wrapper for a `u64`, since a bitboard is 64 bits.
 // the idea for wrapping these types in structs and implementing a tonne of
@@ -57,6 +60,26 @@ impl BitXorAssign for Bitboard {
     #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0;
+    }
+}
+
+impl Display for Bitboard {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+
+        for r in (0..Rank::TOTAL as u8).rev() {
+            for f in 0..File::TOTAL as u8 {
+                let is_bit_set = !(*self & Self::from_pos(Rank(r), File(f))).is_empty();
+                ret.push(char::from(b'0' + u8::from(is_bit_set)));
+                ret.push(' ');
+            }
+            ret.pop();
+            ret.push('\n');
+        }
+        ret.pop();
+
+        f.write_str(&ret)
     }
 }
 
@@ -186,6 +209,8 @@ impl Bitboard {
     /// 0 0 0 0 0 0 0 1
     /// X 0 0 0 0 0 0 1
     /// ```
+    #[inline]
+    #[must_use]
     pub fn edges_without(square: Square) -> Self {
         let excluded_ranks_bb = (Self::file_bb(File::FILE1) | Self::file_bb(File::FILE8))
             & !Self::file_bb(File::from(square));
@@ -263,22 +288,6 @@ impl Bitboard {
     #[must_use]
     pub const fn to_square(self) -> Square {
         Square(self.0.trailing_zeros() as u8)
-    }
-
-    /// Pretty prints `self`.
-    // Allowed dead code because this is occasionally useful for debugging.
-    #[inline]
-    pub fn pretty_print(self) {
-        for r in (Rank::RANK1.0..=Rank::RANK8.0).rev() {
-            for f in File::FILE1.0..=File::FILE8.0 {
-                print!(
-                    "{} ",
-                    u32::from(!(self & Self::from_pos(Rank(r), File(f))).is_empty())
-                );
-            }
-            println!();
-        }
-        println!();
     }
 }
 
