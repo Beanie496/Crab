@@ -81,7 +81,7 @@ impl Gui {
         // bottom to top
         for rank in 0..Rank::TOTAL {
             for file in 0..File::TOTAL {
-                let square = Square::from_pos(Rank::from(rank as u8), File::from(file as u8));
+                let square = Square::from_pos(Rank(rank as u8), File(file as u8));
                 let square_corners = Rect {
                     // the board to be drawn is 800x800 pixels and sits at the
                     // bottom left with a margix of 40 pixels between it and
@@ -105,7 +105,7 @@ impl Gui {
                 let mut child = ui.child_ui_with_id_source(
                     square_corners,
                     Layout::centered_and_justified(Direction::LeftToRight),
-                    square.inner(),
+                    square.0,
                 );
 
                 self.update_square(&mut child, square_corners, square, color);

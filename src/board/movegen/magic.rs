@@ -191,7 +191,7 @@ impl Magic {
     /// <https://www.chessprogramming.org/Magic_Bitboards> for an explanation.
     pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
         occupancies &= self.mask;
-        let mut occupancies = occupancies.inner();
+        let mut occupancies = occupancies.0;
         occupancies = occupancies.wrapping_mul(self.magic);
         occupancies >>= self.shift;
         occupancies as usize + self.offset as usize
@@ -206,7 +206,7 @@ impl Magic {
 /// inner value of a [`PieceType::BISHOP`] or a [`PieceType::ROOK`].
 #[inline]
 pub fn find_magics<const PIECE: u8>() {
-    let piece = PieceType::from(PIECE);
+    let piece = PieceType(PIECE);
     let piece_str = if piece == PieceType::BISHOP {
         "bishop"
     } else if piece == PieceType::ROOK {
@@ -229,14 +229,14 @@ pub fn find_magics<const PIECE: u8>() {
     );
 
     for square in 0..Square::TOTAL {
-        let square = Square::from(square as u8);
+        let square = Square(square as u8);
         let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
             & !Bitboard::file_bb(square.file_of());
         let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
             & !Bitboard::rank_bb(square.rank_of());
         let edges = excluded_ranks_bb | excluded_files_bb;
         let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
-        let mask_bits = mask.inner().count_ones();
+        let mask_bits = mask.0.count_ones();
         let perms = 2usize.pow(mask_bits);
         let shift = 64 - mask_bits;
         gen_all_sliding_attacks::<PIECE>(square, &mut attacks);
@@ -252,7 +252,7 @@ pub fn find_magics<const PIECE: u8>() {
             let mut found = true;
 
             for attack in attacks.iter().take(perms) {
-                let index = blockers.inner().wrapping_mul(sparse_rand) >> shift;
+                let index = blockers.0.wrapping_mul(sparse_rand) >> shift;
                 /* Each time an index is made, it's checked to see if it's
                  * collided with one of its previous indexes. If it hasn't
                  * (i.e. epoch[index] < count), the index is marked as being
@@ -270,7 +270,7 @@ pub fn find_magics<const PIECE: u8>() {
                     break;
                 }
                 // Carry-Rippler trick
-                blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & mask;
+                blockers = Bitboard(blockers.0.wrapping_sub(1)) & mask;
             }
             if found {
                 println!("Found magic for {piece_str}: {sparse_rand}");

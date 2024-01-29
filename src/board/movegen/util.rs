@@ -24,7 +24,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     while !blockers.is_empty() {
         attacks[first_empty] = sliding_attacks::<PIECE>(square, blockers);
         first_empty += 1;
-        blockers = Bitboard::from(blockers.inner().wrapping_sub(1)) & mask;
+        blockers = Bitboard(blockers.0.wrapping_sub(1)) & mask;
     }
     attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::EMPTY);
 }
@@ -49,7 +49,7 @@ pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
 pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
     // I want to lose the sign and intentially overflow `square`, since that
     // would have the same effect as just adding the i8 to the u8
-    let dest = Square::from(square.inner().wrapping_add(DIRECTION as u8));
+    let dest = Square(square.0.wrapping_add(DIRECTION as u8));
     // credit to Stockfish, as I didn't come up with this code.
     // It checks if `square` is still within the board, and if it is, it checks
     // if it hasn't wrapped (because if it has wrapped, the distance will be
@@ -67,7 +67,7 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
     while is_valid::<DIRECTION>(square) && (Bitboard::from_square(square) & blockers).is_empty() {
         // I want to lose the sign and intentially overflow `square`, since
         // that would have the same effect as just adding the i8 to the u8
-        square = Square::from(square.inner().wrapping_add(DIRECTION as u8));
+        square = Square(square.0.wrapping_add(DIRECTION as u8));
         attacks |= Bitboard::from_square(square);
     }
     attacks
@@ -76,18 +76,18 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
 /// Generates the attack set for `piece` on `square` up to and including the
 /// given blockers. Includes the edge.
 pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
-    let piece = PieceType::from(PIECE);
+    let piece = PieceType(PIECE);
     let mut ray = Bitboard::EMPTY;
     if piece == PieceType::BISHOP {
-        ray |= ray_attack::<{ Direction::NE.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::SE.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::SW.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::NW.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::NE.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::SE.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::SW.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::NW.0 }>(square, blockers);
     } else {
-        ray |= ray_attack::<{ Direction::N.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::E.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::S.inner() }>(square, blockers);
-        ray |= ray_attack::<{ Direction::W.inner() }>(square, blockers);
+        ray |= ray_attack::<{ Direction::N.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::E.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::S.0 }>(square, blockers);
+        ray |= ray_attack::<{ Direction::W.0 }>(square, blockers);
     };
     ray
 }

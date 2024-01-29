@@ -154,8 +154,8 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             /* non-standard commands */
             /* "f" - find magic numbers for each square for bishop and rook */
             "f" => {
-                find_magics::<{ PieceType::BISHOP.inner() }>();
-                find_magics::<{ PieceType::ROOK.inner() }>();
+                find_magics::<{ PieceType::BISHOP.0 }>();
+                find_magics::<{ PieceType::ROOK.0 }>();
             }
             /* "p" - prints current position */
             "p" => {

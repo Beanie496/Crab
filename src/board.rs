@@ -19,9 +19,7 @@ pub use movegen::{magic::find_magics, Move, Moves};
 #[derive(Clone, Copy, Eq, PartialEq)]
 // The inner value of a wrapper does not need to be documented.
 #[allow(clippy::missing_docs_in_private_items)]
-pub struct CastlingRights {
-    cr: u8,
-}
+pub struct CastlingRights(u8);
 
 /// Items related to move generation.
 mod movegen;
@@ -95,21 +93,21 @@ impl BitAnd for CastlingRights {
 
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self::from(self.inner() & rhs.inner())
+        Self(self.0 & rhs.0)
     }
 }
 
 impl BitAndAssign for CastlingRights {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
-        self.cr &= rhs.inner();
+        self.0 &= rhs.0;
     }
 }
 
 impl BitOrAssign for CastlingRights {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
-        self.cr |= rhs.inner();
+        self.0 |= rhs.0;
     }
 }
 
@@ -138,7 +136,7 @@ impl Not for CastlingRights {
 
     #[inline]
     fn not(self) -> Self::Output {
-        Self::from(!self.inner())
+        Self(!self.0)
     }
 }
 
@@ -147,7 +145,7 @@ impl Shl<u8> for CastlingRights {
 
     #[inline]
     fn shl(self, rhs: u8) -> Self::Output {
-        Self::from(self.inner() << rhs)
+        Self(self.0 << rhs)
     }
 }
 
@@ -155,17 +153,17 @@ impl Shl<u8> for CastlingRights {
 /// Flags. It's fine to use `&`, `^` and `|` on these.
 impl CastlingRights {
     /// The flag `K`.
-    pub const K: Self = Self::from(0b1000);
+    pub const K: Self = Self(0b1000);
     /// The flag `Q`.
-    pub const Q: Self = Self::from(0b0100);
+    pub const Q: Self = Self(0b0100);
     /// The flag `k`.
-    pub const k: Self = Self::from(0b0010);
+    pub const k: Self = Self(0b0010);
     /// The flag `q`.
-    pub const q: Self = Self::from(0b0001);
+    pub const q: Self = Self(0b0001);
     /// The flags `KQkq`, i.e. all flags.
-    pub const KQkq: Self = Self::from(0b1111);
+    pub const KQkq: Self = Self(0b1111);
     /// No flags.
-    pub const NONE: Self = Self::from(0b0000);
+    pub const NONE: Self = Self(0b0000);
 }
 
 impl Default for Board {
@@ -235,12 +233,12 @@ impl Board {
     /// Returns the piece [`Bitboard`]s of the starting position.
     const fn default_pieces() -> [Bitboard; PieceType::TOTAL] {
         [
-            Bitboard::from(0x00ff_0000_0000_ff00), // Pawns
-            Bitboard::from(0x4200_0000_0000_0042), // Knights
-            Bitboard::from(0x2400_0000_0000_0024), // Bishops
-            Bitboard::from(0x8100_0000_0000_0081), // Rooks
-            Bitboard::from(0x0800_0000_0000_0008), // Queens
-            Bitboard::from(0x1000_0000_0000_0010), // Kings
+            Bitboard(0x00ff_0000_0000_ff00), // Pawns
+            Bitboard(0x4200_0000_0000_0042), // Knights
+            Bitboard(0x2400_0000_0000_0024), // Bishops
+            Bitboard(0x8100_0000_0000_0081), // Rooks
+            Bitboard(0x0800_0000_0000_0008), // Queens
+            Bitboard(0x1000_0000_0000_0010), // Kings
         ]
     }
 
@@ -252,8 +250,8 @@ impl Board {
     /// Returns the side [`Bitboard`]s of the starting position.
     const fn default_sides() -> [Bitboard; Side::TOTAL] {
         [
-            Bitboard::from(0xffff_0000_0000_0000), // Black
-            Bitboard::from(0x0000_0000_0000_ffff), // White
+            Bitboard(0xffff_0000_0000_0000), // Black
+            Bitboard(0x0000_0000_0000_ffff), // White
         ]
     }
 
@@ -292,10 +290,7 @@ impl Board {
         for r in (0..Rank::TOTAL as u8).rev() {
             print!("{} | ", r + 1);
             for f in 0..File::TOTAL as u8 {
-                print!(
-                    "{} ",
-                    self.char_piece_from_pos(Rank::from(r), File::from(f))
-                );
+                print!("{} ", self.char_piece_from_pos(Rank(r), File(f)));
             }
             println!();
         }
@@ -361,10 +356,7 @@ impl Board {
                         reset_board_print_return!(self, "Error: \"{piece}\" is not a valid piece.");
                     };
 
-                    self.add_piece(
-                        Square::from_pos(Rank::from(rank_idx), File::from(file_idx)),
-                        piece_num,
-                    );
+                    self.add_piece(Square::from_pos(Rank(rank_idx), File(file_idx)), piece_num);
 
                     file_idx += 1;
                 }
@@ -484,7 +476,7 @@ impl Board {
         // rank-file
         for rank in (0..Rank::TOTAL).rev() {
             for file in 0..File::TOTAL {
-                let square = Square::from_pos(Rank::from(rank as u8), File::from(file as u8));
+                let square = Square::from_pos(Rank(rank as u8), File(file as u8));
                 let piece = self.piece_on(square);
 
                 if piece == Piece::NONE {
@@ -660,7 +652,7 @@ impl Board {
     #[inline]
     #[must_use]
     pub const fn side_to_move_as_char(&self) -> char {
-        (b'b' + self.side_to_move().inner() * 21) as char
+        (b'b' + self.side_to_move().0 * 21) as char
     }
 
     /// Calculates if the given side can castle kingside.
@@ -775,10 +767,8 @@ impl Board {
     #[inline]
     #[must_use]
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
-        let piece = self.piece_on(Square::from_pos(rank, file));
-        if piece == Piece::NONE {
-            return '0';
-        }
+        let square = Square::from_pos(rank, file);
+        let piece = self.piece_on(square);
         piece.to_char()
     }
 
@@ -890,11 +880,6 @@ impl Board {
 }
 
 impl CastlingRights {
-    /// Returns new [`CastlingRights`] with contents `cr`.
-    const fn from(cr: u8) -> Self {
-        Self { cr }
-    }
-
     /// Returns new [`CastlingRights`] with the default castling rights.
     const fn new() -> Self {
         Self::KQkq
@@ -903,11 +888,6 @@ impl CastlingRights {
     /// Returns empty [`CastlingRights`].
     const fn none() -> Self {
         Self::NONE
-    }
-
-    /// Returns the contents of `self`.
-    const fn inner(self) -> u8 {
-        self.cr
     }
 
     /// Calculates if the given side can castle kingside.
@@ -941,22 +921,22 @@ impl CastlingRights {
     /// Removes the given right from `self`. `right` does not already have to
     /// be set to be removed.
     fn remove_right(&mut self, side: Side, right: Self) {
-        // `side.inner() * 2` is 0 for Black and 2 for White. Thus, if `right`
-        // is `0brr`, `right << side.inner()` is `0brr00` for White and `0brr`
-        // for Black.
-        *self &= !(right << (side.inner() * 2));
+        // `side.0 * 2` is 0 for Black and 2 for White. Thus, if `right` is
+        // `0brr`, `right << side.0` is `0brr00` for White and `0brr` for
+        // Black.
+        *self &= !(right << (side.0 * 2));
     }
 
     /// Clears the rights for `side`.
     fn clear_side(&mut self, side: Side) {
         debug_assert_eq!(
-            Side::WHITE.inner(),
+            Side::WHITE.0,
             1,
             "This function relies on White being 1 and Black 0"
         );
         // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
         // a mask for the bits for White or Black. `&`ing the rights with
         // `!(0b11 << (side * 2))` will clear the bits on the given side.
-        *self &= Self::from(!(0b11 << (side.inner() * 2)));
+        *self &= Self(!(0b11 << (side.0 * 2)));
     }
 }
