@@ -89,8 +89,6 @@ const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = 
 
 /// Creates piece-square tables for both sides from internal initial White-only
 /// piece-square tables.
-// TODO: not too sure about allowing `module_name_repetitions`...maybe rename
-// the module and/or function?
 #[allow(clippy::module_name_repetitions, clippy::similar_names)]
 pub const fn create_piece_square_tables() -> [[Score; Square::TOTAL]; Piece::TOTAL + 1] {
     let mut psqt = [[Score(0, 0); Square::TOTAL]; Piece::TOTAL + 1];
