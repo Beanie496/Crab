@@ -155,6 +155,45 @@ impl Bitboard {
         Self(0xff << (rank.0 * 8))
     }
 
+    /// Calculates the union of the bitboard files and ranks that do not
+    /// contain `square`.
+    ///
+    /// # Examples
+    ///
+    /// `bb_edges_without(Square::H4)` ->
+    /// ```text
+    /// 1 1 1 1 1 1 1 1
+    /// 1 0 0 0 0 0 0 0
+    /// 1 0 0 0 0 0 0 0
+    /// 1 0 0 0 0 0 0 0
+    /// 1 0 0 0 0 0 0 0
+    /// 1 0 0 0 0 0 0 X
+    /// 1 0 0 0 0 0 0 0
+    /// 1 0 0 0 0 0 0 0
+    /// 1 1 1 1 1 1 1 1
+    ///
+    /// ```
+    ///
+    /// `bb_edges_without(Square::A1)` ->
+    /// ```text
+    /// 1 1 1 1 1 1 1 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 0 0 1
+    /// X 0 0 0 0 0 0 1
+    /// ```
+    pub fn edges_without(square: Square) -> Self {
+        let excluded_ranks_bb = (Self::file_bb(File::FILE1) | Self::file_bb(File::FILE8))
+            & !Self::file_bb(File::from(square));
+        let excluded_files_bb = (Self::rank_bb(Rank::RANK1) | Self::rank_bb(Rank::RANK8))
+            & !Self::rank_bb(Rank::from(square));
+        excluded_ranks_bb | excluded_files_bb
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]

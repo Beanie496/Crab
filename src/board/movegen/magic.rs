@@ -5,7 +5,7 @@ use oorandom::Rand64;
 use super::util::{gen_all_sliding_attacks, sliding_attacks};
 use crate::{
     bitboard::Bitboard,
-    defs::{File, PieceType, Rank, Square},
+    defs::{PieceType, Square},
 };
 
 /// Stores magic information for a square:
@@ -230,12 +230,7 @@ pub fn find_magics<const PIECE: u8>() {
 
     for square in 0..Square::TOTAL {
         let square = Square(square as u8);
-        // TODO: this code gets duplicated twice more - make into a function
-        let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-            & !Bitboard::file_bb(File::from(square));
-        let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-            & !Bitboard::rank_bb(Rank::from(square));
-        let edges = excluded_ranks_bb | excluded_files_bb;
+        let edges = Bitboard::edges_without(square);
         let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
         let mask_bits = mask.0.count_ones();
         let perms = 2usize.pow(mask_bits);
