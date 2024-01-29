@@ -59,12 +59,96 @@ pub struct Side(pub u8);
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub struct Square(pub u8);
 
-/// An array of character constants associated with each piece on both sides.
+/// An array of character constants associated with each piece on both sides,
+/// with the character '0' at the end to allow conversion from [`Piece::NONE`].
 ///
-/// e.g. `PIECE_CHARS[Side::WHITE][Piece::KNIGHT] == 'N'`;
-/// `PIECE_CHARS[Side::BLACK][Piece::KING] == 'k'`.
-const PIECE_CHARS: [char; PieceType::TOTAL * Side::TOTAL] =
-    ['P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k'];
+/// e.g. `PIECE_CHARS[Piece::WKNIGHT] == 'N'`; `PIECE_CHARS[Piece::BKING] ==
+/// 'k'`; `PIECE_CHARS[Piece::NONE] == '0'`.
+const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
+    'P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k', '0',
+];
+
+impl From<Piece> for char {
+    #[inline]
+    fn from(piece: Piece) -> Self {
+        PIECE_CHARS[piece.to_index()]
+    }
+}
+
+impl From<PieceType> for char {
+    #[inline]
+    fn from(piece_type: PieceType) -> Self {
+        // default to lowercase, or Black
+        let piece = Piece::from_piecetype(piece_type, Side::BLACK);
+        Self::from(piece)
+    }
+}
+
+impl From<Square> for File {
+    #[inline]
+    fn from(square: Square) -> Self {
+        Self(square.0 & 7)
+    }
+}
+
+impl From<char> for Piece {
+    #[inline]
+    fn from(piece: char) -> Self {
+        match piece {
+            'P' => Self::WPAWN,
+            'N' => Self::WKNIGHT,
+            'B' => Self::WBISHOP,
+            'R' => Self::WROOK,
+            'Q' => Self::WQUEEN,
+            'K' => Self::WKING,
+            'p' => Self::BPAWN,
+            'n' => Self::BKNIGHT,
+            'b' => Self::BBISHOP,
+            'r' => Self::BROOK,
+            'q' => Self::BQUEEN,
+            'k' => Self::BKING,
+            _ => Self::NONE,
+        }
+    }
+}
+
+impl From<char> for PieceType {
+    #[inline]
+    fn from(piece: char) -> Self {
+        let piece = piece.to_ascii_lowercase();
+        match piece {
+            'p' => Self::PAWN,
+            'n' => Self::KNIGHT,
+            'b' => Self::BISHOP,
+            'r' => Self::ROOK,
+            'q' => Self::QUEEN,
+            'k' => Self::KING,
+            _ => Self::NONE,
+        }
+    }
+}
+
+impl From<Piece> for PieceType {
+    #[inline]
+    fn from(piece: Piece) -> Self {
+        Self(piece.0 >> 1)
+    }
+}
+
+impl From<Square> for Rank {
+    #[inline]
+    fn from(square: Square) -> Self {
+        Self(square.0 >> 3)
+    }
+}
+
+impl From<Piece> for Side {
+    /// Returns the side of `self`.
+    #[inline]
+    fn from(piece: Piece) -> Self {
+        Self(piece.0 & 1)
+    }
+}
 
 impl Display for Square {
     #[inline]
@@ -72,9 +156,40 @@ impl Display for Square {
         write!(
             f,
             "{}{}",
-            ((b'a' + self.file_of().0) as char),
-            ((b'1' + self.rank_of().0) as char),
+            ((b'a' + File::from(*self).0) as char),
+            ((b'1' + Rank::from(*self).0) as char),
         )
+    }
+}
+
+impl From<&str> for Square {
+    /// Converts a string representation of a square (e.g. "e4") into a
+    /// [`Square`]. Will return [`None`] if the square is not valid.
+    #[inline]
+    #[must_use]
+    fn from(string: &str) -> Self {
+        let mut square = 0;
+        let mut iter = string.as_bytes().iter();
+
+        let Some(file) = iter.next() else {
+            return Self::NONE;
+        };
+        if (b'a'..=b'h').contains(file) {
+            square += file - b'a';
+        } else {
+            return Self::NONE;
+        }
+
+        let Some(rank) = iter.next() else {
+            return Self::NONE;
+        };
+        if (b'1'..=b'8').contains(rank) {
+            square += (rank - b'1') * 8;
+        } else {
+            return Self::NONE;
+        }
+
+        Self(square)
     }
 }
 
@@ -117,18 +232,18 @@ impl File {
 /// Enumerates pieces for White and Black.
 #[allow(missing_docs)]
 impl Piece {
-    pub const WPAWN: Self = Self::from(PieceType::PAWN, Side::WHITE);
-    pub const WKNIGHT: Self = Self::from(PieceType::KNIGHT, Side::WHITE);
-    pub const WBISHOP: Self = Self::from(PieceType::BISHOP, Side::WHITE);
-    pub const WROOK: Self = Self::from(PieceType::ROOK, Side::WHITE);
-    pub const WQUEEN: Self = Self::from(PieceType::QUEEN, Side::WHITE);
-    pub const WKING: Self = Self::from(PieceType::KING, Side::WHITE);
-    pub const BPAWN: Self = Self::from(PieceType::PAWN, Side::BLACK);
-    pub const BKNIGHT: Self = Self::from(PieceType::KNIGHT, Side::BLACK);
-    pub const BBISHOP: Self = Self::from(PieceType::BISHOP, Side::BLACK);
-    pub const BROOK: Self = Self::from(PieceType::ROOK, Side::BLACK);
-    pub const BQUEEN: Self = Self::from(PieceType::QUEEN, Side::BLACK);
-    pub const BKING: Self = Self::from(PieceType::KING, Side::BLACK);
+    pub const WPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::WHITE);
+    pub const WKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::WHITE);
+    pub const WBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::WHITE);
+    pub const WROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::WHITE);
+    pub const WQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::WHITE);
+    pub const WKING: Self = Self::from_piecetype(PieceType::KING, Side::WHITE);
+    pub const BPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::BLACK);
+    pub const BKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::BLACK);
+    pub const BBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::BLACK);
+    pub const BROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::BLACK);
+    pub const BQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::BLACK);
+    pub const BKING: Self = Self::from_piecetype(PieceType::KING, Side::BLACK);
     pub const TOTAL: usize = 12;
     pub const NONE: Self = Self(12);
 }
@@ -249,62 +364,11 @@ impl Square {
 }
 
 impl Piece {
-    /// Creates a [`Piece`] from a value and a side.
+    /// Creates a [`Piece`] from a [`PieceType`] and a [`Side`].
     #[inline]
     #[must_use]
-    pub const fn from(piece: PieceType, side: Side) -> Self {
+    pub const fn from_piecetype(piece: PieceType, side: Side) -> Self {
         Self((piece.0 << 1) + side.0)
-    }
-
-    /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
-    /// piece is not valid.
-    #[inline]
-    #[must_use]
-    pub const fn from_char(piece: char) -> Option<Self> {
-        match piece {
-            'P' => Some(Self::WPAWN),
-            'N' => Some(Self::WKNIGHT),
-            'B' => Some(Self::WBISHOP),
-            'R' => Some(Self::WROOK),
-            'Q' => Some(Self::WQUEEN),
-            'K' => Some(Self::WKING),
-            'p' => Some(Self::BPAWN),
-            'n' => Some(Self::BKNIGHT),
-            'b' => Some(Self::BBISHOP),
-            'r' => Some(Self::BROOK),
-            'q' => Some(Self::BQUEEN),
-            'k' => Some(Self::BKING),
-            _ => None,
-        }
-    }
-
-    /// Converts `self` to a character.
-    ///
-    /// e.g. `Piece::WKNIGHT -> 'N'`; `Piece::BKING -> 'k'`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` isn't a piece.
-    #[inline]
-    #[must_use]
-    pub const fn to_char(self) -> char {
-        PIECE_CHARS[self.to_index()]
-    }
-
-    /// Returns the type of `self`.
-    // this relies on the LSB being the side
-    #[inline]
-    #[must_use]
-    pub const fn to_type(self) -> PieceType {
-        PieceType(self.0 >> 1)
-    }
-
-    /// Returns the side of `self`.
-    // this relies on the LSB being the side
-    #[inline]
-    #[must_use]
-    pub const fn side(self) -> Side {
-        Side(self.0 & 1)
     }
 
     /// Returns the contents of `self` as a `usize`.
@@ -316,38 +380,6 @@ impl Piece {
 }
 
 impl PieceType {
-    /// Converts the char `piece` into a [`Piece`]. Will return `None` if the
-    /// piece is not valid.
-    #[inline]
-    #[must_use]
-    pub const fn from_char(piece: char) -> Option<Self> {
-        let piece = piece.to_ascii_lowercase();
-        match piece {
-            'p' => Some(Self::PAWN),
-            'n' => Some(Self::KNIGHT),
-            'b' => Some(Self::BISHOP),
-            'r' => Some(Self::ROOK),
-            'q' => Some(Self::QUEEN),
-            'k' => Some(Self::KING),
-            _ => None,
-        }
-    }
-
-    /// Converts `self` to a character.
-    ///
-    /// e.g. `PieceType::KNIGHT -> 'n'`; `PieceType::KING -> 'k'`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` isn't a piece.
-    #[inline]
-    #[must_use]
-    pub const fn to_char(self) -> char {
-        // default to lowercase, or Black
-        let piece = Piece::from(self, Side::BLACK);
-        piece.to_char()
-    }
-
     /// Returns the contents of `self` as a `usize`.
     #[inline]
     #[must_use]
@@ -392,49 +424,11 @@ impl Square {
         Self(rank.0 * 8 + file.0)
     }
 
-    /// Converts a string representation of a square (e.g. "e4") into a
-    /// [`Square`]. Will return [`None`] if the square is not valid.
-    #[inline]
-    #[must_use]
-    pub fn from_string(string: &str) -> Option<Self> {
-        let mut square = 0;
-        let mut iter = string.as_bytes().iter();
-
-        let file = iter.next()?;
-        if (b'a'..=b'h').contains(file) {
-            square += file - b'a';
-        } else {
-            return None;
-        }
-        let rank = iter.next()?;
-        if (b'1'..=b'8').contains(rank) {
-            square += (rank - b'1') * 8;
-        } else {
-            return None;
-        }
-
-        Some(Self(square))
-    }
-
-    /// Calculates the file that `self` is on.
-    #[inline]
-    #[must_use]
-    pub const fn file_of(self) -> File {
-        File(self.0 & 7)
-    }
-
-    /// Calculates the rank that `self` is on.
-    #[inline]
-    #[must_use]
-    pub const fn rank_of(self) -> Rank {
-        Rank(self.0 >> 3)
-    }
-
     /// Finds the horizontal distance between `self` and `other_square`
     #[inline]
     #[must_use]
-    pub const fn horizontal_distance(self, other_square: Self) -> u8 {
-        self.file_of().0.abs_diff(other_square.file_of().0)
+    pub fn horizontal_distance(self, other_square: Self) -> u8 {
+        File::from(self).0.abs_diff(File::from(other_square).0)
     }
 
     /// Checks if `self` is within the board.

@@ -51,9 +51,7 @@ pub struct Lookup {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 // The inner value of a wrapper does not need to be documented.
 #[allow(clippy::missing_docs_in_private_items)]
-pub struct Move {
-    mv: u16,
-}
+pub struct Move(u16);
 
 /// An stack of `Move`s.
 pub struct Moves {
@@ -88,11 +86,11 @@ pub static mut LOOKUPS: Lookup = Lookup::empty();
 impl Display for Move {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let start = Square(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8);
         if self.is_promotion() {
             // we want the lowercase letter here
-            write!(f, "{start}{end}{}", self.promotion_piece().to_char())
+            write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
         } else {
             write!(f, "{start}{end}")
         }
@@ -220,7 +218,7 @@ impl Board {
         let ep_square_bb = if self.ep_square() == Square::NONE {
             Bitboard::EMPTY
         } else {
-            Bitboard::from_square(self.ep_square())
+            Bitboard::from(self.ep_square())
         };
         let empty = !occupancies;
 
@@ -310,13 +308,13 @@ impl Board {
         let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece_type) =
             mv.decompose();
         let piece = self.piece_on(start);
-        let piece_type = piece.to_type();
+        let piece_type = PieceType::from(piece);
         let captured = self.piece_on(end);
-        let captured_type = captured.to_type();
-        let us = piece.side();
+        let captured_type = PieceType::from(captured);
+        let us = Side::from(piece);
         let them = us.flip();
-        let start_bb = Bitboard::from_square(start);
-        let end_bb = Bitboard::from_square(end);
+        let start_bb = Bitboard::from(start);
+        let end_bb = Bitboard::from(end);
 
         self.halfmoves += 1;
         if us == Side::BLACK {
@@ -357,7 +355,7 @@ impl Board {
                 end,
                 rook_square,
                 // `captured` is equivalent but slower
-                Piece::from(PieceType::ROOK, us),
+                Piece::from_piecetype(PieceType::ROOK, us),
                 PieceType::ROOK,
                 us,
             );
@@ -400,12 +398,12 @@ impl Board {
             } else {
                 end.0 + 8
             });
-            let captured_pawn = Piece::from(PieceType::PAWN, them);
+            let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
             self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
         } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square((start.0 + end.0) >> 1));
         } else if is_promotion {
-            let promotion_piece = Piece::from(promotion_piece_type, us);
+            let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
 
             // overwrite the pawn on the mailbox
             self.set_mailbox_piece(end, promotion_piece);
@@ -542,7 +540,7 @@ impl Lookup {
             .enumerate()
             .take(Square::TOTAL - File::TOTAL)
         {
-            let pushed = Bitboard::from_square(Square(square as u8 + 8));
+            let pushed = Bitboard::from(Square(square as u8 + 8));
             *bb = pushed.east() | pushed.west();
         }
         for (square, bb) in self.pawn_attacks[Side::BLACK.to_index()]
@@ -550,7 +548,7 @@ impl Lookup {
             .enumerate()
             .skip(File::TOTAL)
         {
-            let pushed = Bitboard::from_square(Square(square as u8 - 8));
+            let pushed = Bitboard::from(Square(square as u8 - 8));
             *bb = pushed.east() | pushed.west();
         }
     }
@@ -559,7 +557,7 @@ impl Lookup {
     fn init_knight_attacks(&mut self) {
         for (square, bb) in self.knight_attacks.iter_mut().enumerate() {
             let square = Square(square as u8);
-            let knight = Bitboard::from_square(square);
+            let knight = Bitboard::from(square);
             // shortened name to avoid collisions with the function
             let mut e = knight.east();
             let mut w = knight.west();
@@ -577,7 +575,7 @@ impl Lookup {
     fn init_king_attacks(&mut self) {
         for (square, bb) in self.king_attacks.iter_mut().enumerate() {
             let square = Square(square as u8);
-            let king = Bitboard::from_square(square);
+            let king = Bitboard::from(square);
             let mut attacks = king.east() | king.west() | king;
             attacks |= attacks.north() | attacks.south();
             attacks ^= king;
@@ -596,10 +594,10 @@ impl Lookup {
             let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
             let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1)
                 | Bitboard::file_bb(File::FILE8))
-                & !Bitboard::file_bb(square.file_of());
+                & !Bitboard::file_bb(File::from(square));
             let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1)
                 | Bitboard::rank_bb(Rank::RANK8))
-                & !Bitboard::rank_bb(square.rank_of());
+                & !Bitboard::rank_bb(Rank::from(square));
             let edges = excluded_ranks_bb | excluded_files_bb;
             let b_mask =
                 sliding_attacks::<{ PieceType::BISHOP.0 }>(square, Bitboard::EMPTY) & !edges;
@@ -712,9 +710,7 @@ impl Move {
             FLAG != Self::PROMOTION,
             "Tried to make a new promotion `Move` with the wrong function"
         );
-        Self {
-            mv: (start.0 as u16) << Self::START_SHIFT | (end.0 as u16) << Self::END_SHIFT | FLAG,
-        }
+        Self((start.0 as u16) << Self::START_SHIFT | (end.0 as u16) << Self::END_SHIFT | FLAG)
     }
 
     /// Creates a promotion [`Move`] to the given piece.
@@ -729,19 +725,19 @@ impl Move {
             PIECE != PieceType::KING.0,
             "Tried to make a new promotion `Move` into a king"
         );
-        Self {
-            mv: (start.0 as u16) << Self::START_SHIFT
+        Self(
+            (start.0 as u16) << Self::START_SHIFT
                 | (end.0 as u16) << Self::END_SHIFT
                 | Self::PROMOTION
                 | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
-        }
+        )
     }
 
     /// Creates a null [`Move`].
     #[inline]
     #[must_use]
     pub const fn null() -> Self {
-        Self { mv: 0 }
+        Self(0)
     }
 
     /// Turns a [`Move`] into its components: start square, end square, is
@@ -750,12 +746,12 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, PieceType) {
-        let start = Square(((self.mv & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square(((self.mv & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8);
+        let end = Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8);
         let is_promotion = self.is_promotion();
         let is_castling = self.is_castling();
         let is_en_passant = self.is_en_passant();
-        let piece_type = PieceType((self.mv >> Self::PIECE_SHIFT) as u8 + 1);
+        let piece_type = PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1);
         (
             start,
             end,
@@ -770,14 +766,14 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn is_castling(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::CASTLING
+        self.0 & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
     #[inline]
     #[must_use]
     pub const fn is_en_passant(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::EN_PASSANT
+        self.0 & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the given start and end square match the start and end square
@@ -786,15 +782,15 @@ impl Move {
     #[must_use]
     pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
         let other = Self::new::<{ Self::NORMAL }>(start, end);
-        (other.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
-            == (self.mv & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+        (other.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+            == (self.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
     }
 
     /// Checks if the move is a promotion.
     #[inline]
     #[must_use]
     pub const fn is_promotion(&self) -> bool {
-        self.mv & Self::FLAG_MASK == Self::PROMOTION
+        self.0 & Self::FLAG_MASK == Self::PROMOTION
     }
 
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
@@ -802,7 +798,7 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn promotion_piece(&self) -> PieceType {
-        PieceType((self.mv >> Self::PIECE_SHIFT) as u8 + 1)
+        PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
     }
 }
 

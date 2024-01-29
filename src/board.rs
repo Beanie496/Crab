@@ -351,10 +351,10 @@ impl Board {
                     let empty_squares = piece.to_digit(10).unwrap() as u8;
                     file_idx += empty_squares;
                 } else {
-                    let piece_num = Piece::from_char(piece);
-                    let Some(piece_num) = piece_num else {
+                    let piece_num = Piece::from(piece);
+                    if piece_num == Piece::NONE {
                         reset_board_print_return!(self, "Error: \"{piece}\" is not a valid piece.");
-                    };
+                    }
 
                     self.add_piece(Square::from_pos(Rank(rank_idx), File(file_idx)), piece_num);
 
@@ -418,13 +418,17 @@ impl Board {
         self.set_ep_square(if let Some(ep) = ep_square {
             if ep == "-" {
                 Square::NONE
-            } else if let Some(square) = Square::from_string(ep) {
-                square
             } else {
-                reset_board_print_return!(
-                    self,
-                    "Error: En passant square \"{ep}\" is not a valid square"
-                );
+                // TODO: I don't like how this works. Maybe implement `TryFrom`
+                // instead?
+                let square = Square::from(ep);
+                if square == Square::NONE {
+                    reset_board_print_return!(
+                        self,
+                        "Error: En passant square \"{ep}\" is not a valid square"
+                    );
+                }
+                square
             }
         } else {
             Square::NONE
@@ -489,7 +493,7 @@ impl Board {
                         ret_str.push(char::from_digit(empty_squares, 10).unwrap());
                         empty_squares = 0;
                     }
-                    ret_str.push(piece.to_char());
+                    ret_str.push(char::from(piece));
                 }
             }
             if empty_squares != 0 {
@@ -532,10 +536,10 @@ impl Board {
     /// piece on the square to be written to.
     #[inline]
     pub fn add_piece(&mut self, square: Square, piece: Piece) {
-        let square_bb = Bitboard::from_square(square);
-        let side = piece.side();
+        let square_bb = Bitboard::from(square);
+        let side = Side::from(piece);
         self.set_mailbox_piece(square, piece);
-        self.toggle_piece_bb(piece.to_type(), square_bb);
+        self.toggle_piece_bb(PieceType::from(piece), square_bb);
         self.toggle_side_bb(side, square_bb);
         self.add_psq_piece(square, piece);
         self.add_phase_piece(piece);
@@ -554,7 +558,7 @@ impl Board {
         piece_type: PieceType,
         side: Side,
     ) {
-        let bb = Bitboard::from_square(square);
+        let bb = Bitboard::from(square);
         self.unset_mailbox_piece(square);
         self.toggle_piece_bb(piece_type, bb);
         self.toggle_side_bb(side, bb);
@@ -578,7 +582,7 @@ impl Board {
     ) {
         // this _is_ faster to calculate on the fly, since the alternative is
         // passing a full `u64` by argument
-        let bb = Bitboard::from_square(start) | Bitboard::from_square(end);
+        let bb = Bitboard::from(start) | Bitboard::from(end);
         self.move_mailbox_piece(start, end, piece);
         self.update_bb_piece(bb, piece_type, side);
         self.move_psq_piece(start, end, piece);
@@ -769,7 +773,7 @@ impl Board {
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let square = Square::from_pos(rank, file);
         let piece = self.piece_on(square);
-        piece.to_char()
+        char::from(piece)
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.

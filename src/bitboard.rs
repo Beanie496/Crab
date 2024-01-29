@@ -60,6 +60,13 @@ impl BitXorAssign for Bitboard {
     }
 }
 
+impl From<Square> for Bitboard {
+    #[inline]
+    fn from(square: Square) -> Self {
+        Self(1 << square.0)
+    }
+}
+
 impl IntoIterator for Bitboard {
     type Item = Square;
     type IntoIter = BitIter;
@@ -122,20 +129,12 @@ impl Bitboard {
 }
 
 impl Bitboard {
-    /// Converts a [`Square`] into a [`Bitboard`] with the bit in the given
-    /// position set.
-    #[inline]
-    #[must_use]
-    pub const fn from_square(square: Square) -> Self {
-        Self(1 << square.0)
-    }
-
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
     /// given position set.
     #[inline]
     #[must_use]
-    pub const fn from_pos(rank: Rank, file: File) -> Self {
-        Self::from_square(Square::from_pos(rank, file))
+    pub fn from_pos(rank: Rank, file: File) -> Self {
+        Self::from(Square::from_pos(rank, file))
     }
 
     /// Returns the given file represented on a bitboard.

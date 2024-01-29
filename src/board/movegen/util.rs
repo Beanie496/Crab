@@ -13,9 +13,9 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     attacks: &mut [Bitboard; MAX_BLOCKERS],
 ) {
     let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-        & !Bitboard::file_bb(square.file_of());
+        & !Bitboard::file_bb(File::from(square));
     let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-        & !Bitboard::rank_bb(square.rank_of());
+        & !Bitboard::rank_bb(Rank::from(square));
     let edges = excluded_ranks_bb | excluded_files_bb;
     let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
 
@@ -31,11 +31,11 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
 
 /// Checks if the move is a double pawn push.
 pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
-    if piece.to_type() != PieceType::PAWN {
+    if PieceType::from(piece) != PieceType::PAWN {
         return false;
     }
-    let start_bb = Bitboard::from_square(start);
-    let end_bb = Bitboard::from_square(end);
+    let start_bb = Bitboard::from(start);
+    let end_bb = Bitboard::from(end);
     if (start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))).is_empty() {
         return false;
     }
@@ -64,11 +64,11 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
     let mut attacks = Bitboard::EMPTY;
     // checks if the next square is valid and if the piece can move from the
     // square
-    while is_valid::<DIRECTION>(square) && (Bitboard::from_square(square) & blockers).is_empty() {
+    while is_valid::<DIRECTION>(square) && (Bitboard::from(square) & blockers).is_empty() {
         // I want to lose the sign and intentially overflow `square`, since
         // that would have the same effect as just adding the i8 to the u8
         square = Square(square.0.wrapping_add(DIRECTION as u8));
-        attacks |= Bitboard::from_square(square);
+        attacks |= Bitboard::from(square);
     }
     attacks
 }

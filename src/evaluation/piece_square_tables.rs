@@ -95,8 +95,8 @@ const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = 
 pub const fn create_piece_square_tables() -> [[Score; Square::TOTAL]; Piece::TOTAL + 1] {
     let mut psqt = [[Score(0, 0); Square::TOTAL]; Piece::TOTAL + 1];
     cfor!(let mut piece = 0; piece < PieceType::TOTAL; piece += 1; {
-        let w_piece_index = Piece::from(PieceType(piece as u8), Side::WHITE).to_index();
-        let b_piece_index = Piece::from(PieceType(piece as u8), Side::BLACK).to_index();
+        let w_piece_index = Piece::from_piecetype(PieceType(piece as u8), Side::WHITE).to_index();
+        let b_piece_index = Piece::from_piecetype(PieceType(piece as u8), Side::BLACK).to_index();
         cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             let flipped_square = square ^ 56;
             let Score(mut mg, mut eg) = PIECE_VALUES[piece];

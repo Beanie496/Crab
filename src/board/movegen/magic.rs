@@ -230,10 +230,11 @@ pub fn find_magics<const PIECE: u8>() {
 
     for square in 0..Square::TOTAL {
         let square = Square(square as u8);
+        // TODO: this code gets duplicated twice more - make into a function
         let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-            & !Bitboard::file_bb(square.file_of());
+            & !Bitboard::file_bb(File::from(square));
         let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-            & !Bitboard::rank_bb(square.rank_of());
+            & !Bitboard::rank_bb(Rank::from(square));
         let edges = excluded_ranks_bb | excluded_files_bb;
         let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
         let mask_bits = mask.0.count_ones();
