@@ -1,7 +1,10 @@
 // These structs will always remain exhaustive.
 #![allow(clippy::exhaustive_structs)]
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
 
 /// Tells the compiler that `index` cannot match or exceed `bound`.
 ///
@@ -32,6 +35,9 @@ pub struct Direction(pub i8);
 /// A wrapper for a `u8`, since a file can go from 0 to 7.
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
+
+/// The error that happens if a parsed string is invalid.
+pub struct ParseError;
 
 /// A piece, containing the type of piece and side.
 ///
@@ -162,34 +168,36 @@ impl Display for Square {
     }
 }
 
-impl From<&str> for Square {
+impl FromStr for Square {
+    type Err = ParseError;
+
     /// Converts a string representation of a square (e.g. "e4") into a
-    /// [`Square`]. Will return [`None`] if the square is not valid.
+    /// [`Square`]. Will return `Ok(Self)` if the square is valid,
+    /// `Ok(Self::NONE)` if the square is "-" and `Err(ParseError)` otherwise.
     #[inline]
-    #[must_use]
-    fn from(string: &str) -> Self {
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if string == "-" {
+            return Ok(Self::NONE);
+        }
+
         let mut square = 0;
         let mut iter = string.as_bytes().iter();
 
-        let Some(file) = iter.next() else {
-            return Self::NONE;
-        };
+        let file = iter.next().ok_or(ParseError)?;
         if (b'a'..=b'h').contains(file) {
             square += file - b'a';
         } else {
-            return Self::NONE;
+            return Err(ParseError);
         }
 
-        let Some(rank) = iter.next() else {
-            return Self::NONE;
-        };
+        let rank = iter.next().ok_or(ParseError)?;
         if (b'1'..=b'8').contains(rank) {
             square += (rank - b'1') * 8;
         } else {
-            return Self::NONE;
+            return Err(ParseError);
         }
 
-        Self(square)
+        Ok(Self(square))
     }
 }
 

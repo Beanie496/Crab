@@ -416,19 +416,13 @@ impl Board {
 
         // 4. en passant
         self.set_ep_square(if let Some(ep) = ep_square {
-            if ep == "-" {
-                Square::NONE
-            } else {
-                // TODO: I don't like how this works. Maybe implement `TryFrom`
-                // instead?
-                let square = Square::from(ep);
-                if square == Square::NONE {
-                    reset_board_print_return!(
-                        self,
-                        "Error: En passant square \"{ep}\" is not a valid square"
-                    );
-                }
+            if let Ok(square) = ep.parse::<Square>() {
                 square
+            } else {
+                reset_board_print_return!(
+                    self,
+                    "Error: En passant square \"{ep}\" is not a valid square"
+                );
             }
         } else {
             Square::NONE
