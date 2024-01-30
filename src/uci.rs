@@ -2,13 +2,17 @@ use std::{io, process::exit, str::Split};
 
 use crate::{board::find_magics, defs::PieceType, engine::Engine};
 
+/// The starting position as a FEN string.
+const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 /// Repeatedly waits for a command and executes it according to the UCI
 /// protocol. It is not yet concurrent, i.e. it cannot process commands
 /// while not idle.
 ///
 /// # Panics
 ///
-/// Panics if [`std::io::BufRead::read_line()`] returns an [`Err`].
+/// Panics if [`read_line()`](`std::io::BufRead::read_line`) returns an
+/// [`Err`].
 #[inline]
 pub fn main_loop() {
     let mut engine = Engine::new();
@@ -22,28 +26,39 @@ pub fn main_loop() {
     }
 }
 
-/// Given an iterator over the remaining space-deliminated tokens of a
-/// `position` command, removes all empty strings and concatenate the
-/// remaining tokens into a String for the FEN and moves each with a space
-/// between each token.
+/// Given an iterator over the remaining space-delimited tokens of a `position`
+/// command, removes all empty strings and concatenate the remaining tokens
+/// into a [`String`] for the FEN and moves each with a space between each
+/// token.
 fn handle_position(line: &mut Split<'_, char>, engine: &mut Engine) {
-    let mut fen = String::new();
-    line.take_while(|token| *token != "moves")
-        .for_each(|token| {
-            if !token.is_empty() {
-                fen.push_str(token);
-                fen.push(' ');
-            }
-        });
-    // remove the trailing space
-    fen.pop();
+    let fen = match line.next() {
+        Some("startpos") => STARTPOS.to_string(),
+        Some("fen") => {
+            let mut fen = String::new();
+            line.take_while(|token| *token != "moves")
+                .filter(|token| !token.is_empty())
+                // I COULD use `map()` then `collect()` but that's an unnecessary heap
+                // allocation for each token
+                .for_each(|token| {
+                    fen.push_str(token);
+                    fen.push(' ');
+                });
+            // remove the trailing space
+            fen.pop();
+            fen
+        }
+        _ => return,
+    };
+
+    // the moves need to be preceeded with the token "moves"
+    if line.next() != Some("moves") {
+        return;
+    }
 
     let mut moves = String::new();
-    line.for_each(|token| {
-        if !token.is_empty() {
-            moves.push_str(token);
-            moves.push(' ');
-        }
+    line.filter(|token| !token.is_empty()).for_each(|token| {
+        moves.push_str(token);
+        moves.push(' ');
     });
     // remove the trailing space
     moves.pop();
@@ -123,16 +138,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
                  * The moves should look like, for example,
                  * "e2e4".
                  */
-                // add FEN only for now - not moves
-                if let Some(string) = line.next() {
-                    match string {
-                        "fen" => {
-                            handle_position(&mut line, engine);
-                        }
-                        "startpos" => engine.board.set_startpos(),
-                        _ => (),
-                    }
-                }
+                handle_position(&mut line, engine);
             }
             "setoption" => {
                 /* Next element of line_iter should be "name".

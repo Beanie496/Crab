@@ -2,6 +2,7 @@ use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl},
     slice::Iter,
+    str::FromStr,
 };
 
 use crate::{
@@ -309,9 +310,50 @@ impl Board {
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
-    #[allow(clippy::unused_self)]
     #[inline]
-    pub const fn play_moves(&self, _moves: &str) {}
+    pub fn play_moves(&mut self, moves_str: &str) {
+        let mut moves = Moves::new();
+        let mut copy = self.clone();
+
+        // `split()` will always return at least 1 element even if the initial
+        // string is empty
+        if moves_str.is_empty() {
+            return;
+        }
+
+        for mv in moves_str.split(' ') {
+            copy.generate_moves(&mut moves);
+
+            // I don't particularly want to deal with non-ascii characters
+            #[allow(clippy::string_slice)]
+            let Ok(start) = Square::from_str(&mv[0..=1]) else {
+                return println!("Start square of a move is not valid");
+            };
+            #[allow(clippy::string_slice)]
+            let Ok(end) = Square::from_str(&mv[2..=3]) else {
+                return println!("End square of a move is not valid");
+            };
+            // Each move should be exactly 4 characters; if it's a promotion,
+            // the last char will be the promotion char.
+            let mv = if mv.len() == 5 {
+                // SAFETY: It's not possible for it to be `None`.
+                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
+                moves.move_with_promo(start, end, PieceType::from(promotion_char))
+            } else {
+                moves.move_with(start, end)
+            };
+
+            let Some(mv) = mv else {
+                return println!("Illegal move");
+            };
+
+            if !copy.make_move(mv) {
+                return println!("Illegal move");
+            }
+            moves.clear();
+        }
+        *self = copy;
+    }
 
     /// Sets `self.board` to the given FEN. It will check for basic errors,
     /// like the board having too many ranks, but not many more.

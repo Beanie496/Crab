@@ -727,6 +727,26 @@ impl Move {
         )
     }
 
+    /// Creates a promotion [`Move`] to the given piece type.
+    #[inline]
+    #[must_use]
+    pub fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
+        debug_assert!(
+            promotion_piece != PieceType::PAWN,
+            "Tried to make a new promotion `Move` into a pawn"
+        );
+        debug_assert!(
+            promotion_piece != PieceType::KING,
+            "Tried to make a new promotion `Move` into a king"
+        );
+        Self(
+            u16::from(start.0) << Self::START_SHIFT
+                | u16::from(end.0) << Self::END_SHIFT
+                | Self::PROMOTION
+                | u16::from(promotion_piece.0 - 1) << Self::PIECE_SHIFT,
+        )
+    }
+
     /// Creates a null [`Move`].
     #[inline]
     #[must_use]
@@ -780,6 +800,20 @@ impl Move {
             == (self.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
     }
 
+    /// Checks if the given start square, end square and promotion piece match
+    /// the start, end square and promotion piece contained within `self`.
+    #[inline]
+    #[must_use]
+    pub fn is_moving_from_to_promo(
+        &self,
+        start: Square,
+        end: Square,
+        promotion_piece: PieceType,
+    ) -> bool {
+        let other = Self::new_promo_any(start, end, promotion_piece);
+        *self == other
+    }
+
     /// Checks if the move is a promotion.
     #[inline]
     #[must_use]
@@ -831,6 +865,23 @@ impl Moves {
         self.moves
             .into_iter()
             .find(|&mv| mv.is_moving_from_to(start, end))
+    }
+
+    /// Finds and returns, if it exists, the move that has start square
+    /// `start`, end square `end` and promotion piece `piece_type`.
+    ///
+    /// Returns `Some(mv)` if a `Move` does match the criteria; returns `None`
+    /// otherwise.
+    #[inline]
+    pub fn move_with_promo(
+        &mut self,
+        start: Square,
+        end: Square,
+        piece_type: PieceType,
+    ) -> Option<Move> {
+        self.moves
+            .into_iter()
+            .find(|&mv| mv.is_moving_from_to_promo(start, end, piece_type))
     }
 
     /// Returns a random move.

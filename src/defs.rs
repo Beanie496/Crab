@@ -71,7 +71,7 @@ pub struct Square(pub u8);
 /// e.g. `PIECE_CHARS[Piece::WKNIGHT] == 'N'`; `PIECE_CHARS[Piece::BKING] ==
 /// 'k'`; `PIECE_CHARS[Piece::NONE] == '0'`.
 const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
-    'P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k', '0',
+    'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
 ];
 
 impl From<Piece> for char {
