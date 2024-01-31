@@ -137,14 +137,14 @@ fn alpha_beta_search(
 
         let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
         if result >= beta {
-            // our opponent can play a move that makes this position worse
-            // than what we have currently, so this position is guaranteed
-            // to be worse: return
+            // we can play a move that makes this position worse for our
+            // opponent than what they have currently, so they would never pick
+            // this node: return
             return beta;
         }
         if result > alpha {
-            // our opponent can play a move that makes this position better
-            // for them, but our position remains better overall
+            // we've found a better move for us, but not too good to cause a
+            // beta cutoff
             alpha = result;
         }
     }
