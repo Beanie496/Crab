@@ -477,7 +477,7 @@ impl Board {
             } else {
                 reset_board_print_return!(
                     self,
-                    "Error: Invalid number (\"hm\") given for halfmove counter"
+                    "Error: Invalid number (\"{hm}\") given for halfmove counter"
                 );
             }
         } else {
@@ -491,7 +491,7 @@ impl Board {
             } else {
                 reset_board_print_return!(
                     self,
-                    "Error: Invalid number (\"fm\") given for fullmove counter"
+                    "Error: Invalid number (\"{fm}\") given for fullmove counter"
                 );
             }
         } else {
