@@ -182,7 +182,6 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             }
         }
     } else {
-        println!("Unreachable code reached. (Each line should have at least 1 iterable element.)");
-        exit(1);
+        unreachable!("Each line should have at least 1 iterable element.");
     }
 }
