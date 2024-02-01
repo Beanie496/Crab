@@ -4,8 +4,8 @@ use crate::{gui::draw::paint_area_with_color, util::pixels_to_points};
 use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
     egui::{
-        self, widgets::Button, Align, Color32, Context, Direction, Id, Layout, Pos2, Rect, Sense,
-        SidePanel, Ui, Vec2,
+        self, widgets::Button, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel,
+        Ui, Vec2,
     },
     App,
 };
@@ -77,38 +77,30 @@ impl Gui {
     /// the board as it does so.
     fn update_board(&mut self, ctx: &Context, ui: &mut Ui) {
         let mut color = SquareColor::new(SquareColorType::Dark);
+        let available_height = ui.available_height();
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
         for rank in 0..Rank::TOTAL {
             for file in 0..File::TOTAL {
                 let square = Square::from_pos(Rank(rank as u8), File(file as u8));
-                let square_corners = Rect {
+                let square_corners = Rect::from_min_max(
                     // the board to be drawn is 800x800 pixels and sits at the
                     // bottom left with a margix of 40 pixels between it and
                     // the bottom and left. You can figure out the rest :)
-                    min: Pos2::new(
+                    Pos2::new(
                         pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 40.0)),
-                        // yeah idk why the available height is given in pixels to
-                        // begin with
-                        ui.available_height()
+                        available_height
                             - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 140.0)),
                     ),
-                    max: Pos2::new(
+                    Pos2::new(
                         pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 140.0)),
-                        ui.available_height()
+                        available_height
                             - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 40.0)),
                     ),
-                };
-
-                // create a new Ui for the square. This is done so that adding
-                // the piece later adds it exactly where I want it.
-                let mut child = ui.child_ui_with_id_source(
-                    square_corners,
-                    Layout::centered_and_justified(Direction::LeftToRight),
-                    square.0,
                 );
 
-                self.update_square(&mut child, square_corners, square, color);
+                self.update_square(ui, square_corners, square, color);
+                self.add_piece(ui, square_corners, square);
 
                 color.flip_color();
             }
@@ -215,11 +207,10 @@ impl Gui {
     fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, color: SquareColor) {
         if self.has_stopped() {
             paint_area_with_color(ui, region, color.unselected);
-            self.update_piece(ui, square);
             return;
         }
 
-        if ui.interact(region, ui.id(), Sense::click()).clicked() {
+        if ui.allocate_rect(region, Sense::click()).clicked() {
             if let Some(selected) = self.selected_square() {
                 self.set_selected_square(None);
                 let start = selected;
@@ -239,28 +230,28 @@ impl Gui {
         } else {
             paint_area_with_color(ui, region, color.unselected);
         }
-        self.update_piece(ui, square);
     }
 
-    /// Adds the image of the piece that is on the given square. Adds nothing
-    /// if there is no piece on the given square.
-    fn update_piece(&self, ui: &mut Ui, square: Square) {
-        let image_path = match self.piece_on(square) {
-            Piece::WPAWN => "pieces/wp.png",
-            Piece::WKNIGHT => "pieces/wn.png",
-            Piece::WBISHOP => "pieces/wb.png",
-            Piece::WROOK => "pieces/wr.png",
-            Piece::WQUEEN => "pieces/wq.png",
-            Piece::WKING => "pieces/wk.png",
-            Piece::BPAWN => "pieces/bp.png",
-            Piece::BKNIGHT => "pieces/bn.png",
-            Piece::BBISHOP => "pieces/bb.png",
-            Piece::BROOK => "pieces/br.png",
-            Piece::BQUEEN => "pieces/bq.png",
-            Piece::BKING => "pieces/bk.png",
-            // no piece
-            _ => return,
-        };
-        ui.image(image_path);
+    /// Adds the image of the piece on `square` to `ui`. Adds nothing if there
+    /// is no piece on the given square.
+    pub fn add_piece(&self, ui: &mut Ui, region: Rect, square: Square) {
+        ui.allocate_ui_at_rect(region, |ui| {
+            ui.image(match self.piece_on(square) {
+                Piece::WPAWN => "pieces/wp.png",
+                Piece::WKNIGHT => "pieces/wn.png",
+                Piece::WBISHOP => "pieces/wb.png",
+                Piece::WROOK => "pieces/wr.png",
+                Piece::WQUEEN => "pieces/wq.png",
+                Piece::WKING => "pieces/wk.png",
+                Piece::BPAWN => "pieces/bp.png",
+                Piece::BKNIGHT => "pieces/bn.png",
+                Piece::BBISHOP => "pieces/bb.png",
+                Piece::BROOK => "pieces/br.png",
+                Piece::BQUEEN => "pieces/bq.png",
+                Piece::BKING => "pieces/bk.png",
+                // no piece
+                _ => return,
+            });
+        });
     }
 }
