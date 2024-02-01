@@ -1,12 +1,12 @@
 use super::{Gui, SquareColor, SquareColorType};
-use crate::{gui::draw::paint_area_with_color, util::pixels_to_points};
+use crate::{
+    gui::draw::{add_button_to_region, paint_area_with_color},
+    util::pixels_to_points,
+};
 
 use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
-    egui::{
-        self, widgets::Button, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel,
-        Ui, Vec2,
-    },
+    egui::{self, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel, Ui},
     App,
 };
 
@@ -112,9 +112,6 @@ impl Gui {
 
     /// Draws the buttons on the board [`SidePanel`] and handles clicks on
     /// them.
-    ///
-    /// Currently only draws them.
-    // I'm using `self` in a few commits' time, hence the lint allow
     fn update_buttons(&mut self, ctx: &Context, ui: &mut Ui) {
         if self.is_importing_fen() {
             let mut child = ui.child_ui(
@@ -136,61 +133,44 @@ impl Gui {
             return;
         }
 
-        // I need child UI's to lay out the buttons exactly where I want them
-        let mut child = ui.child_ui(
+        // 4 buttons, each 190x70 with 20px spacing, arranged in a 2x2 grid
+        // with 20px spacing
+        add_button_to_region(
+            ui,
             Rect::from_min_max(
-                // this is REALLY fucked. The width of the child UI is the width of
-                // two buttons, plus the spacing between. Ok. The HEIGHT is the
-                // height of ONE button so `Align::Center` causes the button to
-                // fill the whole vertical space, then overflow the UI to form a
-                // nice 2x2 grid. Why am I doing this? So the text is in the centre
-                // of the buttons. Because aligning the text within the buttons is
-                // not a feature for SOME GOD DAMN REASON.
                 Pos2::new(pixels_to_points(ctx, 240.0), pixels_to_points(ctx, 40.0)),
-                // buttons won't lay out correctly because of floating-point
-                // imprecision so I have to do this
-                // oh, and any value smaller than or equal to 0.00003 will
-                // break. That includes `f32::EPSILON`.
-                Pos2::new(
-                    pixels_to_points(ctx, 640.0 + 0.00004),
-                    pixels_to_points(ctx, 110.0),
-                ),
+                Pos2::new(pixels_to_points(ctx, 430.0), pixels_to_points(ctx, 110.0)),
             ),
-            Layout::left_to_right(Align::Center).with_main_wrap(true),
+            "Stop",
+            || self.stop(),
         );
-
-        child.spacing_mut().item_spacing =
-            Vec2::new(pixels_to_points(ctx, 20.0), pixels_to_points(ctx, 20.0));
-
-        let stop = Button::new("Stop").min_size(Vec2::new(
-            pixels_to_points(ctx, 190.0),
-            pixels_to_points(ctx, 70.0),
-        ));
-        let restart = Button::new("Restart").min_size(Vec2::new(
-            pixels_to_points(ctx, 190.0),
-            pixels_to_points(ctx, 70.0),
-        ));
-        let import_fen = Button::new("Import FEN").min_size(Vec2::new(
-            pixels_to_points(ctx, 190.0),
-            pixels_to_points(ctx, 70.0),
-        ));
-        let copy_fen = Button::new("Copy FEN").min_size(Vec2::new(
-            pixels_to_points(ctx, 190.0),
-            pixels_to_points(ctx, 70.0),
-        ));
-
-        if child.add(stop).clicked() {
-            self.stop();
-        }
-        if child.add(restart).clicked() {
-            self.restart();
-        }
-        if child.add(import_fen).clicked() {
-            self.start_importing_fen();
-        }
-        if child.add(copy_fen).clicked() {
-            self.copy_fen_to_clipboard();
-        };
+        add_button_to_region(
+            ui,
+            Rect::from_min_max(
+                Pos2::new(pixels_to_points(ctx, 450.0), pixels_to_points(ctx, 40.0)),
+                Pos2::new(pixels_to_points(ctx, 640.0), pixels_to_points(ctx, 110.0)),
+            ),
+            "Restart",
+            || self.restart(),
+        );
+        add_button_to_region(
+            ui,
+            Rect::from_min_max(
+                Pos2::new(pixels_to_points(ctx, 240.0), pixels_to_points(ctx, 130.0)),
+                Pos2::new(pixels_to_points(ctx, 430.0), pixels_to_points(ctx, 200.0)),
+            ),
+            "Import FEN",
+            || self.start_importing_fen(),
+        );
+        add_button_to_region(
+            ui,
+            Rect::from_min_max(
+                Pos2::new(pixels_to_points(ctx, 450.0), pixels_to_points(ctx, 130.0)),
+                Pos2::new(pixels_to_points(ctx, 640.0), pixels_to_points(ctx, 200.0)),
+            ),
+            "Copy FEN",
+            || self.copy_fen_to_clipboard(),
+        );
     }
 
     /// Draws the labels on the board [`SidePanel`].
