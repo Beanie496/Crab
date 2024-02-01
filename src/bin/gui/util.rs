@@ -1,7 +1,7 @@
 use eframe::egui::Context;
 
-/// Converts logical points to physical pixels.
-pub fn points_to_pixels(ctx: &Context, points: f32) -> f32 {
+/// Converts pixels to logical points.
+pub fn pixels_to_points(ctx: &Context, pixels: f32) -> f32 {
     ctx.native_pixels_per_point()
-        .map_or(points, |ppp| points / ppp)
+        .map_or(pixels, |ppp| pixels / ppp)
 }

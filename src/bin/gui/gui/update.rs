@@ -1,5 +1,5 @@
 use super::{Gui, SquareColor, SquareColorType};
-use crate::{gui::draw::paint_area_with_color, util::points_to_pixels};
+use crate::{gui::draw::paint_area_with_color, util::pixels_to_points};
 
 use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
@@ -50,7 +50,7 @@ impl Gui {
         SidePanel::left(Id::new("board"))
             .resizable(false)
             .show_separator_line(false)
-            .exact_width(points_to_pixels(ctx, width))
+            .exact_width(pixels_to_points(ctx, width))
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
                 self.update_board(ctx, ui);
@@ -68,7 +68,7 @@ impl Gui {
         SidePanel::right(Id::new("info"))
             .resizable(false)
             .show_separator_line(false)
-            .exact_width(points_to_pixels(ctx, width))
+            .exact_width(pixels_to_points(ctx, width))
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |_ui| {});
     }
@@ -87,16 +87,16 @@ impl Gui {
                     // bottom left with a margix of 40 pixels between it and
                     // the bottom and left. You can figure out the rest :)
                     min: Pos2::new(
-                        points_to_pixels(ctx, 100.0f32.mul_add(file as f32, 40.0)),
+                        pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 40.0)),
                         // yeah idk why the available height is given in pixels to
                         // begin with
                         ui.available_height()
-                            - points_to_pixels(ctx, 100.0f32.mul_add(rank as f32, 140.0)),
+                            - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 140.0)),
                     ),
                     max: Pos2::new(
-                        points_to_pixels(ctx, 100.0f32.mul_add(file as f32, 140.0)),
+                        pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 140.0)),
                         ui.available_height()
-                            - points_to_pixels(ctx, 100.0f32.mul_add(rank as f32, 40.0)),
+                            - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 40.0)),
                     ),
                 };
 
@@ -128,8 +128,8 @@ impl Gui {
             let mut child = ui.child_ui(
                 // this is the region that the two bottom buttons cover
                 Rect::from_min_max(
-                    Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 130.0)),
-                    Pos2::new(points_to_pixels(ctx, 640.0), points_to_pixels(ctx, 200.0)),
+                    Pos2::new(pixels_to_points(ctx, 240.0), pixels_to_points(ctx, 130.0)),
+                    Pos2::new(pixels_to_points(ctx, 640.0), pixels_to_points(ctx, 200.0)),
                 ),
                 Layout::left_to_right(Align::Center),
             );
@@ -154,37 +154,37 @@ impl Gui {
                 // nice 2x2 grid. Why am I doing this? So the text is in the centre
                 // of the buttons. Because aligning the text within the buttons is
                 // not a feature for SOME GOD DAMN REASON.
-                Pos2::new(points_to_pixels(ctx, 240.0), points_to_pixels(ctx, 40.0)),
+                Pos2::new(pixels_to_points(ctx, 240.0), pixels_to_points(ctx, 40.0)),
                 // buttons won't lay out correctly because of floating-point
                 // imprecision so I have to do this
                 // oh, and any value smaller than or equal to 0.00003 will
                 // break. That includes `f32::EPSILON`.
                 Pos2::new(
-                    points_to_pixels(ctx, 640.0 + 0.00004),
-                    points_to_pixels(ctx, 110.0),
+                    pixels_to_points(ctx, 640.0 + 0.00004),
+                    pixels_to_points(ctx, 110.0),
                 ),
             ),
             Layout::left_to_right(Align::Center).with_main_wrap(true),
         );
 
         child.spacing_mut().item_spacing =
-            Vec2::new(points_to_pixels(ctx, 20.0), points_to_pixels(ctx, 20.0));
+            Vec2::new(pixels_to_points(ctx, 20.0), pixels_to_points(ctx, 20.0));
 
         let stop = Button::new("Stop").min_size(Vec2::new(
-            points_to_pixels(ctx, 190.0),
-            points_to_pixels(ctx, 70.0),
+            pixels_to_points(ctx, 190.0),
+            pixels_to_points(ctx, 70.0),
         ));
         let restart = Button::new("Restart").min_size(Vec2::new(
-            points_to_pixels(ctx, 190.0),
-            points_to_pixels(ctx, 70.0),
+            pixels_to_points(ctx, 190.0),
+            pixels_to_points(ctx, 70.0),
         ));
         let import_fen = Button::new("Import FEN").min_size(Vec2::new(
-            points_to_pixels(ctx, 190.0),
-            points_to_pixels(ctx, 70.0),
+            pixels_to_points(ctx, 190.0),
+            pixels_to_points(ctx, 70.0),
         ));
         let copy_fen = Button::new("Copy FEN").min_size(Vec2::new(
-            points_to_pixels(ctx, 190.0),
-            points_to_pixels(ctx, 70.0),
+            pixels_to_points(ctx, 190.0),
+            pixels_to_points(ctx, 70.0),
         ));
 
         if child.add(stop).clicked() {
