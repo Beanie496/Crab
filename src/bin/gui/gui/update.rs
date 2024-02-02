@@ -6,7 +6,7 @@ use crate::{
 
 use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
-    egui::{self, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel, Ui},
+    egui::{self, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel, Ui, Vec2},
     App,
 };
 
@@ -27,30 +27,26 @@ pub struct FrameState {
 impl App for Gui {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         // board width with 40 px margin
-        let board_area_width = 880.0;
-        let info_box_width = 1920.0 - 880.0;
+        let board_area_width = pixels_to_points(ctx, 880.0);
+        let info_box_width = pixels_to_points(ctx, 1920.0 - 880.0);
         // I like this color
         let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
+
         self.update_board_area(ctx, board_area_width, bg_col);
         self.update_info_area(ctx, info_box_width, Color32::RED);
     }
 }
 
 impl Gui {
-    /// Creates a [`SidePanel`] and draws the chessboard, buttons and timers.
-    /// It also handles clicks in the board area.
+    /// Updates the chessboard, buttons, and timers, and handles clicks in the
+    /// board area.
     ///
-    /// The reason why this isn't two functions is because the `Ui`s that make
-    /// the squares (and detect the clicks) are created to draw the square and
-    /// then immediately destroyed, so they need to handle clicks there and
-    /// then.
-    ///
-    /// Buttons currently do nothing and timers are not implemented yet.
+    /// Timers are not implemented yet.
     fn update_board_area(&mut self, ctx: &Context, width: f32, col: Color32) {
         SidePanel::left(Id::new("board"))
             .resizable(false)
             .show_separator_line(false)
-            .exact_width(pixels_to_points(ctx, width))
+            .exact_width(width)
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
                 self.update_board(ctx, ui);
@@ -68,7 +64,7 @@ impl Gui {
         SidePanel::right(Id::new("info"))
             .resizable(false)
             .show_separator_line(false)
-            .exact_width(pixels_to_points(ctx, width))
+            .exact_width(width)
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |_ui| {});
     }
@@ -78,32 +74,39 @@ impl Gui {
     fn update_board(&mut self, ctx: &Context, ui: &mut Ui) {
         let mut color = SquareColor::new(SquareColorType::Dark);
         let available_height = ui.available_height();
+
+        let mut square_corners = Rect::from_min_max(
+            // the board to be drawn is 800x800 pixels and sits at the
+            // bottom left with a margix of 40 pixels between it and
+            // the bottom and left. You can figure out the rest :)
+            Pos2::new(
+                pixels_to_points(ctx, 40.0),
+                available_height - pixels_to_points(ctx, 140.0)
+            ),
+            Pos2::new(
+                pixels_to_points(ctx, 140.0),
+                available_height - pixels_to_points(ctx, 40.0)
+            ),
+        );
         // draw the board, starting at the bottom left square; go left to right then
         // bottom to top
         for rank in 0..Rank::TOTAL {
             for file in 0..File::TOTAL {
                 let square = Square::from_pos(Rank(rank as u8), File(file as u8));
-                let square_corners = Rect::from_min_max(
-                    // the board to be drawn is 800x800 pixels and sits at the
-                    // bottom left with a margix of 40 pixels between it and
-                    // the bottom and left. You can figure out the rest :)
-                    Pos2::new(
-                        pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 40.0)),
-                        available_height
-                            - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 140.0)),
-                    ),
-                    Pos2::new(
-                        pixels_to_points(ctx, 100.0f32.mul_add(file as f32, 140.0)),
-                        available_height
-                            - pixels_to_points(ctx, 100.0f32.mul_add(rank as f32, 40.0)),
-                    ),
-                );
 
                 self.update_square(ui, square_corners, square, color);
                 self.add_piece(ui, square_corners, square);
 
+                square_corners = square_corners.translate(Vec2::new(
+                    pixels_to_points(ctx, 100.0),
+                    pixels_to_points(ctx, 0.0)
+                ));
                 color.flip_color();
             }
+            square_corners = square_corners.translate(Vec2::new(
+                pixels_to_points(ctx, -800.0),
+                pixels_to_points(ctx, -100.0)
+            ));
             // when going onto a new rank, flip the square again because it needs
             // stay the same color
             color.flip_color();

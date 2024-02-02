@@ -192,7 +192,7 @@ impl SquareColor {
 /// Embeds all 12 piece images into the binary to allow easy (and efficient)
 /// access later.
 fn include_piece_images(ctx: &Context) {
-    // can't make this any shorter (e.g. with a loop) because `include_bytes`
+    // can't make this any shorter (e.g. with a loop) because `include_bytes!`
     // requires a string literal
     ctx.include_bytes(
         "pieces/wp.png",
