@@ -229,8 +229,8 @@ impl Bitboard {
     /// Tests if no bits in `self` are set.
     #[inline]
     #[must_use]
-    pub fn is_empty(self) -> bool {
-        self == Self::EMPTY
+    pub const fn is_empty(self) -> bool {
+        self.0 == Self::EMPTY.0
     }
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
@@ -255,8 +255,8 @@ impl Bitboard {
     /// Shifts `self` one square east without wrapping.
     #[inline]
     #[must_use]
-    pub fn east(self) -> Self {
-        Self(self.0 << 1) & !Self::file_bb(File::FILE1)
+    pub const fn east(self) -> Self {
+        Self(self.0 << 1 & !Self::file_bb(File::FILE1).0)
     }
 
     /// Shifts `self` one square south without wrapping.
@@ -269,8 +269,8 @@ impl Bitboard {
     /// Shifts `self` one square west without wrapping.
     #[inline]
     #[must_use]
-    pub fn west(self) -> Self {
-        Self(self.0 >> 1) & !Self::file_bb(File::FILE8)
+    pub const fn west(self) -> Self {
+        Self(self.0 >> 1 & !Self::file_bb(File::FILE8).0)
     }
 
     /// Clears the least significant bit of `self` and returns it.
