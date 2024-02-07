@@ -14,6 +14,7 @@ use eframe::{
     },
     App,
 };
+use egui_extras::{Column, TableBuilder};
 
 /// Information about the current frame that the next frame needs to know.
 #[derive(Default)]
@@ -72,8 +73,6 @@ impl Gui {
     /// engine output.
     ///
     /// Currently doesn't display engine output.
-    // TODO: make this actually display info (using `self`)
-    #[allow(clippy::unused_self)]
     fn update_info_box(&self, ctx: &Context, ui: &Ui) {
         let info_box_size = Vec2::new(
             // available width/height minus the 40 px margin
@@ -101,6 +100,65 @@ impl Gui {
             .show(ctx, |ui| {
                 ui.expand_to_include_x(bottom_right_point.x);
                 ui.expand_to_include_y(bottom_right_point.y);
+                self.add_table(ctx, ui);
+            });
+    }
+
+    /// Display the table of the info box.
+    // TODO: make this actually display info (using `self`)
+    #[allow(clippy::unused_self)]
+    fn add_table(&self, ctx: &Context, ui: &mut Ui) {
+        TableBuilder::new(ui)
+            .columns(
+                Column::auto()
+                    .resizable(true)
+                    .at_least(pixels_to_points(ctx, 100.0)),
+                5,
+            )
+            .column(Column::remainder())
+            .header(pixels_to_points(ctx, 35.0), |mut header| {
+                header.col(|ui| {
+                    // add a space so it isn't hugging the side
+                    ui.heading(" Depth");
+                });
+                header.col(|ui| {
+                    ui.heading("Time");
+                });
+                header.col(|ui| {
+                    ui.heading("Nodes");
+                });
+                header.col(|ui| {
+                    ui.heading("NPS");
+                });
+                header.col(|ui| {
+                    ui.heading("Eval");
+                });
+                header.col(|ui| {
+                    ui.heading("PV");
+                });
+            })
+            .body(|mut body| {
+                // this is all just example text
+                body.row(0.0, |mut row| {
+                    row.col(|ui| {
+                        ui.label(" 100/100");
+                    });
+                    row.col(|ui| {
+                        ui.label("983 ms");
+                    });
+                    row.col(|ui| {
+                        ui.label("100,000,000,000");
+                    });
+                    row.col(|ui| {
+                        ui.label("9,999,999k");
+                    });
+                    row.col(|ui| {
+                        ui.label("+100.00");
+                    });
+                    row.col(|ui| {
+                        ui.label("Nf3 d5 d4 Nf6 c4 e6 Nc3 c6 Bg5 h6");
+                    });
+                });
             });
     }
 
