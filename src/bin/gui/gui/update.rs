@@ -6,7 +6,12 @@ use crate::{
 
 use backend::defs::{File, Piece, Rank, Square};
 use eframe::{
-    egui::{self, Align, Color32, Context, Id, Layout, Pos2, Rect, Sense, SidePanel, Ui, Vec2},
+    egui::{
+        self,
+        containers::{Frame, Window},
+        Align, CentralPanel, Color32, Context, Id, Layout, Pos2, Rect, Rounding, Sense, SidePanel,
+        Stroke, Ui, Vec2,
+    },
     App,
 };
 
@@ -26,14 +31,11 @@ pub struct FrameState {
 
 impl App for Gui {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // board width with 40 px margin
-        let board_area_width = pixels_to_points(ctx, 880.0);
-        let info_box_width = pixels_to_points(ctx, 1920.0 - 880.0);
         // I like this color
         let bg_col = Color32::from_rgb(0x2e, 0x2e, 0x2e);
 
-        self.update_board_area(ctx, board_area_width, bg_col);
-        self.update_info_area(ctx, info_box_width, Color32::RED);
+        self.update_board_area(ctx, bg_col);
+        self.update_info_area(ctx, bg_col);
     }
 }
 
@@ -42,11 +44,13 @@ impl Gui {
     /// board area.
     ///
     /// Timers are not implemented yet.
-    fn update_board_area(&mut self, ctx: &Context, width: f32, col: Color32) {
+    fn update_board_area(&mut self, ctx: &Context, col: Color32) {
         SidePanel::left(Id::new("board"))
             .resizable(false)
             .show_separator_line(false)
-            .exact_width(width)
+            // board width with 40 px margin between it and the edge of the
+            // screen
+            .exact_width(pixels_to_points(ctx, 840.0))
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
                 self.update_board(ctx, ui);
@@ -56,17 +60,48 @@ impl Gui {
     }
 
     /// Draws the area where all the information from the engine is displayed.
-    ///
-    /// Currently just paints the whole thing the color `col`.
-    // I'm using `self` in a few commits' time, hence the lint allow
-    #[allow(clippy::unused_self)]
-    fn update_info_area(&self, ctx: &Context, width: f32, col: Color32) {
-        SidePanel::right(Id::new("info"))
-            .resizable(false)
-            .show_separator_line(false)
-            .exact_width(width)
+    fn update_info_area(&self, ctx: &Context, col: Color32) {
+        CentralPanel::default()
             .frame(egui::Frame::none().fill(col))
-            .show(ctx, |_ui| {});
+            .show(ctx, |ui| {
+                self.update_info_box(ctx, ui);
+            });
+    }
+
+    /// Draws the information box, which contains several fields to display
+    /// engine output.
+    ///
+    /// Currently doesn't display engine output.
+    // TODO: make this actually display info (using `self`)
+    #[allow(clippy::unused_self)]
+    fn update_info_box(&self, ctx: &Context, ui: &Ui) {
+        let info_box_size = Vec2::new(
+            // available width/height minus the 40 px margin
+            ui.available_width() - pixels_to_points(ctx, 80.0),
+            ui.available_height() - pixels_to_points(ctx, 80.0),
+        );
+        let top_left_point = Pos2::new(
+            // edge of the board + margin
+            pixels_to_points(ctx, 880.0),
+            // top of the screen + margin
+            pixels_to_points(ctx, 40.0),
+        );
+        let bottom_right_point = top_left_point + info_box_size;
+
+        Window::new("Eval")
+            .frame(
+                Frame::none()
+                    .stroke(Stroke::new(pixels_to_points(ctx, 5.0), Color32::DARK_GRAY))
+                    .rounding(Rounding::same(pixels_to_points(ctx, 10.0))),
+            )
+            .movable(false)
+            .fixed_rect(Rect::from_min_max(top_left_point, bottom_right_point))
+            .collapsible(false)
+            .scroll2(true)
+            .show(ctx, |ui| {
+                ui.expand_to_include_x(bottom_right_point.x);
+                ui.expand_to_include_y(bottom_right_point.y);
+            });
     }
 
     /// Draws the chessboard and all the pieces on it, handling clicks within
@@ -81,11 +116,11 @@ impl Gui {
             // the bottom and left. You can figure out the rest :)
             Pos2::new(
                 pixels_to_points(ctx, 40.0),
-                available_height - pixels_to_points(ctx, 140.0)
+                available_height - pixels_to_points(ctx, 140.0),
             ),
             Pos2::new(
                 pixels_to_points(ctx, 140.0),
-                available_height - pixels_to_points(ctx, 40.0)
+                available_height - pixels_to_points(ctx, 40.0),
             ),
         );
         // draw the board, starting at the bottom left square; go left to right then
@@ -99,13 +134,13 @@ impl Gui {
 
                 square_corners = square_corners.translate(Vec2::new(
                     pixels_to_points(ctx, 100.0),
-                    pixels_to_points(ctx, 0.0)
+                    pixels_to_points(ctx, 0.0),
                 ));
                 color.flip_color();
             }
             square_corners = square_corners.translate(Vec2::new(
                 pixels_to_points(ctx, -800.0),
-                pixels_to_points(ctx, -100.0)
+                pixels_to_points(ctx, -100.0),
             ));
             // when going onto a new rank, flip the square again because it needs
             // stay the same color
