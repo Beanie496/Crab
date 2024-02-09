@@ -1,7 +1,7 @@
 use super::{Pv, SearchInfo};
 use crate::{
     board::{Board, Moves},
-    defs::PieceType,
+    defs::MoveType,
     evaluation::{evaluate, Eval},
 };
 
@@ -23,7 +23,7 @@ pub fn alpha_beta_search(
 
     let mut pv = Pv::new();
     let mut moves = Moves::new();
-    board.generate_moves(&mut moves);
+    board.generate_moves::<{ MoveType::ALL }>(&mut moves);
 
     for mv in moves {
         let mut copy = board.clone();
@@ -71,16 +71,9 @@ fn quiescent_search(
     }
 
     let mut moves = Moves::new();
-    board.generate_moves(&mut moves);
+    board.generate_moves::<{ MoveType::CAPTURES }>(&mut moves);
 
     for mv in moves {
-        // skip over all non-captures
-        // (castling has to be specifically accounted for because it's encoded
-        // as king takes rook)
-        if PieceType::from(board.piece_on(mv.end())) == PieceType::NONE || mv.is_castling() {
-            continue;
-        }
-
         let mut copy = board.clone();
         if !copy.make_move(mv) {
             continue;

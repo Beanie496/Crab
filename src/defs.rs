@@ -36,6 +36,10 @@ pub struct Direction(pub i8);
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
 
+/// A wrapper for certain types of move. See associated constants for the
+/// current types.
+pub struct MoveType;
+
 /// The error that happens if a parsed string is invalid.
 pub struct ParseError;
 
@@ -235,6 +239,13 @@ impl File {
     pub const FILE7: Self = Self(6);
     pub const FILE8: Self = Self(7);
     pub const TOTAL: usize = 8;
+}
+
+impl MoveType {
+    /// All moves.
+    pub const ALL: u8 = 0;
+    /// Captures only.
+    pub const CAPTURES: u8 = 1;
 }
 
 /// Enumerates pieces for White and Black.

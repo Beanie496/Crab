@@ -1,7 +1,10 @@
 use std::time::Instant;
 
 use super::Engine;
-use crate::board::{Board, Moves};
+use crate::{
+    board::{Board, Moves},
+    defs::MoveType,
+};
 
 impl Engine {
     /// Outputs and returns the number of leaf nodes `depth` moves in the
@@ -31,7 +34,7 @@ impl Engine {
         }
 
         let mut moves = Moves::new();
-        self.board.generate_moves(&mut moves);
+        self.board.generate_moves::<{ MoveType::ALL }>(&mut moves);
 
         let mut total = 0;
         for mv in moves {
@@ -62,7 +65,7 @@ impl Engine {
         }
 
         let mut moves = Moves::new();
-        board.generate_moves(&mut moves);
+        board.generate_moves::<{ MoveType::ALL }>(&mut moves);
 
         let mut total = 0;
         for mv in moves {

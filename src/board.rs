@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     bitboard::Bitboard,
-    defs::{File, Piece, PieceType, Rank, Side, Square},
+    defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
     out_of_bounds_is_unreachable,
 };
@@ -322,7 +322,7 @@ impl Board {
         }
 
         for mv in moves_str.split(' ') {
-            copy.generate_moves(&mut moves);
+            copy.generate_moves::<{ MoveType::ALL }>(&mut moves);
 
             // I don't particularly want to deal with non-ascii characters
             #[allow(clippy::string_slice)]

@@ -2,7 +2,7 @@ use super::Gui;
 
 use backend::{
     board::Moves,
-    defs::{Piece, Square},
+    defs::{MoveType, Piece, Square},
 };
 
 impl Gui {
@@ -16,7 +16,9 @@ impl Gui {
     // - set the current board to the copy
     pub fn move_piece(&mut self, start: Square, end: Square) -> bool {
         let mut moves = Moves::new();
-        self.engine.board.generate_moves(&mut moves);
+        self.engine
+            .board
+            .generate_moves::<{ MoveType::ALL }>(&mut moves);
 
         let mv = moves.move_with(start, end);
         let mv = if mv.is_none() {
@@ -38,7 +40,7 @@ impl Gui {
         self.engine.board = loop {
             let mut copy = self.engine.board.clone();
             moves.clear();
-            copy.generate_moves(&mut moves);
+            copy.generate_moves::<{ MoveType::ALL }>(&mut moves);
             let rand_move = moves.random_move();
             // if we've selected a legal move, break. Otherwise, keep trying
             // other random moves.
