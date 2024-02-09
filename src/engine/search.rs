@@ -9,19 +9,30 @@ use crate::{
     evaluation::{evaluate_board, Eval},
 };
 
+/// The principle variation: the current best sequence of moves for both sides.
+// non-circular queue, as all the moves are enqueued exactly once before all
+// the moves are dequeued exactly once (then it goes out of scope)
+// 512 bytes
+#[allow(clippy::missing_docs_in_private_items)]
+struct Pv {
+    moves: [Move; MAX_PLY],
+    first_item: u8,
+    first_empty: u8,
+}
+
 /// Information about a search.
 struct SearchInfo {
     /// The depth to be searched.
     pub depth: u8,
-    /// The maximum depth reached during quiessence (not implemented).
+    /// The maximum depth reached during quiescence (not implemented).
     pub seldepth: u8,
     /// How long the search has been going.
     pub time: Duration,
     /// How many positions have been searched.
     pub nodes: u64,
-    // not sure how to make these two work yet - just the first move for now?
     /// The principle variation: the optimal sequence of moves for both sides.
-    pub pv: Move,
+    pub pv: Pv,
+    // ignore this for now
     //_multipv: [[Move]],
     /// The score of the position from the perspective of the side to move.
     pub score: Eval,
@@ -37,6 +48,28 @@ struct SearchInfo {
 
 /// The highest possible (positive) evaluation.
 const INF_EVAL: Eval = Eval::MAX;
+/// The maximum depth this engine supports.
+const MAX_PLY: usize = u8::MAX as usize;
+
+impl Display for Pv {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut ret_str = String::with_capacity(self.len());
+        for mv in 0..self.len() {
+            ret_str.push_str(&self.get(mv).to_string());
+            ret_str.push(' ');
+        }
+        ret_str.pop();
+        write!(f, "{ret_str}")
+    }
+}
+
+impl Iterator for Pv {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.dequeue()
+    }
+}
 
 impl Display for SearchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -64,32 +97,75 @@ impl Engine {
     pub fn search(&self, depth: Option<u8>) {
         let time = Instant::now();
         let depth = depth.unwrap_or(u8::MAX);
-        let mut alpha = -INF_EVAL;
+        let alpha = -INF_EVAL;
         let beta = INF_EVAL;
         let mut search_info = SearchInfo::new(depth);
 
-        let mut moves = Moves::new();
-        self.board.generate_moves(&mut moves);
+        let result = alpha_beta_search(&mut search_info, &self.board.clone(), -beta, -alpha, depth);
 
-        for mv in moves {
-            let mut copy = self.board.clone();
-            if !copy.make_move(mv) {
-                continue;
-            }
-
-            let result = -alpha_beta_search(&mut search_info, &copy, -beta, -alpha, depth - 1);
-            if result > alpha {
-                alpha = result;
-                search_info.pv = mv;
-            }
-        }
-
-        search_info.seldepth = depth;
+        // ply counts from 0; seldepth counts from 1
+        search_info.seldepth = depth + 1;
         search_info.time = time.elapsed();
-        search_info.score = alpha;
+        search_info.score = result;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
 
         println!("{search_info}");
+    }
+}
+
+impl Pv {
+    /// Returns a new 0-initialised [`Pv`].
+    const fn new() -> Self {
+        Self {
+            // TODO: `MaybeUninit` might be faster?
+            moves: [Move::null(); MAX_PLY],
+            first_item: 0,
+            first_empty: 0,
+        }
+    }
+
+    /// Appends the [`Move`]s from `other_pv` to `self`.
+    fn append_pv(&mut self, other_pv: &mut Self) {
+        // NOTE: `collect_into()` would be a more ergonomic way to do this,
+        // but that's currently nightly
+        for mv in other_pv {
+            self.enqueue(mv);
+        }
+    }
+
+    /// Adds a [`Move`] to the back of `self`.
+    fn enqueue(&mut self, mv: Move) {
+        self.moves[self.first_empty as usize] = mv;
+        self.first_empty += 1;
+    }
+
+    /// Removes a [`Move`] from the front of `self`.
+    fn dequeue(&mut self) -> Option<Move> {
+        (self.first_item < self.first_empty).then(|| {
+            let mv = self.moves[self.first_item as usize];
+            self.first_item += 1;
+            mv
+        })
+    }
+
+    /// Clears all moves from `self`.
+    ///
+    /// This only sets a couple of variables, so it's basically free.
+    fn clear(&mut self) {
+        self.first_item = 0;
+        self.first_empty = 0;
+    }
+
+    /// Gets the [`Move`] at the given index.
+    ///
+    /// Useful for read-only iteration.
+    const fn get(&self, index: usize) -> Move {
+        self.moves[index]
+    }
+
+    /// Calculates the length of `self`.
+    fn len(&self) -> usize {
+        usize::from(self.first_empty - self.first_item)
     }
 }
 
@@ -102,7 +178,7 @@ impl SearchInfo {
             seldepth: 0,
             time: Duration::ZERO,
             nodes: 0,
-            pv: Move::null(),
+            pv: Pv::new(),
             score: 0,
             _currmove: Move::null(),
             _currmovenumber: 1,
@@ -122,10 +198,12 @@ fn alpha_beta_search(
     depth: u8,
 ) -> Eval {
     search_info.nodes += 1;
+
     if depth == 0 {
         return evaluate_board(board);
     }
 
+    let mut pv = Pv::new();
     let mut moves = Moves::new();
     board.generate_moves(&mut moves);
 
@@ -146,8 +224,12 @@ fn alpha_beta_search(
             // we've found a better move for us, but not too good to cause a
             // beta cutoff
             alpha = result;
+            pv.clear();
+            pv.enqueue(mv);
+            pv.append_pv(&mut search_info.pv);
         }
     }
+    search_info.pv = pv;
 
     alpha
 }
