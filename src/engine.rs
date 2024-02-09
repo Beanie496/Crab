@@ -2,7 +2,7 @@ use crate::board::Board;
 
 /// For perft, as it's counting leaf nodes, not searching.
 mod perft;
-/// For search-related code.
+/// For the search.
 mod search;
 
 /// Master object that contains all the other major objects.
