@@ -95,7 +95,7 @@ impl Score {
 /// Currently just calculates material balance with piece-square tables.
 #[inline]
 #[must_use]
-pub fn evaluate_board(board: &Board) -> Eval {
+pub fn evaluate(board: &Board) -> Eval {
     let score = board.psq();
     let phase = board.phase();
 

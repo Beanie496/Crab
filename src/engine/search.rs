@@ -25,8 +25,6 @@ struct Pv {
 struct SearchInfo {
     /// The depth to be searched.
     pub depth: u8,
-    /// The maximum depth reached during quiescence (not implemented).
-    pub seldepth: u8,
     /// How long the search has been going.
     pub time: Duration,
     /// How many positions have been searched.
@@ -76,9 +74,8 @@ impl Display for SearchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "info depth {} seldepth {} time {} nodes {} pv {} score cp {} nps {}",
+            "info depth {} time {} nodes {} pv {} score cp {} nps {}",
             self.depth,
-            self.seldepth,
             self.time.as_millis(),
             self.nodes,
             self.pv,
@@ -104,8 +101,9 @@ impl Engine {
 
         let result = alpha_beta_search(&mut search_info, &self.board.clone(), -beta, -alpha, depth);
 
-        // ply counts from 0; seldepth counts from 1
-        search_info.seldepth = depth + 1;
+        // the initial call to `alpha_beta_search()` counts the starting
+        // position, so remove that count
+        search_info.nodes -= 1;
         search_info.time = time.elapsed();
         search_info.score = result;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
@@ -176,7 +174,6 @@ impl SearchInfo {
     const fn new(depth: u8) -> Self {
         Self {
             depth,
-            seldepth: 0,
             time: Duration::ZERO,
             nodes: 0,
             pv: Pv::new(),

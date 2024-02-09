@@ -760,8 +760,8 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, PieceType) {
-        let start = Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = self.start();
+        let end = self.end();
         let is_promotion = self.is_promotion();
         let is_castling = self.is_castling();
         let is_en_passant = self.is_en_passant();
@@ -774,6 +774,20 @@ impl Move {
             is_promotion,
             piece_type,
         )
+    }
+
+    /// Calculates the start square of `self`.
+    #[inline]
+    #[must_use]
+    pub const fn start(&self) -> Square {
+        Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8)
+    }
+
+    /// Calculates the end square of `self`.
+    #[inline]
+    #[must_use]
+    pub const fn end(&self) -> Square {
+        Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8)
     }
 
     /// Checks if the move is castling.

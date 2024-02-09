@@ -1,7 +1,8 @@
 use super::{Pv, SearchInfo};
 use crate::{
     board::{Board, Moves},
-    evaluation::{evaluate_board, Eval},
+    defs::PieceType,
+    evaluation::{evaluate, Eval},
 };
 
 /// Performs negamax on `board`. Returns the evaluation of after searching
@@ -14,11 +15,11 @@ pub fn alpha_beta_search(
     beta: Eval,
     depth: u8,
 ) -> Eval {
-    search_info.nodes += 1;
-
     if depth == 0 {
-        return evaluate_board(board);
+        return quiescent_search(search_info, board, alpha, beta);
     }
+
+    search_info.nodes += 1;
 
     let mut pv = Pv::new();
     let mut moves = Moves::new();
@@ -48,5 +49,50 @@ pub fn alpha_beta_search(
     }
     search_info.pv = pv;
 
+    alpha
+}
+
+/// Perform a quiescent search on the current position. This is similar to
+/// alpha-beta but it only examines captures.
+fn quiescent_search(
+    search_info: &mut SearchInfo,
+    board: &Board,
+    mut alpha: Eval,
+    beta: Eval,
+) -> Eval {
+    search_info.nodes += 1;
+
+    let stand_pat = evaluate(board);
+    if stand_pat >= beta {
+        return beta;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+
+    let mut moves = Moves::new();
+    board.generate_moves(&mut moves);
+
+    for mv in moves {
+        // skip over all non-captures
+        // (castling has to be specifically accounted for because it's encoded
+        // as king takes rook)
+        if PieceType::from(board.piece_on(mv.end())) == PieceType::NONE || mv.is_castling() {
+            continue;
+        }
+
+        let mut copy = board.clone();
+        if !copy.make_move(mv) {
+            continue;
+        }
+
+        let result = -quiescent_search(search_info, &copy, -beta, -alpha);
+        if result >= beta {
+            return beta;
+        }
+        if result > alpha {
+            alpha = result;
+        }
+    }
     alpha
 }
