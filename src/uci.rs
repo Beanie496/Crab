@@ -26,6 +26,31 @@ pub fn main_loop() {
     }
 }
 
+/// Starts the search, given the rest of the tokens after `go`.
+fn go(line: &mut Split<'_, char>, engine: &Engine) {
+    let mut depth = None;
+
+    while let Some(token) = line.next() {
+        // just depth for now
+        #[allow(clippy::single_match)]
+        match token {
+            "depth" => {
+                if let Some(result) = line.next() {
+                    if let Ok(d) = result.parse::<u8>() {
+                        if d != 0 {
+                            depth = Some(d);
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+
+    let search_info = engine.search(depth);
+    println!("{search_info}");
+}
+
 /// Given an iterator over the remaining space-delimited tokens of a `position`
 /// command, removes all empty strings and concatenate the remaining tokens
 /// into a [`String`] for the FEN and moves each with a space between each
@@ -86,64 +111,40 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
                 /* Start calculating from the current position,
                  * as specified by the "position" command.
                  * The next element should be one of the following:
-                 * - searchmoves: restrict search to one of the
-                 *   specified moves
-                 * - ponder: start searching in pondering mode.
-                 *   Don't implement this.
+                 * - searchmoves: restrict search to one of the specified moves
+                 * - ponder: start searching in pondering mode.  Don't
+                 *   implement this.
                  * - wtime: White has x ms left
                  * - btime: Black has x ms left
                  * - winc: White has x ms inc
                  * - binc: Black has x ms inc
-                 * - movestogo: x moves until next tc, otherwise
-                 *   sudden death
+                 * - movestogo: x moves until next tc, otherwise sudden death
                  * - depth: search x plies only
                  * - nodes: search x nodes only
                  * - mate: search for mate in x
                  * - movetime: search for exactly x ms
-                 * - infinite: search until "stop" command
-                 *   received. Do not exit search otherwise.
+                 * - infinite: search until "stop" command received. Do not
+                 * exit search otherwise.
                  */
-                // just depth for now, as making this easily extensible
-                // would take a little time
-                if let Some(string) = line.next() {
-                    if string != "depth" {
-                        return;
-                    }
-                    if let Some(depth) = line.next() {
-                        match depth.parse::<u8>() {
-                            Ok(result) => {
-                                if result == 0 {
-                                    engine.search(None);
-                                } else {
-                                    engine.search(Some(result));
-                                }
-                            }
-                            Err(result) => println!("{result}; must give 0-255"),
-                        }
-                    }
-                } else {
-                    engine.search(None);
-                }
+                go(&mut line, engine);
             }
             "isready" => {
                 /* Immediately print "readyok" */
                 println!("readyok");
             }
             "position" => {
-                /* Next element should be "fen" or "startpos".
-                 * If the next element is "fen", a FEN string
-                 * should be given (spanning multiple elements).
-                 * The element after that should be "moves",
-                 * followed by a series of moves, one per element.
-                 * The moves should look like, for example,
-                 * "e2e4".
+                /* Next element should be "fen" or "startpos".  If the next
+                 * element is "fen", a FEN string should be given (spanning
+                 * multiple elements).  The element after that should be
+                 * "moves", followed by a series of moves, one per element.
+                 * The moves should look like, for example, "e2e4".
                  */
                 handle_position(&mut line, engine);
             }
             "setoption" => {
-                /* Next element of line_iter should be "name".
-                 * Element after "name" should be one of the
-                 * options specified from "uci" command.
+                /* Next element of line_iter should be "name".  Element after
+                 * "name" should be one of the options specified from "uci"
+                 * command.
                  */
             }
             "stop" => { /* Stop calculating immediately. */ }

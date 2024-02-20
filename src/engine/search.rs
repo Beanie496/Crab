@@ -15,14 +15,15 @@ mod alpha_beta;
 // the moves are dequeued exactly once (then it goes out of scope)
 // 512 bytes
 #[allow(clippy::missing_docs_in_private_items)]
-struct Pv {
+pub struct Pv {
     moves: [Move; MAX_PLY],
     first_item: u8,
     first_empty: u8,
 }
 
 /// Information about a search.
-struct SearchInfo {
+#[allow(clippy::module_name_repetitions)]
+pub struct SearchInfo {
     /// The depth to be searched.
     pub depth: u8,
     /// How long the search has been going.
@@ -92,7 +93,8 @@ impl Engine {
     // obviously different
     #[allow(clippy::similar_names)]
     #[inline]
-    pub fn search(&self, depth: Option<u8>) {
+    #[must_use]
+    pub fn search(&self, depth: Option<u8>) -> SearchInfo {
         let time = Instant::now();
         let depth = depth.unwrap_or(u8::MAX);
         let alpha = -INF_EVAL;
@@ -107,8 +109,7 @@ impl Engine {
         search_info.time = time.elapsed();
         search_info.score = result;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
-
-        println!("{search_info}");
+        search_info
     }
 }
 
