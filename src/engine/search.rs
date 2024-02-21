@@ -260,7 +260,7 @@ impl SearchInfo {
     /// will be `Unfinished` if the search has not stopped and `Finished` if it
     /// has.
     fn create_result(&self, depth: u8) -> SearchResult {
-        if self.has_stopped {
+        if !self.has_stopped {
             SearchResult::Unfinished(WorkingResult {
                 depth,
                 time: self.time,
