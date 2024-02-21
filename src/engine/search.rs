@@ -154,7 +154,8 @@ impl Engine {
 
         // The inner thread spawned runs the iterative deepening loop. It sends
         // the information to `info_rx`. The outer thread spawned prints any
-        // information received through `info_rx`, blocking until it does.
+        // information received through `info_rx`, blocking until it does. When
+        // the search finishes, both threads terminate.
         // I don't like spawning two threads, but I don't really have a choice
         // if I don't want users of my API not to have to implement
         // parallelism.
