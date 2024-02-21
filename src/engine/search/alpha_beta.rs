@@ -21,6 +21,12 @@ pub fn alpha_beta_search(
 
     search_info.nodes += 1;
 
+    // Stop if needed. The return value isn't important because it will be
+    // discarded anyway.
+    if search_info.should_stop() {
+        return 0;
+    }
+
     let mut pv = Pv::new();
     let mut moves = Moves::new();
     board.generate_moves::<{ MoveType::ALL }>(&mut moves);

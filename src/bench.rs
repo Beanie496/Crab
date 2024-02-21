@@ -2,7 +2,7 @@
 
 use std::{
     sync::{mpsc, Arc, Mutex},
-    thread::{self, available_parallelism},
+    thread::{available_parallelism, spawn},
 };
 
 use crate::engine::Engine;
@@ -105,7 +105,7 @@ fn test_positions() {
         let rx = Arc::clone(&rx);
         // Spawn a thread that dequeues and runs the test positions from the
         // receiver until there are no positions left
-        handles.push(thread::spawn(move || loop {
+        handles.push(spawn(move || loop {
             let test_pos = rx.lock().unwrap().try_recv();
             if let Ok(test_pos) = test_pos {
                 test_pos.run_test(&mut engine)

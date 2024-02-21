@@ -27,7 +27,7 @@ pub fn main_loop() {
 }
 
 /// Starts the search, given the rest of the tokens after `go`.
-fn go(line: &mut Split<'_, char>, engine: &Engine) {
+fn go(line: &mut Split<'_, char>, engine: &mut Engine) {
     let mut depth = None;
 
     while let Some(token) = line.next() {
@@ -47,8 +47,7 @@ fn go(line: &mut Split<'_, char>, engine: &Engine) {
         }
     }
 
-    let search_info = engine.search(depth);
-    println!("{search_info}");
+    engine.start_search(depth);
 }
 
 /// Given an iterator over the remaining space-delimited tokens of a `position`
@@ -147,7 +146,10 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
                  * command.
                  */
             }
-            "stop" => { /* Stop calculating immediately. */ }
+            "stop" => {
+                /* Stop calculating immediately. */
+                engine.stop_search();
+            }
             "uci" => {
                 /* Print ID, all options and "uciok" */
                 println!("uciok");
@@ -155,6 +157,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
             "q" | "quit" => {
                 /* Quit as soon as possible */
+                engine.stop_search();
                 exit(0);
             }
 
@@ -166,7 +169,7 @@ fn handle_input_line(line: &str, engine: &mut Engine) {
             }
             /* "p" - prints current position */
             "p" => {
-                engine.board.pretty_print();
+                engine.pretty_print_board();
             }
             /* "perft n", where n is a number - run perft to depth n */
             "perft" => {

@@ -1,10 +1,15 @@
 use std::{
     fmt::{self, Display, Formatter},
+    sync::mpsc::{channel, Receiver, Sender},
+    thread::spawn,
     time::{Duration, Instant},
 };
 
 use super::Engine;
-use crate::{board::Move, evaluation::Eval};
+use crate::{
+    board::{Board, Move},
+    evaluation::Eval,
+};
 use alpha_beta::alpha_beta_search;
 
 /// For carrying out the search.
@@ -15,6 +20,7 @@ mod alpha_beta;
 // the moves are dequeued exactly once (then it goes out of scope)
 // 512 bytes
 #[allow(clippy::missing_docs_in_private_items)]
+#[derive(Clone)]
 pub struct Pv {
     moves: [Move; MAX_PLY],
     first_item: u8,
@@ -23,7 +29,7 @@ pub struct Pv {
 
 /// Information about a search.
 #[allow(clippy::module_name_repetitions)]
-pub struct SearchInfo {
+struct SearchInfo {
     /// The depth to be searched.
     pub depth: u8,
     /// How long the search has been going.
@@ -44,7 +50,39 @@ pub struct SearchInfo {
     pub _hashfull: u16,
     /// How many positions have been reached on average per second.
     pub nps: u64,
+    /// A channel to receive the 'stop' command from.
+    pub control_rx: Receiver<Stop>,
+    /// Whether or not the search has received the 'stop' command.
+    pub has_stopped: bool,
 }
+
+/// The result of a search. If `has_finished` is true, all of these values are
+/// undefined apart from the first move of `pv`.
+///
+/// This is almost identical to [`SearchInfo`] but doesn't have a receiver.
+/// When I remove the GUI, this struct will be deleted.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
+pub struct SearchResult {
+    /// The depth reached.
+    pub depth: u8,
+    /// The time taken.
+    pub time: Duration,
+    /// The positions searched.
+    pub nodes: u64,
+    /// The principle variation: the optimal sequence of moves for both sides.
+    pub pv: Pv,
+    /// The score of the position from the perspective of the side to move.
+    pub score: Eval,
+    /// How many positions were searched per second.
+    pub nps: u64,
+    /// Whether or not the result is final (i.e. if it's reached the end of the
+    /// iterative deepening loop or received the 'stop' command).
+    pub has_finished: bool,
+}
+
+/// Used to tell the search thread to stop.
+pub struct Stop;
 
 /// The highest possible (positive) evaluation.
 const INF_EVAL: Eval = Eval::MAX;
@@ -71,45 +109,66 @@ impl Iterator for Pv {
     }
 }
 
-impl Display for SearchInfo {
+impl Display for SearchResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "info depth {} time {} nodes {} pv {} score cp {} nps {}",
-            self.depth,
-            self.time.as_millis(),
-            self.nodes,
-            self.pv,
-            self.score,
-            self.nps,
-        )
+        if self.has_finished {
+            write!(f, "bestmove {}", self.pv.get(0))
+        } else {
+            write!(
+                f,
+                "info depth {} time {} nodes {} pv {} score cp {} nps {}",
+                self.depth,
+                self.time.as_millis(),
+                self.nodes,
+                self.pv,
+                self.score,
+                self.nps,
+            )
+        }
     }
 }
 
 impl Engine {
-    /// Start the search. Runs to infinity if `depth == None`,
-    /// otherwise runs to depth `Some(depth)`.
+    /// Start the search. Runs to infinity if `depth == None`, otherwise runs
+    /// to depth `Some(depth)`.
     // this triggers because of `elapsed_us` and `elapsed_ms`, which are
     // obviously different
     #[allow(clippy::similar_names)]
     #[inline]
-    #[must_use]
-    pub fn search(&self, depth: Option<u8>) -> SearchInfo {
-        let time = Instant::now();
+    pub fn start_search(&mut self, depth: Option<u8>) {
+        let board_clone = self.board.clone();
         let depth = depth.unwrap_or(u8::MAX);
-        let alpha = -INF_EVAL;
-        let beta = INF_EVAL;
-        let mut search_info = SearchInfo::new(depth);
+        let (info_tx, info_rx) = channel();
+        let (control_tx, control_rx) = channel();
+        self.control_tx = Some(control_tx);
 
-        let result = alpha_beta_search(&mut search_info, &self.board.clone(), -beta, -alpha, depth);
+        let search_info = SearchInfo::new(depth, control_rx);
 
-        // the initial call to `alpha_beta_search()` counts the starting
-        // position, so remove that count
-        search_info.nodes -= 1;
-        search_info.time = time.elapsed();
-        search_info.score = result;
-        search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
-        search_info
+        // The inner thread spawned runs the iterative deepening loop. It sends
+        // the information to `info_rx`. The outer thread spawned prints any
+        // information received through `info_rx`, blocking until it does.
+        // I don't like spawning two threads, but I don't really have a choice
+        // if I don't want users of my API not to have to implement
+        // parallelism.
+        spawn(move || {
+            spawn(move || {
+                iterative_deepening(search_info, &info_tx, &board_clone);
+            });
+            for result in info_rx {
+                println!("{result}");
+            }
+        });
+    }
+
+    /// Stops the search, if any.
+    #[inline]
+    pub fn stop_search(&mut self) {
+        // we don't particularly care if it's already stopped, we just want it
+        // to stop.
+        #[allow(unused_must_use)]
+        if let Some(tx) = self.control_tx.take() {
+            tx.send(Stop);
+        }
     }
 }
 
@@ -172,7 +231,7 @@ impl Pv {
 impl SearchInfo {
     /// Creates a new [`SearchInfo`] with the initial information that searches
     /// start with.
-    const fn new(depth: u8) -> Self {
+    const fn new(depth: u8, control_rx: Receiver<Stop>) -> Self {
         Self {
             depth,
             time: Duration::ZERO,
@@ -183,6 +242,56 @@ impl SearchInfo {
             _currmovenumber: 1,
             _hashfull: 0,
             nps: 0,
+            control_rx,
+            has_stopped: false,
+        }
+    }
+
+    /// Turns the information in `self` into a result that can be printed.
+    fn create_result(&self, depth: u8) -> SearchResult {
+        SearchResult {
+            depth,
+            time: self.time,
+            nodes: self.nodes,
+            pv: self.pv.clone(),
+            score: self.score,
+            nps: self.nps,
+            has_finished: self.has_stopped,
+        }
+    }
+
+    /// If the search needs to stop.
+    fn should_stop(&mut self) -> bool {
+        if self.control_rx.try_recv().is_ok() {
+            self.has_stopped = true;
+        }
+        self.has_stopped
+    }
+}
+
+/// Performs iterative deepening.
+///
+/// Since there is no move ordering or TT, this is currently a slowdown.
+fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResult>, board: &Board) {
+    let time = Instant::now();
+    let alpha = -INF_EVAL;
+    let beta = INF_EVAL;
+
+    for depth in 1..=search_info.depth {
+        let eval = alpha_beta_search(&mut search_info, &board.clone(), -beta, -alpha, depth);
+
+        // the initial call to `alpha_beta_search()` counts the starting
+        // position, so remove that count
+        search_info.nodes -= 1;
+        search_info.time = time.elapsed();
+        search_info.score = eval;
+        search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
+        info_tx
+            .send(search_info.create_result(depth))
+            .expect("Info receiver dropped too early");
+
+        if search_info.has_stopped {
+            break;
         }
     }
 }
