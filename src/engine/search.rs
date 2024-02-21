@@ -15,6 +15,16 @@ use alpha_beta::alpha_beta_search;
 /// For carrying out the search.
 mod alpha_beta;
 
+/// The result of an iteration of an iterative deepening loop.
+#[allow(clippy::module_name_repetitions, clippy::large_enum_variant)]
+#[derive(Clone)]
+pub enum SearchResult {
+    /// Information about the search so far (time, nodes, etc.)
+    Unfinished(WorkingResult),
+    /// The best move.
+    Finished(Move),
+}
+
 /// The principle variation: the current best sequence of moves for both sides.
 // non-circular queue, as all the moves are enqueued exactly once before all
 // the moves are dequeued exactly once (then it goes out of scope)
@@ -56,14 +66,12 @@ struct SearchInfo {
     pub has_stopped: bool,
 }
 
-/// The result of a search. If `has_finished` is true, all of these values are
-/// undefined apart from the first move of `pv`.
+/// The current result of a search.
 ///
 /// This is almost identical to [`SearchInfo`] but doesn't have a receiver.
 /// When I remove the GUI, this struct will be deleted.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone)]
-pub struct SearchResult {
+pub struct WorkingResult {
     /// The depth reached.
     pub depth: u8,
     /// The time taken.
@@ -76,9 +84,6 @@ pub struct SearchResult {
     pub score: Eval,
     /// How many positions were searched per second.
     pub nps: u64,
-    /// Whether or not the result is final (i.e. if it's reached the end of the
-    /// iterative deepening loop or received the 'stop' command).
-    pub has_finished: bool,
 }
 
 /// Used to tell the search thread to stop.
@@ -111,19 +116,22 @@ impl Iterator for Pv {
 
 impl Display for SearchResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.has_finished {
-            write!(f, "bestmove {}", self.pv.get(0))
-        } else {
-            write!(
-                f,
-                "info depth {} time {} nodes {} pv {} score cp {} nps {}",
-                self.depth,
-                self.time.as_millis(),
-                self.nodes,
-                self.pv,
-                self.score,
-                self.nps,
-            )
+        // I think this is a false positive?
+        #[allow(clippy::pattern_type_mismatch)]
+        match self {
+            Self::Unfinished(result) => {
+                write!(
+                    f,
+                    "info depth {} time {} nodes {} pv {} score cp {} nps {}",
+                    result.depth,
+                    result.time.as_millis(),
+                    result.nodes,
+                    result.pv,
+                    result.score,
+                    result.nps,
+                )
+            }
+            Self::Finished(mv) => write!(f, "bestmove {mv}"),
         }
     }
 }
@@ -247,16 +255,21 @@ impl SearchInfo {
         }
     }
 
-    /// Turns the information in `self` into a result that can be printed.
+    /// Turns the information in `self` into a [`SearchResult`]. The result
+    /// will be `Unfinished` if the search has not stopped and `Finished` if it
+    /// has.
     fn create_result(&self, depth: u8) -> SearchResult {
-        SearchResult {
-            depth,
-            time: self.time,
-            nodes: self.nodes,
-            pv: self.pv.clone(),
-            score: self.score,
-            nps: self.nps,
-            has_finished: self.has_stopped,
+        if self.has_stopped {
+            SearchResult::Unfinished(WorkingResult {
+                depth,
+                time: self.time,
+                nodes: self.nodes,
+                pv: self.pv.clone(),
+                score: self.score,
+                nps: self.nps,
+            })
+        } else {
+            SearchResult::Finished(self.pv.get(0))
         }
     }
 
