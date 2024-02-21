@@ -358,8 +358,7 @@ impl Board {
     /// Sets `self.board` to the given FEN. It will check for basic errors,
     /// like the board having too many ranks, but not many more.
     // this function cannot panic as the only unwrap is on a hardcoded value
-    #[allow(clippy::missing_panics_doc)]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
     #[inline]
     pub fn set_pos_to_fen(&mut self, position: &str) {
         self.clear_board();
