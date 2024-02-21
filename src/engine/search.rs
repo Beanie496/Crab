@@ -143,7 +143,7 @@ impl Engine {
     // obviously different
     #[allow(clippy::similar_names)]
     #[inline]
-    pub fn start_search(&mut self, depth: Option<u8>) {
+    pub fn start_search(&mut self, depth: Option<u8>) -> Receiver<SearchResult> {
         let board_clone = self.board.clone();
         let depth = depth.unwrap_or(u8::MAX);
         let (info_tx, info_rx) = channel();
@@ -160,13 +160,9 @@ impl Engine {
         // if I don't want users of my API not to have to implement
         // parallelism.
         spawn(move || {
-            spawn(move || {
-                iterative_deepening(search_info, &info_tx, &board_clone);
-            });
-            for result in info_rx {
-                println!("{result}");
-            }
+            iterative_deepening(search_info, &info_tx, &board_clone);
         });
+        info_rx
     }
 
     /// Stops the search, if any.
@@ -260,7 +256,9 @@ impl SearchInfo {
     /// will be `Unfinished` if the search has not stopped and `Finished` if it
     /// has.
     fn create_result(&self, depth: u8) -> SearchResult {
-        if !self.has_stopped {
+        if self.has_stopped {
+            SearchResult::Finished(self.pv.get(0))
+        } else {
             SearchResult::Unfinished(WorkingResult {
                 depth,
                 time: self.time,
@@ -269,8 +267,6 @@ impl SearchInfo {
                 score: self.score,
                 nps: self.nps,
             })
-        } else {
-            SearchResult::Finished(self.pv.get(0))
         }
     }
 
