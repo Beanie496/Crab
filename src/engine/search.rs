@@ -289,8 +289,14 @@ fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResul
         info_tx
             .send(search_info.create_result(depth))
             .expect("Info receiver dropped too early");
-
-        if search_info.has_stopped {
+        // if we've successfully reached the maximum depth, print the best move
+        // as well
+        if depth == search_info.depth {
+            search_info.has_stopped = true;
+            info_tx
+                .send(search_info.create_result(depth))
+                .expect("Info receiver dropped too early");
+        } else if search_info.has_stopped {
             break;
         }
     }

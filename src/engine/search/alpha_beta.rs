@@ -38,15 +38,16 @@ pub fn alpha_beta_search(
         }
 
         let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
+
+        // This position is too good - our opponent is guaranteed a worse
+        // position if they pick this position, so they'll never pick it -
+        // meaning we can stop searching.
         if result >= beta {
-            // we can play a move that makes this position worse for our
-            // opponent than what they have currently, so they would never pick
-            // this node: return
             return beta;
         }
+
+        // We've found a better move for us, but not good enough to raise beta.
         if result > alpha {
-            // we've found a better move for us, but not too good to cause a
-            // beta cutoff
             alpha = result;
             pv.clear();
             pv.enqueue(mv);
@@ -69,10 +70,11 @@ fn quiescent_search(
     search_info.nodes += 1;
 
     let stand_pat = evaluate(board);
+
     if stand_pat >= beta {
         return beta;
     }
-    if alpha < stand_pat {
+    if stand_pat > alpha {
         alpha = stand_pat;
     }
 
