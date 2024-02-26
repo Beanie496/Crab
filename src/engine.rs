@@ -1,7 +1,5 @@
-use std::sync::mpsc::Sender;
-
 use crate::board::Board;
-use search::Stop;
+use search::{Stop, ThreadState};
 
 /// For perft, as it's counting leaf nodes, not searching.
 mod perft;
@@ -17,8 +15,9 @@ pub struct Engine {
     /// See [`Board`].
     // FIXME: this is a hack. I'll make this private when I remove the GUI.
     pub board: Board,
-    /// Used to send the 'stop' command to the search thread.
-    control_tx: Option<Sender<Stop>>,
+    /// A tramsmitter to the search thread to tell it to stop and a join handle
+    /// to the same thread.
+    search_thread_state: Option<ThreadState<Stop, ()>>,
 }
 
 impl Clone for Engine {
@@ -26,7 +25,7 @@ impl Clone for Engine {
     fn clone(&self) -> Self {
         Self {
             board: self.board.clone(),
-            control_tx: None,
+            search_thread_state: None,
         }
     }
 }
@@ -39,7 +38,7 @@ impl Engine {
     pub fn new() -> Self {
         Self {
             board: Board::new(),
-            control_tx: None,
+            search_thread_state: None,
         }
     }
 

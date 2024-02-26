@@ -1,7 +1,8 @@
 use std::{
     fmt::{self, Display, Formatter},
+    process::exit,
     sync::mpsc::{channel, Receiver, Sender},
-    thread::spawn,
+    thread::{spawn, JoinHandle},
     time::{Duration, Instant},
 };
 
@@ -66,6 +67,17 @@ struct SearchInfo {
     pub has_stopped: bool,
 }
 
+/// Used to tell the search thread to stop.
+pub struct Stop;
+
+/// Used to lump together a transmitter and a join handle into the same
+/// [`Option`].
+#[allow(clippy::missing_docs_in_private_items)]
+pub struct ThreadState<Tx, Handle> {
+    tx: Sender<Tx>,
+    handle: JoinHandle<Handle>,
+}
+
 /// The current result of a search.
 ///
 /// This is almost identical to [`SearchInfo`] but doesn't have a receiver.
@@ -85,9 +97,6 @@ pub struct WorkingResult {
     /// How many positions were searched per second.
     pub nps: u64,
 }
-
-/// Used to tell the search thread to stop.
-pub struct Stop;
 
 /// The highest possible (positive) evaluation.
 const INF_EVAL: Eval = Eval::MAX;
@@ -148,7 +157,6 @@ impl Engine {
         let depth = depth.unwrap_or(u8::MAX);
         let (info_tx, info_rx) = channel();
         let (control_tx, control_rx) = channel();
-        self.control_tx = Some(control_tx);
 
         let search_info = SearchInfo::new(depth, control_rx);
 
@@ -159,9 +167,12 @@ impl Engine {
         // I don't like spawning two threads, but I don't really have a choice
         // if I don't want users of my API not to have to implement
         // parallelism.
-        spawn(move || {
-            iterative_deepening(search_info, &info_tx, &board_clone);
-        });
+        self.search_thread_state = Some(ThreadState::new(
+            control_tx,
+            spawn(move || {
+                iterative_deepening(search_info, &info_tx, &board_clone);
+            }),
+        ));
         info_rx
     }
 
@@ -171,9 +182,17 @@ impl Engine {
         // we don't particularly care if it's already stopped, we just want it
         // to stop.
         #[allow(unused_must_use)]
-        if let Some(tx) = self.control_tx.take() {
-            tx.send(Stop);
+        if let Some(state) = self.search_thread_state.take() {
+            state.tx.send(Stop);
+            state.handle.join();
         }
+    }
+
+    /// Stops the search and exits.
+    #[inline]
+    pub fn exit(&mut self) {
+        self.stop_search();
+        exit(0);
     }
 }
 
@@ -279,6 +298,13 @@ impl SearchInfo {
     }
 }
 
+impl<T, U> ThreadState<T, U> {
+    /// Creates a new [`ThreadState`] from a transmitter and handle.
+    const fn new(tx: Sender<T>, handle: JoinHandle<U>) -> Self {
+        Self { tx, handle }
+    }
+}
+
 /// Performs iterative deepening.
 ///
 /// Since there is no move ordering or TT, this is currently a slowdown.
@@ -306,8 +332,13 @@ fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResul
             info_tx
                 .send(search_info.create_result(depth))
                 .expect("Info receiver dropped too early");
-        } else if search_info.has_stopped {
-            break;
+        } else {
+            if search_info.control_rx.try_recv().is_ok() {
+                search_info.has_stopped = true;
+            }
+            if search_info.has_stopped {
+                break;
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
 use std::{
     io,
-    process::exit,
     str::Split,
     sync::{Arc, Mutex},
     thread::spawn,
@@ -172,10 +171,8 @@ fn handle_input_line(line: &str, engine: &Arc<Mutex<Engine>>) {
             "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
             "q" | "quit" => {
                 /* Quit as soon as possible */
-                // TODO: this is a race condition: fix
                 #[allow(clippy::unwrap_used)]
-                engine.lock().unwrap().stop_search();
-                exit(0);
+                engine.lock().unwrap().exit();
             }
 
             /* non-standard commands */
