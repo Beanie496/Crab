@@ -19,7 +19,7 @@ const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 /// Panics if [`read_line()`](`std::io::BufRead::read_line`) returns an
 /// [`Err`].
 #[inline]
-pub fn main_loop() {
+pub fn main_loop() -> ! {
     let engine = Arc::new(Mutex::new(Engine::new()));
     let mut input = String::new();
     loop {
@@ -86,9 +86,11 @@ fn handle_position(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
         _ => return,
     };
 
-    // the moves need to be preceeded with the token "moves"
-    if line.next() != Some("moves") {
-        return;
+    if let Some(token) = line.next() {
+        // the moves need to be preceeded with the token "moves"
+        if token != "moves" {
+            return;
+        }
     }
 
     let mut moves = String::new();
