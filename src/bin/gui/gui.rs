@@ -1,8 +1,8 @@
-use update::FrameState;
+use std::{sync::mpsc::Receiver, time::Instant};
 
 use backend::{
     defs::{Piece, Square},
-    engine::Engine,
+    engine::{Engine, SearchResult},
 };
 use clipboard::{ClipboardContext, ClipboardProvider};
 use eframe::{
@@ -10,6 +10,8 @@ use eframe::{
     CreationContext,
 };
 use egui_extras::install_image_loaders;
+
+use update::FrameState;
 
 /// For manipulating the internal state of the GUI.
 mod board;
@@ -35,6 +37,11 @@ pub struct Gui {
     engine: Engine,
     /// See documentation for [`FrameState`].
     state: FrameState,
+    /// The receiver used to obtain information about the search.
+    info_rx: Option<Receiver<SearchResult>>,
+    /// When the search has started. Used to calculate when the search should
+    /// be stopped.
+    search_start: Instant,
 }
 
 /// The 4 colors that each square can take.
@@ -74,6 +81,10 @@ impl Gui {
             piece_mailbox: engine.board.clone_mailbox(),
             engine,
             state: FrameState::default(),
+            info_rx: None,
+            // actually we don't need to call this, but rust doesn't allow for
+            // easy uninitialisation
+            search_start: Instant::now(),
         }
     }
 

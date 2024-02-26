@@ -17,7 +17,11 @@ use alpha_beta::alpha_beta_search;
 mod alpha_beta;
 
 /// The result of an iteration of an iterative deepening loop.
-#[allow(clippy::module_name_repetitions, clippy::large_enum_variant)]
+#[allow(
+    clippy::module_name_repetitions,
+    clippy::large_enum_variant,
+    clippy::exhaustive_enums
+)]
 #[derive(Clone)]
 pub enum SearchResult {
     /// Information about the search so far (time, nodes, etc.)
@@ -79,9 +83,9 @@ pub struct ThreadState<Tx, Handle> {
 }
 
 /// The current result of a search.
-///
-/// This is almost identical to [`SearchInfo`] but doesn't have a receiver.
-/// When I remove the GUI, this struct will be deleted.
+// This is almost identical to `SearchInfo` but doesn't have a receiver. When
+// I remove the GUI, this struct will be deleted.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone)]
 pub struct WorkingResult {
     /// The depth reached.
@@ -104,6 +108,7 @@ const INF_EVAL: Eval = Eval::MAX;
 const MAX_PLY: usize = u8::MAX as usize;
 
 impl Display for Pv {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
         for mv in 0..self.len() {
@@ -118,17 +123,17 @@ impl Display for Pv {
 impl Iterator for Pv {
     type Item = Move;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
     }
 }
 
 impl Display for SearchResult {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // I think this is a false positive?
-        #[allow(clippy::pattern_type_mismatch)]
-        match self {
-            Self::Unfinished(result) => {
+        match *self {
+            Self::Unfinished(ref result) => {
                 write!(
                     f,
                     "info depth {} time {} nodes {} pv {} score cp {} nps {}",
@@ -140,7 +145,7 @@ impl Display for SearchResult {
                     result.nps,
                 )
             }
-            Self::Finished(mv) => write!(f, "bestmove {mv}"),
+            Self::Finished(ref mv) => write!(f, "bestmove {mv}"),
         }
     }
 }
@@ -152,6 +157,7 @@ impl Engine {
     // obviously different
     #[allow(clippy::similar_names)]
     #[inline]
+    #[must_use]
     pub fn start_search(&mut self, depth: Option<u8>) -> Receiver<SearchResult> {
         let board_clone = self.board.clone();
         let depth = depth.unwrap_or(u8::MAX);
@@ -312,10 +318,24 @@ fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResul
     let time = Instant::now();
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
+    let mut best_move = Move::null();
 
     for depth in 1..=search_info.depth {
         let eval = alpha_beta_search(&mut search_info, &board.clone(), -beta, -alpha, depth);
 
+        if search_info.has_stopped {
+            // if the search gets stopped before even depth 1 gets finished,
+            // make the best move whatever the best move in the search was
+            if depth == 1 {
+                best_move = search_info.pv.get(0);
+            }
+            info_tx
+                .send(SearchResult::Finished(best_move))
+                .expect("Info receiver dropped too early");
+            break;
+        }
+
+        best_move = search_info.pv.get(0);
         // the initial call to `alpha_beta_search()` counts the starting
         // position, so remove that count
         search_info.nodes -= 1;
@@ -325,20 +345,11 @@ fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResul
         info_tx
             .send(search_info.create_result(depth))
             .expect("Info receiver dropped too early");
-        // if we've successfully reached the maximum depth, print the best move
-        // as well
+
         if depth == search_info.depth {
-            search_info.has_stopped = true;
             info_tx
-                .send(search_info.create_result(depth))
+                .send(SearchResult::Finished(best_move))
                 .expect("Info receiver dropped too early");
-        } else {
-            if search_info.control_rx.try_recv().is_ok() {
-                search_info.has_stopped = true;
-            }
-            if search_info.has_stopped {
-                break;
-            }
         }
     }
 }

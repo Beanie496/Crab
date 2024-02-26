@@ -1,11 +1,11 @@
 //! A GUI used to play chess against.
 
-use gui::Gui;
-
 use eframe::{
     egui::{Vec2, ViewportBuilder},
     run_native, Error, NativeOptions,
 };
+
+use gui::Gui;
 
 /// Defines what happens each frame.
 mod gui;

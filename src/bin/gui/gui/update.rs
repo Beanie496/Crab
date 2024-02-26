@@ -1,10 +1,9 @@
-use super::{Gui, SquareColor, SquareColorType};
-use crate::{
-    gui::draw::{add_button_to_region, paint_area_with_color},
-    util::pixels_to_points,
-};
+use std::time::Instant;
 
-use backend::defs::{File, Piece, Rank, Square};
+use backend::{
+    defs::{File, Piece, Rank, Square},
+    engine::{SearchResult, WorkingResult},
+};
 use eframe::{
     egui::{
         self,
@@ -16,8 +15,13 @@ use eframe::{
 };
 use egui_extras::{Column, TableBuilder};
 
+use super::{Gui, SquareColor, SquareColorType};
+use crate::{
+    gui::draw::{add_button_to_region, paint_area_with_color},
+    util::pixels_to_points,
+};
+
 /// Information about the current frame that the next frame needs to know.
-#[derive(Default)]
 pub struct FrameState {
     /// Whether or not the user is entering a FEN string.
     pub is_importing_fen: bool,
@@ -28,6 +32,41 @@ pub struct FrameState {
     pub has_stopped: bool,
     /// Which square is selected, if any.
     pub selected_square: Option<Square>,
+    /// If it's the player's turn or not.
+    pub is_player_turn: bool,
+    /// The search results so far. Cleared when a new search starts.
+    pub search_results: Vec<SearchResultString>,
+}
+
+/// A [`SearchResult`] where each field has been converted to a string.
+pub struct SearchResultString {
+    /// Format: `depth`.
+    ///
+    /// Seldepth is not displayed yet.
+    pub depth: String,
+    /// Format: `x ms`, where `x >= 0`.
+    pub time: String,
+    /// Format: `nodes`.
+    pub nodes: String,
+    /// Format: `nps`.
+    pub nps: String,
+    /// Format: `+-p.cc`, where `p >= 0` and `0 <= cc < 100`.
+    pub eval: String,
+    /// Format: `move1 move2 move3 ...`.
+    pub pv: String,
+}
+
+impl Default for FrameState {
+    fn default() -> Self {
+        Self {
+            is_importing_fen: false,
+            entered_fen_string: String::new(),
+            has_stopped: false,
+            selected_square: None,
+            is_player_turn: true,
+            search_results: Vec::new(),
+        }
+    }
 }
 
 impl App for Gui {
@@ -37,6 +76,23 @@ impl App for Gui {
 
         self.update_board_area(ctx, bg_col);
         self.update_info_area(ctx, bg_col);
+    }
+}
+
+impl From<WorkingResult> for SearchResultString {
+    fn from(w: WorkingResult) -> Self {
+        Self {
+            depth: w.depth.to_string(),
+            time: {
+                let mut time = w.time.as_millis().to_string();
+                time.push_str(" ms");
+                time
+            },
+            nodes: w.nodes.to_string(),
+            nps: w.nps.to_string(),
+            eval: format!("{:.2}", (f32::from(w.score) / 100.0)),
+            pv: w.pv.to_string(),
+        }
     }
 }
 
@@ -61,7 +117,7 @@ impl Gui {
     }
 
     /// Draws the area where all the information from the engine is displayed.
-    fn update_info_area(&self, ctx: &Context, col: Color32) {
+    fn update_info_area(&mut self, ctx: &Context, col: Color32) {
         CentralPanel::default()
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
@@ -73,7 +129,7 @@ impl Gui {
     /// engine output.
     ///
     /// Currently doesn't display engine output.
-    fn update_info_box(&self, ctx: &Context, ui: &Ui) {
+    fn update_info_box(&mut self, ctx: &Context, ui: &Ui) {
         let info_box_size = Vec2::new(
             // available width/height minus the 40 px margin
             ui.available_width() - pixels_to_points(ctx, 80.0),
@@ -100,14 +156,45 @@ impl Gui {
             .show(ctx, |ui| {
                 ui.expand_to_include_x(bottom_right_point.x);
                 ui.expand_to_include_y(bottom_right_point.y);
-                self.add_table(ctx, ui);
+                self.check_search_result();
+                self.update_table(ctx, ui);
             });
     }
 
+    /// Checks on the results of the search.
+    ///
+    /// If a search result exists, it pushes it onto
+    /// `self.sate.search_results` if it's unfinished or makes the move if it
+    /// is. If there is no search result yet, it does nothing.
+    fn check_search_result(&mut self) {
+        #[allow(clippy::needless_borrowed_reference)]
+        if let &Some(ref rx) = &self.info_rx {
+            // stop the search if it's taken too long
+            if self.search_start.elapsed().as_secs() >= 4 {
+                self.engine.stop_search();
+            }
+            if let Ok(result) = rx.try_recv() {
+                match result {
+                    SearchResult::Unfinished(wr) => {
+                        self.state.search_results.push(SearchResultString::from(wr));
+                    }
+                    SearchResult::Finished(mv) => {
+                        assert!(
+                            self.engine.board.make_move(mv),
+                            "Error: best move is illegal"
+                        );
+                        self.regenerate_mailboxes();
+                        self.info_rx = None;
+                        self.state.is_player_turn = true;
+                    }
+                }
+            }
+        }
+    }
+
     /// Display the table of the info box.
-    // TODO: make this actually display info (using `self`)
     #[allow(clippy::unused_self)]
-    fn add_table(&self, ctx: &Context, ui: &mut Ui) {
+    fn update_table(&self, ctx: &Context, ui: &mut Ui) {
         TableBuilder::new(ui)
             .columns(
                 Column::auto()
@@ -137,26 +224,35 @@ impl Gui {
                     ui.heading("PV");
                 });
             })
-            .body(|mut body| {
-                // this is all just example text
-                body.row(0.0, |mut row| {
+            .body(|body| {
+                let rows = self.state.search_results.len();
+                let height = pixels_to_points(ctx, 30.0);
+                let mut iter = self.state.search_results.iter().rev();
+
+                body.rows(height, rows, |mut row| {
+                    let search_result = iter
+                        .next()
+                        .expect("`rows()` is calling this closure more times than it should.");
                     row.col(|ui| {
-                        ui.label(" 100/100");
+                        // this will display " <depth>"
+                        let mut depth = " ".to_string();
+                        depth.push_str(&search_result.depth);
+                        ui.label(depth);
                     });
                     row.col(|ui| {
-                        ui.label("983 ms");
+                        ui.label(&search_result.time);
                     });
                     row.col(|ui| {
-                        ui.label("100,000,000,000");
+                        ui.label(&search_result.nodes);
                     });
                     row.col(|ui| {
-                        ui.label("9,999,999k");
+                        ui.label(&search_result.nps);
                     });
                     row.col(|ui| {
-                        ui.label("+100.00");
+                        ui.label(&search_result.eval);
                     });
                     row.col(|ui| {
-                        ui.label("Nf3 d5 d4 Nf6 c4 e6 Nc3 c6 Bg5 h6");
+                        ui.label(&search_result.pv);
                     });
                 });
             });
@@ -276,10 +372,12 @@ impl Gui {
     fn update_labels(&self, _ctx: &Context, _ui: &mut Ui) {}
 
     /// Draws a square on `ui` in the given region, assuming the square number
-    /// is `square`. If it is selected, it will draw the selected field of
-    /// `color`; otherwise, it'll draw the unselected field.
+    /// is `square`.
     ///
-    /// It will update the selected square of `self` if `ui` is clicked.
+    /// If some square is selected, it will draw the unselected field of
+    /// `color`; otherwise, it'll draw the selected field. If a piece is
+    /// selected and moving the piece from the selected square to this square
+    /// is legal, it will do so and start the search.
     fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, color: SquareColor) {
         if self.has_stopped() {
             paint_area_with_color(ui, region, color.unselected);
@@ -295,7 +393,14 @@ impl Gui {
                     return;
                 }
 
-                self.move_piece(start, end);
+                if self.state.is_player_turn && self.move_piece(start, end) {
+                    self.state.is_player_turn = false;
+                    self.state.search_results.clear();
+                    // go to an infinite depth: the search will get stopped if
+                    // it goes on for too long
+                    self.info_rx = Some(self.engine.start_search(None));
+                    self.search_start = Instant::now();
+                }
             } else {
                 self.set_selected_square(Some(square));
             }

@@ -1,4 +1,5 @@
 use crate::board::Board;
+pub use search::{Pv, SearchResult, WorkingResult};
 use search::{Stop, ThreadState};
 
 /// For perft, as it's counting leaf nodes, not searching.
