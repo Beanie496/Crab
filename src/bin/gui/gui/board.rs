@@ -16,7 +16,7 @@ impl Gui {
     // - set the current board to the copy
     pub fn move_piece(&mut self, start: Square, end: Square) -> bool {
         let mut moves = Moves::new();
-        self.engine
+        self.engine()
             .board
             .generate_moves::<{ MoveType::ALL }>(&mut moves);
 
@@ -28,12 +28,12 @@ impl Gui {
             unsafe { mv.unwrap_unchecked() }
         };
 
-        let mut copy = self.engine.board.clone();
+        let mut copy = self.engine().board.clone();
         if !copy.make_move(mv) {
             return false;
         }
 
-        self.engine.board = copy;
+        self.engine().board = copy;
 
         self.regenerate_mailboxes();
 
@@ -47,6 +47,7 @@ impl Gui {
 
     /// Refreshes the mailboxe of `self` from `self.engine.board`.
     pub fn regenerate_mailboxes(&mut self) {
-        self.piece_mailbox = self.engine.board.clone_mailbox();
+        let mailbox = self.engine().board.clone_mailbox();
+        self.piece_mailbox = mailbox;
     }
 }

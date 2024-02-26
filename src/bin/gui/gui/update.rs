@@ -1,4 +1,8 @@
-use std::time::Instant;
+use std::{
+    sync::{mpsc::channel, Arc},
+    thread::{sleep, spawn},
+    time::Duration,
+};
 
 use backend::{
     defs::{File, Piece, Rank, Square},
@@ -55,6 +59,9 @@ pub struct SearchResultString {
     /// Format: `move1 move2 move3 ...`.
     pub pv: String,
 }
+
+/// The maximum time the search should last.
+const SEARCH_DURATION_MS: u64 = 3200;
 
 impl Default for FrameState {
     fn default() -> Self {
@@ -169,10 +176,6 @@ impl Gui {
     fn check_search_result(&mut self) {
         #[allow(clippy::needless_borrowed_reference)]
         if let &Some(ref rx) = &self.info_rx {
-            // stop the search if it's taken too long
-            if self.search_start.elapsed().as_secs() >= 4 {
-                self.engine.stop_search();
-            }
             if let Ok(result) = rx.try_recv() {
                 match result {
                     SearchResult::Unfinished(wr) => {
@@ -180,7 +183,7 @@ impl Gui {
                     }
                     SearchResult::Finished(mv) => {
                         assert!(
-                            self.engine.board.make_move(mv),
+                            self.engine().board.make_move(mv),
                             "Error: best move is illegal"
                         );
                         self.regenerate_mailboxes();
@@ -283,7 +286,7 @@ impl Gui {
             for file in 0..File::TOTAL {
                 let square = Square::from_pos(Rank(rank as u8), File(file as u8));
 
-                self.update_square(ui, square_corners, square, color);
+                self.update_square(ui, ctx, square_corners, square, color);
                 self.add_piece(ui, square_corners, square);
 
                 square_corners = square_corners.translate(Vec2::new(
@@ -378,7 +381,14 @@ impl Gui {
     /// `color`; otherwise, it'll draw the selected field. If a piece is
     /// selected and moving the piece from the selected square to this square
     /// is legal, it will do so and start the search.
-    fn update_square(&mut self, ui: &mut Ui, region: Rect, square: Square, color: SquareColor) {
+    fn update_square(
+        &mut self,
+        ui: &mut Ui,
+        ctx: &Context,
+        region: Rect,
+        square: Square,
+        color: SquareColor,
+    ) {
         if self.has_stopped() {
             paint_area_with_color(ui, region, color.unselected);
             return;
@@ -395,11 +405,7 @@ impl Gui {
 
                 if self.state.is_player_turn && self.move_piece(start, end) {
                     self.state.is_player_turn = false;
-                    self.state.search_results.clear();
-                    // go to an infinite depth: the search will get stopped if
-                    // it goes on for too long
-                    self.info_rx = Some(self.engine.start_search(None));
-                    self.search_start = Instant::now();
+                    self.start_search(ctx);
                 }
             } else {
                 self.set_selected_square(Some(square));
@@ -433,6 +439,43 @@ impl Gui {
                 // no piece
                 _ => return,
             });
+        });
+    }
+}
+
+impl Gui {
+    /// Starts the search on a new thread.
+    ///
+    /// The purpose of this new thread is to tell the main thread to redraw. If
+    /// this was done on the main thread, it would block if the user isn't
+    /// giving any input and thus not display new information when it gets
+    /// sent.
+    fn start_search(&mut self, ctx: &Context) {
+        self.state.search_results.clear();
+
+        let (tx, rx) = channel();
+        self.info_rx = Some(rx);
+        // go to an infinite depth: the search will get stopped if
+        // it goes on for too long
+        let rx = self.engine().start_search(None);
+        let ctx = ctx.clone();
+        let engine = Arc::clone(&self.engine);
+
+        // spawn a thread that stops the search when it's gone on for too long
+        spawn(move || {
+            sleep(Duration::from_millis(SEARCH_DURATION_MS));
+            #[allow(clippy::unwrap_used)]
+            engine.lock().unwrap().stop_search();
+        });
+
+        // spawn a thread that tells the main thread to redraw whenever new
+        // information is send down the channel
+        spawn(move || {
+            for info in rx {
+                #[allow(clippy::unwrap_used)]
+                tx.send(info).unwrap();
+                ctx.request_repaint();
+            }
         });
     }
 }

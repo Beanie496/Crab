@@ -1,4 +1,4 @@
-use std::{sync::mpsc::Receiver, time::Instant};
+use std::sync::{mpsc::Receiver, Arc, Mutex, MutexGuard};
 
 use backend::{
     defs::{Piece, Square},
@@ -34,14 +34,11 @@ pub struct Gui {
     /// A redundant piece mailbox to separate it from the internal board.
     piece_mailbox: [Piece; Square::TOTAL],
     /// The internal engine, used for calculating legal moves and searching.
-    engine: Engine,
+    engine: Arc<Mutex<Engine>>,
     /// See documentation for [`FrameState`].
     state: FrameState,
     /// The receiver used to obtain information about the search.
     info_rx: Option<Receiver<SearchResult>>,
-    /// When the search has started. Used to calculate when the search should
-    /// be stopped.
-    search_start: Instant,
 }
 
 /// The 4 colors that each square can take.
@@ -75,17 +72,22 @@ impl Gui {
         install_image_loaders(&cc.egui_ctx);
         include_piece_images(&cc.egui_ctx);
 
-        let engine = Engine::new();
+        let engine = Arc::new(Mutex::new(Engine::new()));
+        #[allow(clippy::unwrap_used)]
+        let piece_mailbox = engine.lock().unwrap().board.clone_mailbox();
 
         Self {
-            piece_mailbox: engine.board.clone_mailbox(),
+            piece_mailbox,
             engine,
             state: FrameState::default(),
             info_rx: None,
-            // actually we don't need to call this, but rust doesn't allow for
-            // easy uninitialisation
-            search_start: Instant::now(),
         }
+    }
+
+    /// Returns a [`MutexGuard`] to `self.engine`.
+    fn engine(&self) -> MutexGuard<'_, Engine> {
+        #[allow(clippy::unwrap_used)]
+        self.engine.lock().unwrap()
     }
 
     /// Returns the selected square of `self`.
@@ -135,7 +137,8 @@ impl Gui {
 
     /// Sets the board position to the string that the user entered.
     fn set_position_to_entered_fen(&mut self) {
-        self.engine.set_position(&self.state.entered_fen_string, "");
+        self.engine()
+            .set_position(&self.state.entered_fen_string, "");
         self.regenerate_mailboxes();
     }
 
@@ -144,7 +147,7 @@ impl Gui {
     fn copy_fen_to_clipboard(&self) {
         match ClipboardContext::new() {
             Ok(mut clipboard) => clipboard
-                .set_contents(self.engine.board.current_fen_string())
+                .set_contents(self.engine().board.current_fen_string())
                 .unwrap_or_else(|error| println!("{error}")),
             Err(error) => println!("{error}"),
         };
@@ -160,7 +163,7 @@ impl Gui {
     /// Sets the board to the starting position and starts running if `self`
     /// had been stopped.
     fn restart(&mut self) {
-        self.engine.board.set_startpos();
+        self.engine().board.set_startpos();
         self.set_selected_square(None);
         self.state.has_stopped = false;
         self.regenerate_mailboxes();
