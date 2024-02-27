@@ -49,8 +49,6 @@ pub struct Lookup {
 /// * Flags == 2 bits.
 /// * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-// The inner value of a wrapper does not need to be documented.
-#[allow(clippy::missing_docs_in_private_items)]
 pub struct Move(u16);
 
 /// An stack of `Move`s.
