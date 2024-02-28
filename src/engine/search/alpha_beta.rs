@@ -2,7 +2,7 @@ use super::{Pv, SearchInfo};
 use crate::{
     board::{Board, Moves},
     defs::MoveType,
-    evaluation::{evaluate, Eval},
+    evaluation::{evaluate, mated_in, Eval, DRAW, MATE},
 };
 
 /// Performs negamax on `board`. Returns the evaluation of after searching
@@ -30,6 +30,7 @@ pub fn alpha_beta_search(
     let mut pv = Pv::new();
     let mut moves = Moves::new();
     board.generate_moves::<{ MoveType::ALL }>(&mut moves);
+    let mut total_moves = 0;
 
     for mv in moves {
         let mut copy = board.clone();
@@ -53,7 +54,18 @@ pub fn alpha_beta_search(
             pv.enqueue(mv);
             pv.append_pv(&mut search_info.pv);
         }
+
+        total_moves += 1;
     }
+
+    if total_moves == 0 {
+        return if board.is_in_check() {
+            mated_in(search_info.depth - depth)
+        } else {
+            DRAW
+        };
+    }
+
     search_info.pv = pv;
 
     alpha
@@ -69,7 +81,12 @@ fn quiescent_search(
 ) -> Eval {
     search_info.nodes += 1;
 
-    let stand_pat = evaluate(board);
+    let stand_pat = if board.is_in_check() {
+        // assume we're getting mated
+        -MATE
+    } else {
+        evaluate(board)
+    };
 
     if stand_pat >= beta {
         return beta;

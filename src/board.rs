@@ -128,6 +128,9 @@ impl Display for CastlingRights {
         if self.can_castle_queenside::<false>() {
             ret_str.push('q');
         }
+        if ret_str.is_empty() {
+            ret_str.push('-');
+        }
         f.write_str(&ret_str)
     }
 }
@@ -915,6 +918,22 @@ impl Board {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
         self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
+    }
+
+    /// Tests if the king is in check.
+    #[inline]
+    #[must_use]
+    pub fn is_in_check(&self) -> bool {
+        self.is_square_attacked(self.king_square())
+    }
+
+    /// Calculates the square the king is on.
+    fn king_square(&self) -> Square {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
+        (self.piece::<{ PieceType::KING.to_index() }>()
+            & self.sides[self.side_to_move().to_index()])
+        .to_square()
     }
 }
 

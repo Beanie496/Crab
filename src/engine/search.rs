@@ -9,7 +9,7 @@ use std::{
 use super::Engine;
 use crate::{
     board::{Board, Move},
-    evaluation::Eval,
+    evaluation::{Eval, INF_EVAL},
 };
 use alpha_beta::alpha_beta_search;
 
@@ -102,8 +102,6 @@ pub struct WorkingResult {
     pub nps: u64,
 }
 
-/// The highest possible (positive) evaluation.
-const INF_EVAL: Eval = Eval::MAX;
 /// The maximum depth this engine supports.
 const MAX_PLY: usize = u8::MAX as usize;
 
@@ -164,7 +162,7 @@ impl Engine {
         let (info_tx, info_rx) = channel();
         let (control_tx, control_rx) = channel();
 
-        let search_info = SearchInfo::new(depth, control_rx);
+        let search_info = SearchInfo::new(control_rx);
 
         // The inner thread spawned runs the iterative deepening loop. It sends
         // the information to `info_rx`. The outer thread spawned prints any
@@ -176,7 +174,7 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(search_info, &info_tx, &board_clone);
+                iterative_deepening(search_info, &info_tx, &board_clone, depth);
             }),
         ));
         info_rx
@@ -261,9 +259,9 @@ impl Pv {
 impl SearchInfo {
     /// Creates a new [`SearchInfo`] with the initial information that searches
     /// start with.
-    const fn new(depth: u8, control_rx: Receiver<Stop>) -> Self {
+    const fn new(control_rx: Receiver<Stop>) -> Self {
         Self {
-            depth,
+            depth: 0,
             time: Duration::ZERO,
             nodes: 0,
             pv: Pv::new(),
@@ -280,12 +278,12 @@ impl SearchInfo {
     /// Turns the information in `self` into a [`SearchResult`]. The result
     /// will be `Unfinished` if the search has not stopped and `Finished` if it
     /// has.
-    fn create_result(&self, depth: u8) -> SearchResult {
+    fn create_result(&self) -> SearchResult {
         if self.has_stopped {
             SearchResult::Finished(self.pv.get(0))
         } else {
             SearchResult::Unfinished(WorkingResult {
-                depth,
+                depth: self.depth,
                 time: self.time,
                 nodes: self.nodes,
                 pv: self.pv.clone(),
@@ -314,13 +312,21 @@ impl<T, U> ThreadState<T, U> {
 /// Performs iterative deepening.
 ///
 /// Since there is no move ordering or TT, this is currently a slowdown.
-fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResult>, board: &Board) {
+fn iterative_deepening(
+    mut search_info: SearchInfo,
+    info_tx: &Sender<SearchResult>,
+    board: &Board,
+    max_depth: u8,
+) {
     let time = Instant::now();
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
 
-    for depth in 1..=search_info.depth {
+    for depth in 1..=max_depth {
+        search_info.pv.clear();
+        search_info.depth += 1;
+
         let eval = alpha_beta_search(&mut search_info, &board.clone(), -beta, -alpha, depth);
 
         if search_info.has_stopped {
@@ -343,13 +349,10 @@ fn iterative_deepening(mut search_info: SearchInfo, info_tx: &Sender<SearchResul
         search_info.score = eval;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
         info_tx
-            .send(search_info.create_result(depth))
+            .send(search_info.create_result())
             .expect("Info receiver dropped too early");
-
-        if depth == search_info.depth {
-            info_tx
-                .send(SearchResult::Finished(best_move))
-                .expect("Info receiver dropped too early");
-        }
     }
+    info_tx
+        .send(SearchResult::Finished(best_move))
+        .expect("Info receiver dropped too early");
 }

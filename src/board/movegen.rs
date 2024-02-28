@@ -482,7 +482,9 @@ impl Board {
     }
 
     /// Tests if `square` is attacked by an enemy piece.
-    fn is_square_attacked(&self, square: Square) -> bool {
+    #[inline]
+    #[must_use]
+    pub fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
         let us = self.side_to_move();
         let them = us.flip();
@@ -521,15 +523,6 @@ impl Board {
             | is_attacked_orthogonally)
             & them_bb)
             .is_empty()
-    }
-
-    /// Calculates the square the king is on.
-    fn king_square(&self) -> Square {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
-        (self.piece::<{ PieceType::KING.to_index() }>()
-            & self.sides[self.side_to_move().to_index()])
-        .to_square()
     }
 
     /// Returns all the occupied squares on the board.

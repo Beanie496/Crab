@@ -31,6 +31,13 @@ pub const PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 /// weight 0; an extra 0 is added to allow [`Piece::NONE`] to index into it.
 pub const PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
+/// The highest possible (positive) evaluation.
+pub const INF_EVAL: Eval = Eval::MAX;
+/// The evaluation of a mate.
+pub const MATE: Eval = INF_EVAL - 300;
+/// The evaluation of a draw.
+pub const DRAW: Eval = 0;
+
 /// A blend between middlegame value and endgame value.
 #[derive(Clone, Copy)]
 pub struct Score(pub Eval, pub Eval);
@@ -105,4 +112,10 @@ pub fn evaluate(board: &Board) -> Eval {
     } else {
         -eval
     }
+}
+
+/// Calculates the evaluation if a mate is in `depth` halfmoves.
+#[must_use]
+pub fn mated_in(depth: u8) -> Eval {
+    -MATE + Eval::from(depth)
 }
