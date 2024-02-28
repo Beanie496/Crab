@@ -453,9 +453,6 @@ impl Board {
                     }
                 }
             }
-        } else {
-            // KQkq if nothing is given.
-            self.set_default_castling_rights();
         }
 
         // 4. en passant
