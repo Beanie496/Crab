@@ -114,7 +114,13 @@ pub fn evaluate(board: &Board) -> Eval {
     }
 }
 
-/// Calculates the evaluation if a mate is in `depth` halfmoves.
+/// Calculates the evaluation if we're mating in `depth` halfmoves.
+#[must_use]
+pub fn mate_in(depth: u8) -> Eval {
+    MATE - Eval::from(depth)
+}
+
+/// Calculates the evaluation if we're getting mated in `depth` halfmoves.
 #[must_use]
 pub fn mated_in(depth: u8) -> Eval {
     -MATE + Eval::from(depth)
