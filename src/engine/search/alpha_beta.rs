@@ -2,7 +2,7 @@ use super::{Pv, SearchInfo};
 use crate::{
     board::{Board, Moves},
     defs::MoveType,
-    evaluation::{evaluate, mated_in, Eval, DRAW, MATE, mate_in},
+    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW},
 };
 
 /// Performs negamax on `board`. Returns the evaluation of after searching
@@ -102,12 +102,7 @@ fn quiescent_search(
 ) -> Eval {
     search_info.nodes += 1;
 
-    let stand_pat = if board.is_in_check() {
-        // assume we're getting mated
-        -MATE
-    } else {
-        evaluate(board)
-    };
+    let stand_pat = evaluate(board);
 
     if stand_pat >= beta {
         return beta;
