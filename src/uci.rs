@@ -86,13 +86,6 @@ fn handle_position(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
         _ => return,
     };
 
-    if let Some(token) = line.next() {
-        // the moves need to be preceeded with the token "moves"
-        if token != "moves" {
-            return;
-        }
-    }
-
     let mut moves = String::new();
     line.filter(|token| !token.is_empty()).for_each(|token| {
         moves.push_str(token);
