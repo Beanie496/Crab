@@ -433,7 +433,7 @@ impl Gui {
 
     /// Adds the image of the piece on `square` to `ui`. Adds nothing if there
     /// is no piece on the given square.
-    pub fn add_piece(&self, ui: &mut Ui, region: Rect, square: Square) {
+    fn add_piece(&self, ui: &mut Ui, region: Rect, square: Square) {
         ui.allocate_ui_at_rect(region, |ui| {
             ui.image(match self.piece_on(square) {
                 Piece::WPAWN => "pieces/wp.png",
@@ -453,9 +453,7 @@ impl Gui {
             });
         });
     }
-}
 
-impl Gui {
     /// Checks `self.state.side_has_won` to see if the game has concluded. If
     /// it has, it displays the result of the game in text at `position`.
     fn check_game_over(&self, ctx: &Context, ui: &mut Ui, mut position: Rect) {
