@@ -458,28 +458,31 @@ impl Gui {
 
     /// Checks `self.state.side_has_won` to see if the game has concluded. If
     /// it has, it displays the result of the game in text at `position`.
-    fn check_game_over(&self, ctx: &Context, ui: &mut Ui, mut position: Rect) {
+    fn check_game_over(&self, ctx: &Context, ui: &mut Ui, position: Rect) {
         if self.state.side_has_won.is_none() {
             return;
         }
 
-        let mut size = 400.0;
-        let text = RichText::new(match self.state.side_has_won {
-            Some(Side::WHITE) => "1 - 0",
-            Some(Side::BLACK) => "0 - 1",
-            Some(Side::NONE) => {
-                size = 300.0;
-                position = position.translate(Vec2::new(
+        let (text, position, size) = match self.state.side_has_won {
+            Some(Side::WHITE) => ("1 - 0", position, pixels_to_points(ctx, 400.0)),
+            Some(Side::BLACK) => (
+                "0 - 1",
+                position.translate(Vec2::new(pixels_to_points(ctx, 50.0), 0.0)),
+                pixels_to_points(ctx, 400.0),
+            ),
+            Some(Side::NONE) => (
+                "½ - ½",
+                position.translate(Vec2::new(
                     pixels_to_points(ctx, 30.0),
-                    pixels_to_points(ctx, 50.0),
-                ));
-                "½ - ½"
-            }
+                    pixels_to_points(ctx, 38.0),
+                )),
+                pixels_to_points(ctx, 300.0),
+            ),
             _ => unreachable!(),
-        });
+        };
 
         ui.allocate_ui_at_rect(position, |ui| {
-            ui.label(text.size(pixels_to_points(ctx, size)).weak());
+            ui.label(RichText::new(text).size(size).weak());
         });
     }
 
