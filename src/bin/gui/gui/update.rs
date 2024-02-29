@@ -417,7 +417,9 @@ impl Gui {
 
                 if self.state.is_player_turn && self.move_piece(start, end) {
                     self.state.is_player_turn = false;
-                    self.start_search(ctx);
+                    if self.state.side_has_won.is_none() {
+                        self.start_search(ctx);
+                    }
                 }
             } else {
                 self.set_selected_square(Some(square));
