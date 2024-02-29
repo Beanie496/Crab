@@ -65,7 +65,7 @@ pub struct SearchResultString {
 }
 
 /// The maximum time the search should last.
-const SEARCH_DURATION_MS: u64 = 1000;
+const SEARCH_DURATION_MS: u64 = 3500;
 
 impl Default for FrameState {
     fn default() -> Self {
