@@ -1,9 +1,4 @@
-use std::{
-    io,
-    str::Split,
-    sync::{Arc, Mutex},
-    thread::spawn,
-};
+use std::{io, str::Split, thread::spawn};
 
 use crate::{board::find_magics, defs::PieceType, engine::Engine};
 
@@ -20,19 +15,19 @@ const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 /// [`Err`].
 #[inline]
 pub fn main_loop() -> ! {
-    let engine = Arc::new(Mutex::new(Engine::new()));
+    let mut engine = Engine::new();
     let mut input = String::new();
     loop {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read from stdin");
-        handle_input_line(&input, &engine);
+        handle_input_line(&input, &mut engine);
         input.clear();
     }
 }
 
 /// Starts the search, given the rest of the tokens after `go`.
-fn go(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
+fn go(line: &mut Split<'_, char>, engine: &mut Engine) {
     let mut depth = None;
 
     while let Some(token) = line.next() {
@@ -52,10 +47,8 @@ fn go(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
         }
     }
 
-    let engine = Arc::clone(engine);
+    let info_rx = engine.start_search(depth);
     spawn(move || {
-        #[allow(clippy::unwrap_used)]
-        let info_rx = engine.lock().unwrap().start_search(depth);
         for result in info_rx {
             println!("{result}");
         }
@@ -66,7 +59,7 @@ fn go(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
 /// command, removes all empty strings and concatenate the remaining tokens
 /// into a [`String`] for the FEN and moves each with a space between each
 /// token.
-fn handle_position(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
+fn handle_position(line: &mut Split<'_, char>, engine: &mut Engine) {
     let fen = match line.next() {
         Some("startpos") => STARTPOS.to_string(),
         Some("fen") => {
@@ -94,12 +87,11 @@ fn handle_position(line: &mut Split<'_, char>, engine: &Arc<Mutex<Engine>>) {
     // remove the trailing space
     moves.pop();
 
-    #[allow(clippy::unwrap_used)]
-    engine.lock().unwrap().set_position(&fen, &moves);
+    engine.set_position(&fen, &moves);
 }
 
 /// Dissects `line` according to the UCI protocol.
-fn handle_input_line(line: &str, engine: &Arc<Mutex<Engine>>) {
+fn handle_input_line(line: &str, engine: &mut Engine) {
     let mut line = line.trim().split(' ');
 
     // handle each UCI option
@@ -156,8 +148,7 @@ fn handle_input_line(line: &str, engine: &Arc<Mutex<Engine>>) {
             }
             "stop" => {
                 /* Stop calculating immediately. */
-                #[allow(clippy::unwrap_used)]
-                engine.lock().unwrap().stop_search();
+                engine.stop_search();
             }
             "uci" => {
                 /* Print ID, all options and "uciok" */
@@ -166,8 +157,7 @@ fn handle_input_line(line: &str, engine: &Arc<Mutex<Engine>>) {
             "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
             "q" | "quit" => {
                 /* Quit as soon as possible */
-                #[allow(clippy::unwrap_used)]
-                engine.lock().unwrap().exit();
+                engine.exit();
             }
 
             /* non-standard commands */
@@ -178,15 +168,13 @@ fn handle_input_line(line: &str, engine: &Arc<Mutex<Engine>>) {
             }
             /* "p" - prints current position */
             "p" => {
-                #[allow(clippy::unwrap_used)]
-                engine.lock().unwrap().pretty_print_board();
+                engine.pretty_print_board();
             }
             /* "perft n", where n is a number - run perft to depth n */
             "perft" => {
                 if let Some(depth) = line.next() {
                     match depth.parse::<u8>() {
-                        #[allow(clippy::unwrap_used)]
-                        Ok(result) => _ = engine.lock().unwrap().perft::<true, true>(result),
+                        Ok(result) => _ = engine.perft::<true, true>(result),
                         Err(result) => println!("{result}; must give 0-255"),
                     }
                 }
