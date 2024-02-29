@@ -13,5 +13,5 @@ pub mod defs;
 pub mod engine;
 /// For evaluation.
 mod evaluation;
-/// Handles UCI input
+/// Handles UCI input.
 pub mod uci;

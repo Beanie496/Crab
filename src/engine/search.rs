@@ -1,6 +1,5 @@
 use std::{
     fmt::{self, Display, Formatter},
-    process::exit,
     sync::mpsc::{channel, Receiver, Sender},
     thread::{spawn, JoinHandle},
     time::{Duration, Instant},
@@ -181,6 +180,10 @@ impl Engine {
     }
 
     /// Stops the search, if any.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` couldn't join on the search thread.
     #[inline]
     pub fn stop_search(&mut self) {
         // we don't particularly care if it's already stopped, we just want it
@@ -188,15 +191,9 @@ impl Engine {
         #[allow(unused_must_use)]
         if let Some(state) = self.search_thread_state.take() {
             state.tx.send(Stop);
-            state.handle.join();
+            #[allow(clippy::unwrap_used)]
+            state.handle.join().unwrap();
         }
-    }
-
-    /// Stops the search and exits.
-    #[inline]
-    pub fn exit(&mut self) {
-        self.stop_search();
-        exit(0);
     }
 }
 

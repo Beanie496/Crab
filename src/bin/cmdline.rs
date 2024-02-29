@@ -1,7 +1,7 @@
-//! A crate used simply to run [`backend::uci::main_loop`].
+//! A crate used simply to run [`Uci::main_loop()`].
 
-use backend::uci::main_loop;
+use backend::uci::Uci;
 
 fn main() {
-    main_loop();
+    Uci::new().main_loop();
 }
