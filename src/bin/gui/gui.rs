@@ -139,6 +139,8 @@ impl Gui {
     fn set_position_to_entered_fen(&mut self) {
         self.engine()
             .set_position(&self.state.entered_fen_string, "");
+        self.set_selected_square(None);
+        self.state = FrameState::default();
         self.regenerate_mailboxes();
     }
 
