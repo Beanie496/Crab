@@ -165,7 +165,7 @@ impl Gui {
     fn restart(&mut self) {
         self.engine().board.set_startpos();
         self.set_selected_square(None);
-        self.state.has_stopped = false;
+        self.state = FrameState::default();
         self.regenerate_mailboxes();
     }
 }

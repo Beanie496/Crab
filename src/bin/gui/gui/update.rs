@@ -5,13 +5,14 @@ use std::{
 };
 
 use backend::{
-    defs::{File, Piece, Rank, Square},
+    defs::{File, Piece, Rank, Side, Square},
     engine::{SearchResult, WorkingResult},
 };
 use eframe::{
     egui::{
         self,
         containers::{Frame, Window},
+        widget_text::RichText,
         Align, CentralPanel, Color32, Context, Id, Layout, Pos2, Rect, Rounding, Sense, SidePanel,
         Stroke, Ui, Vec2,
     },
@@ -40,6 +41,9 @@ pub struct FrameState {
     pub is_player_turn: bool,
     /// The search results so far. Cleared when a new search starts.
     pub search_results: Vec<SearchResultString>,
+    /// Which side has won, if any. If this isn't [`None`], the game should not
+    /// continue.
+    pub side_has_won: Option<Side>,
 }
 
 /// A [`SearchResult`] where each field has been converted to a string.
@@ -61,7 +65,7 @@ pub struct SearchResultString {
 }
 
 /// The maximum time the search should last.
-const SEARCH_DURATION_MS: u64 = 3200;
+const SEARCH_DURATION_MS: u64 = 1000;
 
 impl Default for FrameState {
     fn default() -> Self {
@@ -72,6 +76,7 @@ impl Default for FrameState {
             selected_square: None,
             is_player_turn: true,
             search_results: Vec::new(),
+            side_has_won: None,
         }
     }
 }
@@ -117,9 +122,22 @@ impl Gui {
             .exact_width(pixels_to_points(ctx, 840.0))
             .frame(egui::Frame::none().fill(col))
             .show(ctx, |ui| {
+                let available_height = ui.available_height();
+                let game_over_position = Rect::from_min_max(
+                    Pos2::new(
+                        pixels_to_points(ctx, 40.0),
+                        available_height - pixels_to_points(ctx, 640.0),
+                    ),
+                    Pos2::new(
+                        pixels_to_points(ctx, 840.0),
+                        available_height - pixels_to_points(ctx, 240.0),
+                    ),
+                );
+
                 self.update_board(ctx, ui);
                 self.update_buttons(ctx, ui);
                 self.update_labels(ctx, ui);
+                self.check_game_over(ctx, ui, game_over_position);
             });
     }
 
@@ -182,13 +200,7 @@ impl Gui {
                         self.state.search_results.push(SearchResultString::from(wr));
                     }
                     SearchResult::Finished(mv) => {
-                        assert!(
-                            self.engine().board.make_move(mv),
-                            "Error: best move is illegal"
-                        );
-                        self.regenerate_mailboxes();
-                        self.info_rx = None;
-                        self.state.is_player_turn = true;
+                        self.make_engine_move(mv);
                     }
                 }
             }
@@ -444,6 +456,33 @@ impl Gui {
 }
 
 impl Gui {
+    /// Checks `self.state.side_has_won` to see if the game has concluded. If
+    /// it has, it displays the result of the game in text at `position`.
+    fn check_game_over(&self, ctx: &Context, ui: &mut Ui, mut position: Rect) {
+        if self.state.side_has_won.is_none() {
+            return;
+        }
+
+        let mut size = 400.0;
+        let text = RichText::new(match self.state.side_has_won {
+            Some(Side::WHITE) => "1 - 0",
+            Some(Side::BLACK) => "0 - 1",
+            Some(Side::NONE) => {
+                size = 300.0;
+                position = position.translate(Vec2::new(
+                    pixels_to_points(ctx, 30.0),
+                    pixels_to_points(ctx, 50.0),
+                ));
+                "½ - ½"
+            }
+            _ => unreachable!(),
+        });
+
+        ui.allocate_ui_at_rect(position, |ui| {
+            ui.label(text.size(pixels_to_points(ctx, size)).weak());
+        });
+    }
+
     /// Starts the search on a new thread.
     ///
     /// The purpose of this new thread is to tell the main thread to redraw. If
