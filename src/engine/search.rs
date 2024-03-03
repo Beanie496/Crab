@@ -332,9 +332,6 @@ fn iterative_deepening(
             if depth == 1 {
                 best_move = search_info.pv.get(0);
             }
-            info_tx
-                .send(SearchResult::Finished(best_move))
-                .expect("Info receiver dropped too early");
             break;
         }
 
