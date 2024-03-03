@@ -781,7 +781,7 @@ impl Board {
         self.halfmoves
     }
 
-    /// Sets halfmoves. Currently does nothing.
+    /// Sets halfmoves.
     #[inline]
     pub fn set_halfmoves(&mut self, count: u8) {
         self.halfmoves = count;
@@ -794,7 +794,7 @@ impl Board {
         self.fullmoves
     }
 
-    /// Sets fullmoves. Currently does nothing.
+    /// Sets fullmoves.
     #[inline]
     pub fn set_fullmoves(&mut self, count: u16) {
         self.fullmoves = count;

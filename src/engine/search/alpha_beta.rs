@@ -11,15 +11,13 @@ use crate::{
 pub fn alpha_beta_search(
     search_info: &mut SearchInfo,
     board: &Board,
-    alpha: Eval,
-    beta: Eval,
+    mut alpha: Eval,
+    mut beta: Eval,
     depth: u8,
 ) -> Eval {
     if depth == 0 {
         return quiescent_search(search_info, board, alpha, beta);
     }
-
-    search_info.nodes += 1;
 
     // Stop if needed. The return value isn't important because it will be
     // discarded anyway.
@@ -27,7 +25,17 @@ pub fn alpha_beta_search(
         return 0;
     }
 
-    // mate distance pruning
+    search_info.nodes += 1;
+
+    // Fifty-move rule
+    if board.halfmoves() >= 100 {
+        alpha = alpha.max(0);
+        if alpha >= beta {
+            return beta;
+        }
+    }
+
+    // Mate distance pruning
     // 4 options:
     // - Neither side is getting mated. Alpha and beta will remain unchanged,
     //   alpha will remain smaller than beta and this function will continue.
@@ -42,8 +50,8 @@ pub fn alpha_beta_search(
     //   much the same as above but with reversed and negated alpha and beta.
     // - We both have a mate in x.
     //   * Can't happen. Either one side is getting mated or the other.
-    let beta = beta.min(mate_in(search_info.depth - depth));
-    let mut alpha = alpha.max(mated_in(search_info.depth - depth));
+    beta = beta.min(mate_in(search_info.depth - depth));
+    alpha = alpha.max(mated_in(search_info.depth - depth));
     if alpha >= beta {
         return beta;
     }
