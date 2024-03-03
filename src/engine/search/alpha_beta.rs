@@ -54,8 +54,6 @@ pub fn alpha_beta_search(
         return beta;
     }
 
-    search_info.nodes += 1;
-
     let mut pv = Pv::new();
     let mut moves = Moves::new();
     board.generate_moves::<{ MoveType::ALL }>(&mut moves);
@@ -68,6 +66,7 @@ pub fn alpha_beta_search(
         }
 
         let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
+        search_info.nodes += 1;
 
         // This position is too good - our opponent is guaranteed a worse
         // position if they pick this position, so they'll never pick it -
@@ -108,8 +107,6 @@ fn quiescent_search(
     mut alpha: Eval,
     beta: Eval,
 ) -> Eval {
-    search_info.nodes += 1;
-
     let stand_pat = evaluate(board);
 
     if stand_pat >= beta {
@@ -129,6 +126,8 @@ fn quiescent_search(
         }
 
         let result = -quiescent_search(search_info, &copy, -beta, -alpha);
+        search_info.nodes += 1;
+
         if result >= beta {
             return beta;
         }

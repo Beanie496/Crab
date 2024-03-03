@@ -336,9 +336,6 @@ fn iterative_deepening(
         }
 
         best_move = search_info.pv.get(0);
-        // the initial call to `alpha_beta_search()` counts the starting
-        // position, so remove that count
-        search_info.nodes -= 1;
         search_info.time = time.elapsed();
         search_info.score = eval;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
