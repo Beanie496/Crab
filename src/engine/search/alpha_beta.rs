@@ -25,8 +25,6 @@ pub fn alpha_beta_search(
         return 0;
     }
 
-    search_info.nodes += 1;
-
     // Fifty-move rule
     if board.halfmoves() >= 100 {
         alpha = alpha.max(0);
@@ -55,6 +53,8 @@ pub fn alpha_beta_search(
     if alpha >= beta {
         return beta;
     }
+
+    search_info.nodes += 1;
 
     let mut pv = Pv::new();
     let mut moves = Moves::new();
