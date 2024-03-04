@@ -24,7 +24,7 @@ u64 knight_attacks[64]
 u64 king_attacks[64]
 Magic bishop_magics[64]
 Magic rook_magics[64]
-// C++-style number deliminators
+// C++-style number delimitors
 u64 bishop_magic_lookup[5'248]
 u64 rook_magic_lookup[102'400]
 
