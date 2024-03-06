@@ -17,8 +17,8 @@ mod piece_square_tables;
 pub type Eval = i16;
 
 /// Piece-square tables. A bonus/malus for each piece depending on its
-/// position. Copied verbatim from
-/// [`PeSTO`]<https://www.chessprogramming.org/PeSTO>.
+/// position. Copied verbatim from PeSTO:
+/// <https://www.chessprogramming.org/PeSTO>.
 ///
 /// Order: pawn, knight, bishop, rook, queen, king. An extra table is included
 /// so that [`Piece::NONE`] can index into this array for a value of `0`.
