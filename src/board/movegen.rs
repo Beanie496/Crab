@@ -87,6 +87,11 @@ impl Display for Move {
         if self.is_promotion() {
             // we want the lowercase letter here
             write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
+        } else if self.is_castling() {
+            // castling is encoded as king takes rook, but it needs to be
+            // displayed as the king moving to where it actually goes
+            let end = Square((start.0 + end.0 + 1) / 2);
+            write!(f, "{start}{end}")
         } else {
             write!(f, "{start}{end}")
         }
