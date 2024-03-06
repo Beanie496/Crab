@@ -14,8 +14,7 @@ pub struct Engine {
     /// The internal board.
     ///
     /// See [`Board`].
-    // FIXME: this is a hack. I'll make this private when I remove the GUI.
-    pub board: Board,
+    board: Board,
     /// A tramsmitter to the search thread to tell it to stop and a join handle
     /// to the same thread.
     search_thread_state: Option<ThreadState<Stop, ()>>,
