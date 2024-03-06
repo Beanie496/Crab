@@ -10,8 +10,6 @@ use crate::{
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
 
-use getrandom::getrandom;
-
 /// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
@@ -927,27 +925,6 @@ impl Moves {
         self.moves
             .into_iter()
             .find(|&mv| mv.is_moving_from_to_promo(start, end, piece_type))
-    }
-
-    /// Returns a random move.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `self` is empty.
-    #[inline]
-    #[must_use]
-    pub fn random_move(&self) -> Move {
-        assert!(
-            !self.is_empty(),
-            "Tried to get a random move from an empty `Moves` list"
-        );
-        let mut rand = [0u8; 1];
-        if getrandom(&mut rand).is_ok() {
-            let rand = rand[0] as usize;
-            self.moves[rand % self.len()]
-        } else {
-            self.moves[0]
-        }
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.

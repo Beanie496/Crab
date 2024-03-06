@@ -1,6 +1,8 @@
 //! Crab, a UCI-compatible chess engine for my A-level project written in Rust.
 #![allow(clippy::new_without_default)]
 
+use uci::Uci;
+
 /// For unit testing.
 mod bench;
 /// A container for [`Bitboard`](bitboard::Bitboard).
@@ -15,3 +17,7 @@ pub mod engine;
 mod evaluation;
 /// Handles UCI input.
 pub mod uci;
+
+fn main() {
+    Uci::new().main_loop();
+}
