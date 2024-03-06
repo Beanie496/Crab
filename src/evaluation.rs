@@ -16,6 +16,7 @@ mod piece_square_tables;
 /// The result of an evaluation.
 pub type Eval = i16;
 
+#[allow(clippy::doc_markdown)]
 /// Piece-square tables. A bonus/malus for each piece depending on its
 /// position. Copied verbatim from PeSTO:
 /// <https://www.chessprogramming.org/PeSTO>.
