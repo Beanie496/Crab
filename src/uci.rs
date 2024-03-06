@@ -83,7 +83,15 @@ impl Uci {
     /// token.
     fn handle_position(&mut self, line: &mut Split<'_, char>) {
         let fen = match line.next() {
-            Some("startpos") => STARTPOS.to_string(),
+            Some("startpos") => {
+                // ensure the next token is "moves" if there is one
+                if let Some(token) = line.next() {
+                    if token != "moves" {
+                        return;
+                    }
+                }
+                STARTPOS.to_string()
+            }
             Some("fen") => {
                 let mut fen = String::new();
                 line.take_while(|token| *token != "moves")
