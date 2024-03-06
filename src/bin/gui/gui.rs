@@ -158,6 +158,8 @@ impl Gui {
     /// Stops `self` from responding to input.
     fn stop(&mut self) {
         self.state.has_stopped = true;
+        self.engine().stop_search();
+        self.info_rx = None;
     }
 
     /// Resets the state of `self`.
@@ -165,6 +167,7 @@ impl Gui {
     /// Sets the board to the starting position and starts running if `self`
     /// had been stopped.
     fn restart(&mut self) {
+        self.stop();
         self.engine().board.set_startpos();
         self.set_selected_square(None);
         self.state = FrameState::default();
