@@ -351,7 +351,6 @@ impl Board {
         let is_promotion = mv.is_promotion();
         let is_castling = mv.is_castling();
         let is_en_passant = mv.is_en_passant();
-        let promotion_piece_type = mv.promotion_piece();
 
         let piece = self.piece_on(start);
         let piece_type = PieceType::from(piece);
@@ -449,6 +448,7 @@ impl Board {
         } else if is_double_pawn_push(start, end, piece) {
             self.set_ep_square(Square((start.0 + end.0) >> 1));
         } else if is_promotion {
+            let promotion_piece_type = mv.promotion_piece();
             let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
 
             // overwrite the pawn on the mailbox
