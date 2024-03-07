@@ -169,23 +169,23 @@ impl Board {
             if self.can_castle_kingside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WK).is_empty()
             {
-                moves.push_move(Move::new_castle(Square::E1, Square::H1));
+                moves.push_move(Move::new_castle::<true, true>());
             }
             if self.can_castle_queenside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WQ).is_empty()
             {
-                moves.push_move(Move::new_castle(Square::E1, Square::A1));
+                moves.push_move(Move::new_castle::<true, false>());
             }
         } else {
             if self.can_castle_kingside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BK).is_empty()
             {
-                moves.push_move(Move::new_castle(Square::E8, Square::H8));
+                moves.push_move(Move::new_castle::<false, true>());
             }
             if self.can_castle_queenside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BQ).is_empty()
             {
-                moves.push_move(Move::new_castle(Square::E8, Square::A8));
+                moves.push_move(Move::new_castle::<false, false>());
             }
         }
     }
@@ -756,15 +756,41 @@ impl Move {
         )
     }
 
-    /// Creates a castling [`Move`] from `start` to `end`.
+    /// Creates a castling [`Move`] from `start` to `end`, given if the side is
+    /// White and if the side of the board is kingside.
     #[inline]
     #[must_use]
-    pub const fn new_castle(start: Square, end: Square) -> Self {
-        Self(
-            (start.0 as u16) << Self::START_SHIFT
-                | (end.0 as u16) << Self::END_SHIFT
-                | Self::CASTLING,
-        )
+    pub const fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
+        #[allow(clippy::collapsible_else_if)]
+        if IS_WHITE {
+            if IS_KINGSIDE {
+                Self(
+                    (Square::E1.0 as u16) << Self::START_SHIFT
+                        | (Square::H1.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING,
+                )
+            } else {
+                Self(
+                    (Square::E1.0 as u16) << Self::START_SHIFT
+                        | (Square::A1.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING,
+                )
+            }
+        } else {
+            if IS_KINGSIDE {
+                Self(
+                    (Square::E8.0 as u16) << Self::START_SHIFT
+                        | (Square::H8.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING,
+                )
+            } else {
+                Self(
+                    (Square::E8.0 as u16) << Self::START_SHIFT
+                        | (Square::A8.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING,
+                )
+            }
+        }
     }
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
