@@ -40,12 +40,11 @@ pub struct Lookup {
 }
 
 /// A wrapper for a move and associated methods.
-///
-/// From LSB onwards, a [`Move`] is as follows:
-/// * Start pos == 6 bits, 0-63
-/// * End pos == 6 bits, 0-63
-/// * Flags == 2 bits.
-/// * Promotion piece == 2 bits. Knight == `0b00`, Bishop == `0b01`, etc.
+// From LSB onwards, a [`Move`] is as follows:
+// * Start pos == 6 bits, 0-63
+// * End pos == 6 bits, 0-63
+// * Flags == 2 bits.
+// * Promotion piece == 2 bits. Knight == `0b00`, bishop == `0b01`, etc.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Move(u16);
 
@@ -170,23 +169,23 @@ impl Board {
             if self.can_castle_kingside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WK).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E1, Square::H1));
+                moves.push_move(Move::new_castle(Square::E1, Square::H1));
             }
             if self.can_castle_queenside::<true>()
                 && (occupancies & Bitboard::CASTLING_SPACE_WQ).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E1, Square::A1));
+                moves.push_move(Move::new_castle(Square::E1, Square::A1));
             }
         } else {
             if self.can_castle_kingside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BK).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E8, Square::H8));
+                moves.push_move(Move::new_castle(Square::E8, Square::H8));
             }
             if self.can_castle_queenside::<false>()
                 && (occupancies & Bitboard::CASTLING_SPACE_BQ).is_empty()
             {
-                moves.push_move(Move::new::<{ Move::CASTLING }>(Square::E8, Square::A8));
+                moves.push_move(Move::new_castle(Square::E8, Square::A8));
             }
         }
     }
@@ -217,7 +216,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(knight, target));
+                moves.push_move(Move::new(knight, target));
             }
         }
 
@@ -226,7 +225,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.king_attacks(king) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(king, target));
+                moves.push_move(Move::new(king, target));
             }
         }
     }
@@ -263,10 +262,10 @@ impl Board {
             // captures in the same loop.
             if MOVE_TYPE == MoveType::CAPTURES {
                 for target in normal_captures {
-                    moves.push_move(Move::new::<{ Move::NORMAL }>(pawn_sq, target));
+                    moves.push_move(Move::new(pawn_sq, target));
                 }
                 for target in ep_targets {
-                    moves.push_move(Move::new::<{ Move::EN_PASSANT }>(pawn_sq, target));
+                    moves.push_move(Move::new_en_passant(pawn_sq, target));
                 }
                 continue;
             }
@@ -286,10 +285,10 @@ impl Board {
             let normal_targets = targets ^ promotion_targets;
 
             for target in normal_targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(pawn_sq, target));
+                moves.push_move(Move::new(pawn_sq, target));
             }
             for target in ep_targets {
-                moves.push_move(Move::new::<{ Move::EN_PASSANT }>(pawn_sq, target));
+                moves.push_move(Move::new_en_passant(pawn_sq, target));
             }
             for target in promotion_targets {
                 moves.push_move(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
@@ -318,7 +317,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(bishop, target));
+                moves.push_move(Move::new(bishop, target));
             }
         }
 
@@ -327,7 +326,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(rook, target));
+                moves.push_move(Move::new(rook, target));
             }
         }
 
@@ -336,7 +335,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new::<{ Move::NORMAL }>(queen, target));
+                moves.push_move(Move::new(queen, target));
             }
         }
     }
@@ -344,6 +343,7 @@ impl Board {
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move. Returns `true` if the given move is legal, `false`
     /// otherwise.
+    #[allow(clippy::too_many_lines)]
     #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
         let start = mv.start();
@@ -379,26 +379,28 @@ impl Board {
         // since castling is encoded as king takes rook, castling has to be
         // checked before checking for captures
         if is_castling {
+            let king_start = start;
+            let rook_start = end;
+            let king_end = Square((start.0 + end.0 + 1) >> 1);
+            let rook_end = Square((start.0 + king_end.0) >> 1);
+
             // if the king is castling out of check
-            if self.is_square_attacked(start) {
+            if self.is_square_attacked(king_start) {
                 return false;
             }
-            let king_square = Square((start.0 + end.0 + 1) >> 1);
-            let rook_square = Square((start.0 + king_square.0) >> 1);
-
             // if the king is castling through check
-            if self.is_square_attacked(rook_square) {
+            if self.is_square_attacked(rook_end) {
                 return false;
             }
             // if the king is castling into check
-            if self.is_square_attacked(king_square) {
+            if self.is_square_attacked(king_end) {
                 return false;
             }
 
-            self.move_piece(start, king_square, piece, PieceType::KING, us);
+            self.move_piece(king_start, king_end, piece, PieceType::KING, us);
             self.move_piece(
-                end,
-                rook_square,
+                rook_start,
+                rook_end,
                 // `captured` is equivalent but slower
                 Piece::from_piecetype(PieceType::ROOK, us),
                 PieceType::ROOK,
@@ -730,34 +732,46 @@ impl Lookup {
 }
 
 impl Move {
-    /// Creates a [`Move`] given a start square and end square. `FLAG` can be
-    /// set to either [`CASTLING`](Move::CASTLING) or
-    /// [`EN_PASSANT`](Move::EN_PASSANT), but cannot be used for
-    /// [`PROMOTION`](Move::PROMOTION), since that requires an additional
-    /// parameter. See [`new_promo`](Move::new_promo) for a new promotion
-    /// [`Move`].
+    /// Creates a normal [`Move`] from `start` to `end`.
+    ///
+    /// This function cannot be used for special moves like castling.
     #[inline]
     #[must_use]
-    pub const fn new<const FLAG: u16>(start: Square, end: Square) -> Self {
-        debug_assert!(
-            FLAG != Self::PROMOTION,
-            "Tried to make a new promotion `Move` with the wrong function"
-        );
-        Self((start.0 as u16) << Self::START_SHIFT | (end.0 as u16) << Self::END_SHIFT | FLAG)
+    pub const fn new(start: Square, end: Square) -> Self {
+        Self(
+            (start.0 as u16) << Self::START_SHIFT
+                | (end.0 as u16) << Self::END_SHIFT
+                | Self::NORMAL,
+        )
     }
 
-    /// Creates a promotion [`Move`] to the given piece.
+    /// Creates an en passant [`Move`] from `start` to `end`.
+    #[inline]
+    #[must_use]
+    pub const fn new_en_passant(start: Square, end: Square) -> Self {
+        Self(
+            (start.0 as u16) << Self::START_SHIFT
+                | (end.0 as u16) << Self::END_SHIFT
+                | Self::EN_PASSANT,
+        )
+    }
+
+    /// Creates a castling [`Move`] from `start` to `end`.
+    #[inline]
+    #[must_use]
+    pub const fn new_castle(start: Square, end: Square) -> Self {
+        Self(
+            (start.0 as u16) << Self::START_SHIFT
+                | (end.0 as u16) << Self::END_SHIFT
+                | Self::CASTLING,
+        )
+    }
+
+    /// Creates a promotion [`Move`] to the given piece type from `start` to
+    /// `end`.
     #[inline]
     #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
-        debug_assert!(
-            PIECE != PieceType::PAWN.0,
-            "Tried to make a new promotion `Move` into a pawn"
-        );
-        debug_assert!(
-            PIECE != PieceType::KING.0,
-            "Tried to make a new promotion `Move` into a king"
-        );
         Self(
             (start.0 as u16) << Self::START_SHIFT
                 | (end.0 as u16) << Self::END_SHIFT
@@ -766,18 +780,11 @@ impl Move {
         )
     }
 
-    /// Creates a promotion [`Move`] to the given piece type.
+    /// Creates a promotion [`Move`] to the given piece type from `start` to
+    /// `end`.
     #[inline]
     #[must_use]
     pub fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
-        debug_assert!(
-            promotion_piece != PieceType::PAWN,
-            "Tried to make a new promotion `Move` into a pawn"
-        );
-        debug_assert!(
-            promotion_piece != PieceType::KING,
-            "Tried to make a new promotion `Move` into a king"
-        );
         Self(
             u16::from(start.0) << Self::START_SHIFT
                 | u16::from(end.0) << Self::END_SHIFT
@@ -836,12 +843,21 @@ impl Move {
         PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
     }
 
+    /// Returns the difference between the king destination square and the rook
+    /// starting square. Assumes `self.is_promotion()`. Cannot return anything
+    /// other than -2 or 1.
+    #[inline]
+    #[must_use]
+    pub const fn castling_rook_offset(&self) -> i8 {
+        (self.0 >> Self::PIECE_SHIFT) as i8 - 2
+    }
+
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
     #[inline]
     #[must_use]
     pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
-        let other = Self::new::<{ Self::NORMAL }>(start, end);
+        let other = Self::new(start, end);
         (other.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
             == (self.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
     }

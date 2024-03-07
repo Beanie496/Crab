@@ -19,7 +19,6 @@ pub use movegen::{magic::find_magics, Move, Moves};
 /// E.g. `0b1101` would be castling rights `KQq`.
 #[derive(Clone, Copy, Eq, PartialEq)]
 // The inner value of a wrapper does not need to be documented.
-#[allow(clippy::missing_docs_in_private_items)]
 pub struct CastlingRights(u8);
 
 /// Items related to move generation.
