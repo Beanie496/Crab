@@ -1,9 +1,4 @@
-use std::{
-    io,
-    process::exit,
-    str::Split,
-    thread::{spawn, JoinHandle},
-};
+use std::{io, process::exit, str::Split};
 
 use crate::{board::find_magics, defs::PieceType, engine::Engine};
 
@@ -11,8 +6,6 @@ use crate::{board::find_magics, defs::PieceType, engine::Engine};
 pub struct Uci {
     /// The engine.
     engine: Engine,
-    /// The handle to the thread that prints the information from the search.
-    search_handle: Option<JoinHandle<()>>,
 }
 
 /// The starting position as a FEN string.
@@ -25,7 +18,6 @@ impl Uci {
     pub fn new() -> Self {
         Self {
             engine: Engine::new(),
-            search_handle: None,
         }
     }
 
@@ -69,12 +61,7 @@ impl Uci {
             }
         }
 
-        let info_rx = self.engine.start_search(depth);
-        self.search_handle = Some(spawn(move || {
-            for result in info_rx {
-                println!("{result}");
-            }
-        }));
+        self.engine.start_search(depth);
     }
 
     /// Given an iterator over the remaining space-delimited tokens of a `position`
@@ -118,17 +105,6 @@ impl Uci {
         moves.pop();
 
         self.engine.set_position(&fen, &moves);
-    }
-
-    /// Stops the search.
-    fn stop(&mut self) {
-        self.engine.stop_search();
-        // there's nothing wrong with calling this function even if there's no
-        // search going on
-        if let Some(handle) = self.search_handle.take() {
-            #[allow(clippy::unwrap_used)]
-            handle.join().unwrap();
-        }
     }
 
     /// Dissects `line` according to the UCI protocol.
@@ -189,7 +165,7 @@ impl Uci {
                 }
                 "stop" => {
                     /* Stop calculating immediately. */
-                    self.stop();
+                    self.engine.stop_search();
                 }
                 "uci" => {
                     /* Print ID, all options and "uciok" */
@@ -198,7 +174,7 @@ impl Uci {
                 "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
                 "q" | "quit" => {
                     /* Quit as soon as possible */
-                    self.stop();
+                    self.engine.stop_search();
                     exit(0);
                 }
 

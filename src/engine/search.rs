@@ -15,20 +15,6 @@ use alpha_beta::alpha_beta_search;
 /// For carrying out the search.
 mod alpha_beta;
 
-/// The result of an iteration of an iterative deepening loop.
-#[allow(
-    clippy::module_name_repetitions,
-    clippy::large_enum_variant,
-    clippy::exhaustive_enums
-)]
-#[derive(Clone)]
-pub enum SearchResult {
-    /// Information about the search so far (time, nodes, etc.)
-    Unfinished(WorkingResult),
-    /// The best move.
-    Finished(Move),
-}
-
 /// The principle variation: the current best sequence of moves for both sides.
 // non-circular queue, as all the moves are enqueued exactly once before all
 // the moves are dequeued exactly once (then it goes out of scope)
@@ -81,26 +67,6 @@ pub struct ThreadState<Tx, Handle> {
     handle: JoinHandle<Handle>,
 }
 
-/// The current result of a search.
-// This is almost identical to `SearchInfo` but doesn't have a receiver. When
-// I remove the GUI, this struct will be deleted.
-#[allow(clippy::exhaustive_structs)]
-#[derive(Clone)]
-pub struct WorkingResult {
-    /// The depth reached.
-    pub depth: u8,
-    /// The time taken.
-    pub time: Duration,
-    /// The positions searched.
-    pub nodes: u64,
-    /// The principle variation: the optimal sequence of moves for both sides.
-    pub pv: Pv,
-    /// The score of the position from the perspective of the side to move.
-    pub score: Eval,
-    /// How many positions were searched per second.
-    pub nps: u64,
-}
-
 /// The maximum depth this engine supports.
 const MAX_PLY: usize = u8::MAX as usize;
 
@@ -126,24 +92,19 @@ impl Iterator for Pv {
     }
 }
 
-impl Display for SearchResult {
+impl Display for SearchInfo {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::Unfinished(ref result) => {
-                write!(
-                    f,
-                    "info depth {} time {} nodes {} pv {} score cp {} nps {}",
-                    result.depth,
-                    result.time.as_millis(),
-                    result.nodes,
-                    result.pv,
-                    result.score,
-                    result.nps,
-                )
-            }
-            Self::Finished(ref mv) => write!(f, "bestmove {mv}"),
-        }
+        write!(
+            f,
+            "info depth {} time {} nodes {} pv {} score cp {} nps {}",
+            self.depth,
+            self.time.as_millis(),
+            self.nodes,
+            self.pv,
+            self.score,
+            self.nps,
+        )
     }
 }
 
@@ -154,11 +115,9 @@ impl Engine {
     // obviously different
     #[allow(clippy::similar_names)]
     #[inline]
-    #[must_use]
-    pub fn start_search(&mut self, depth: Option<u8>) -> Receiver<SearchResult> {
+    pub fn start_search(&mut self, depth: Option<u8>) {
         let board_clone = self.board.clone();
         let depth = depth.unwrap_or(u8::MAX);
-        let (info_tx, info_rx) = channel();
         let (control_tx, control_rx) = channel();
 
         let search_info = SearchInfo::new(control_rx);
@@ -173,10 +132,9 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(search_info, &info_tx, &board_clone, depth);
+                iterative_deepening(search_info, &board_clone, depth);
             }),
         ));
-        info_rx
     }
 
     /// Stops the search, if any.
@@ -272,24 +230,6 @@ impl SearchInfo {
         }
     }
 
-    /// Turns the information in `self` into a [`SearchResult`]. The result
-    /// will be `Unfinished` if the search has not stopped and `Finished` if it
-    /// has.
-    fn create_result(&self) -> SearchResult {
-        if self.has_stopped {
-            SearchResult::Finished(self.pv.get(0))
-        } else {
-            SearchResult::Unfinished(WorkingResult {
-                depth: self.depth,
-                time: self.time,
-                nodes: self.nodes,
-                pv: self.pv.clone(),
-                score: self.score,
-                nps: self.nps,
-            })
-        }
-    }
-
     /// If the search needs to stop.
     fn should_stop(&mut self) -> bool {
         if self.control_rx.try_recv().is_ok() {
@@ -309,12 +249,7 @@ impl<T, U> ThreadState<T, U> {
 /// Performs iterative deepening.
 ///
 /// Since there is no move ordering or TT, this is currently a slowdown.
-fn iterative_deepening(
-    mut search_info: SearchInfo,
-    info_tx: &Sender<SearchResult>,
-    board: &Board,
-    max_depth: u8,
-) {
+fn iterative_deepening(mut search_info: SearchInfo, board: &Board, max_depth: u8) {
     let time = Instant::now();
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
@@ -339,11 +274,8 @@ fn iterative_deepening(
         search_info.time = time.elapsed();
         search_info.score = eval;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
-        info_tx
-            .send(search_info.create_result())
-            .expect("Info receiver dropped too early");
+
+        println!("{search_info}");
     }
-    info_tx
-        .send(SearchResult::Finished(best_move))
-        .expect("Info receiver dropped too early");
+    println!("bestmove {best_move}");
 }
