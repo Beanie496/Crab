@@ -346,8 +346,13 @@ impl Board {
     /// otherwise.
     #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
-        let (start, end, is_castling, is_en_passant, is_promotion, promotion_piece_type) =
-            mv.decompose();
+        let start = mv.start();
+        let end = mv.end();
+        let is_promotion = mv.is_promotion();
+        let is_castling = mv.is_castling();
+        let is_en_passant = mv.is_en_passant();
+        let promotion_piece_type = mv.promotion_piece();
+
         let piece = self.piece_on(start);
         let piece_type = PieceType::from(piece);
         let captured = self.piece_on(end);
@@ -788,28 +793,6 @@ impl Move {
         Self(0)
     }
 
-    /// Turns a [`Move`] into its components: start square, end square, is
-    /// castling, is promotion, is en passant and piece (only set if
-    /// `is_promotion`), in that order.
-    #[inline]
-    #[must_use]
-    pub const fn decompose(&self) -> (Square, Square, bool, bool, bool, PieceType) {
-        let start = self.start();
-        let end = self.end();
-        let is_promotion = self.is_promotion();
-        let is_castling = self.is_castling();
-        let is_en_passant = self.is_en_passant();
-        let piece_type = PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1);
-        (
-            start,
-            end,
-            is_castling,
-            is_en_passant,
-            is_promotion,
-            piece_type,
-        )
-    }
-
     /// Calculates the start square of `self`.
     #[inline]
     #[must_use]
@@ -838,6 +821,21 @@ impl Move {
         self.0 & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
+    /// Checks if the move is a promotion.
+    #[inline]
+    #[must_use]
+    pub const fn is_promotion(&self) -> bool {
+        self.0 & Self::FLAG_MASK == Self::PROMOTION
+    }
+
+    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
+    /// only return a value from 1 to 4.
+    #[inline]
+    #[must_use]
+    pub const fn promotion_piece(&self) -> PieceType {
+        PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
+    }
+
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
     #[inline]
@@ -860,21 +858,6 @@ impl Move {
     ) -> bool {
         let other = Self::new_promo_any(start, end, promotion_piece);
         *self == other
-    }
-
-    /// Checks if the move is a promotion.
-    #[inline]
-    #[must_use]
-    pub const fn is_promotion(&self) -> bool {
-        self.0 & Self::FLAG_MASK == Self::PROMOTION
-    }
-
-    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
-    /// only return a value from 1 to 4.
-    #[inline]
-    #[must_use]
-    pub const fn promotion_piece(&self) -> PieceType {
-        PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
     }
 }
 
