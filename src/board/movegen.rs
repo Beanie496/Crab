@@ -222,10 +222,11 @@ impl Board {
         let us_bb = self.side::<IS_WHITE>();
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
-        let ep_square_bb = if self.ep_square() == Square::NONE {
+        let ep_square = self.ep_square();
+        let ep_square_bb = if ep_square == Square::NONE {
             Bitboard::empty()
         } else {
-            Bitboard::from(self.ep_square())
+            Bitboard::from(ep_square)
         };
         let empty = !occupancies;
 
