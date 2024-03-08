@@ -147,8 +147,6 @@ impl Bitboard {
     /// The squares betwen the Black king and queenside rook in the starting
     /// position.
     const CASTLING_SPACE_BQ: Self = Self(0x0e00_0000_0000_0000);
-    /// An empty bitboard: `0x0`.
-    pub const EMPTY: Self = Self(0);
 }
 
 impl Bitboard {
@@ -240,6 +238,13 @@ impl Bitboard {
         }
     }
 
+    /// Returns an empty bitboard.
+    #[inline]
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self(0)
+    }
+
     /// Returns the contents of `self`.
     #[inline]
     #[must_use]
@@ -251,7 +256,7 @@ impl Bitboard {
     #[inline]
     #[must_use]
     pub const fn is_empty(self) -> bool {
-        self.0 == Self::EMPTY.0
+        self.0 == Self::empty().0
     }
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts

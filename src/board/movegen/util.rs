@@ -17,7 +17,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
         & !Bitboard::rank_bb(Rank::from(square));
     let edges = excluded_ranks_bb | excluded_files_bb;
-    let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
+    let mask = sliding_attacks::<PIECE>(square, Bitboard::empty()) & !edges;
 
     let mut blockers = mask;
     let mut first_empty = 0;
@@ -26,7 +26,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
         first_empty += 1;
         blockers = Bitboard(blockers.0.wrapping_sub(1)) & mask;
     }
-    attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::EMPTY);
+    attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::empty());
 }
 
 /// Checks if the move is a double pawn push.
@@ -61,7 +61,7 @@ pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
 /// including the first encountered bit set in `blockers`. `blockers` is
 /// assumed not to include `square` itself.
 pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -> Bitboard {
-    let mut attacks = Bitboard::EMPTY;
+    let mut attacks = Bitboard::empty();
     // checks if the next square is valid and if the piece can move from the
     // square
     while is_valid::<DIRECTION>(square) && (Bitboard::from(square) & blockers).is_empty() {
@@ -77,7 +77,7 @@ pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -
 /// given blockers. Includes the edge.
 pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
     let piece = PieceType(PIECE);
-    let mut ray = Bitboard::EMPTY;
+    let mut ray = Bitboard::empty();
     if piece == PieceType::BISHOP {
         ray |= ray_attack::<{ Direction::NE.0 }>(square, blockers);
         ray |= ray_attack::<{ Direction::SE.0 }>(square, blockers);

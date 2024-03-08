@@ -247,7 +247,7 @@ impl Board {
 
     /// Returns the piece [`Bitboard`]s of an empty board.
     const fn no_pieces() -> [Bitboard; PieceType::TOTAL] {
-        [Bitboard::EMPTY; PieceType::TOTAL]
+        [Bitboard::empty(); PieceType::TOTAL]
     }
 
     /// Returns the side [`Bitboard`]s of the starting position.
@@ -260,7 +260,7 @@ impl Board {
 
     /// Returns the side [`Bitboard`]s of an empty board.
     const fn no_sides() -> [Bitboard; Side::TOTAL] {
-        [Bitboard::EMPTY; Side::TOTAL]
+        [Bitboard::empty(); Side::TOTAL]
     }
 
     /// Returns an iterator over the internal mailbox. a1 b1, etc.

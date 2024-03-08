@@ -180,7 +180,7 @@ impl Magic {
     /// Returns a 0-initialised [`Magic`].
     pub const fn default() -> Self {
         Self {
-            mask: Bitboard::EMPTY,
+            mask: Bitboard::empty(),
             magic: 0,
             shift: 0,
             offset: 0,
@@ -216,9 +216,9 @@ pub fn find_magics<const PIECE: u8>() {
     };
 
     // this stores the attacks for each square
-    let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
+    let mut attacks = [Bitboard::empty(); MAX_BLOCKERS];
     // this is used to check if any collisions are destructive
-    let mut lookup_table = [Bitboard::EMPTY; MAX_BLOCKERS];
+    let mut lookup_table = [Bitboard::empty(); MAX_BLOCKERS];
     // this is used to store the latest iteration of each index
     let mut epoch = [0u32; MAX_BLOCKERS];
     let mut rand_gen = Rand64::new(
@@ -231,7 +231,7 @@ pub fn find_magics<const PIECE: u8>() {
     for square in 0..Square::TOTAL {
         let square = Square(square as u8);
         let edges = Bitboard::edges_without(square);
-        let mask = sliding_attacks::<PIECE>(square, Bitboard::EMPTY) & !edges;
+        let mask = sliding_attacks::<PIECE>(square, Bitboard::empty()) & !edges;
         let mask_bits = mask.0.count_ones();
         let perms = 2usize.pow(mask_bits);
         let shift = 64 - mask_bits;

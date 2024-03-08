@@ -223,7 +223,7 @@ impl Board {
         let occupancies = self.occupancies();
         let them_bb = occupancies ^ us_bb;
         let ep_square_bb = if self.ep_square() == Square::NONE {
-            Bitboard::EMPTY
+            Bitboard::empty()
         } else {
             Bitboard::from(self.ep_square())
         };
@@ -550,12 +550,12 @@ impl Lookup {
     #[allow(clippy::large_stack_frames)]
     const fn empty() -> Self {
         Self {
-            pawn_attacks: [[Bitboard::EMPTY; Square::TOTAL]; Side::TOTAL],
-            knight_attacks: [Bitboard::EMPTY; Square::TOTAL],
-            king_attacks: [Bitboard::EMPTY; Square::TOTAL],
+            pawn_attacks: [[Bitboard::empty(); Square::TOTAL]; Side::TOTAL],
+            knight_attacks: [Bitboard::empty(); Square::TOTAL],
+            king_attacks: [Bitboard::empty(); Square::TOTAL],
             // allowed because, after testing, a vector was slightly slower
             #[allow(clippy::large_stack_arrays)]
-            magic_table: [Bitboard::EMPTY; ROOK_SIZE + BISHOP_SIZE],
+            magic_table: [Bitboard::empty(); ROOK_SIZE + BISHOP_SIZE],
             bishop_magics: [Magic::default(); Square::TOTAL],
             rook_magics: [Magic::default(); Square::TOTAL],
         }
@@ -619,11 +619,12 @@ impl Lookup {
 
         for square in 0..Square::TOTAL {
             let square = Square(square as u8);
-            let mut attacks = [Bitboard::EMPTY; MAX_BLOCKERS];
+            let mut attacks = [Bitboard::empty(); MAX_BLOCKERS];
             let edges = Bitboard::edges_without(square);
             let b_mask =
-                sliding_attacks::<{ PieceType::BISHOP.0 }>(square, Bitboard::EMPTY) & !edges;
-            let r_mask = sliding_attacks::<{ PieceType::ROOK.0 }>(square, Bitboard::EMPTY) & !edges;
+                sliding_attacks::<{ PieceType::BISHOP.0 }>(square, Bitboard::empty()) & !edges;
+            let r_mask =
+                sliding_attacks::<{ PieceType::ROOK.0 }>(square, Bitboard::empty()) & !edges;
             let b_mask_bits = b_mask.0.count_ones();
             let r_mask_bits = r_mask.0.count_ones();
             let b_perms = 2usize.pow(b_mask_bits);
