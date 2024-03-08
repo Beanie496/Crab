@@ -354,6 +354,10 @@ impl Board {
             self.fullmoves += 1;
         }
 
+        // this should also have `&& !is_castling`, but adding that check makes
+        // oerft a lot slower for some reason...gah
+        // do I make the whole of perft up to 10% slower just to account for
+        // one specific scenario that will probably never occur ever?
         if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
             self.halfmoves = 0;
         // 75-move rule: if 75 moves have been made by both players, the game
