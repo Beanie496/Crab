@@ -341,14 +341,6 @@ impl Board {
                 // SAFETY: It's not possible for it to be `None`.
                 let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
                 moves.move_with_promo(start, end, PieceType::from(promotion_char))
-            } else if PieceType::from(self.piece_on(start)) == PieceType::KING {
-                // Castling is encoded as king takes rook so the end square
-                // needs to be translated
-                if end == Square::C1 || end == Square::C8 {
-                    moves.move_with(start, Square(end.0 - 2))
-                } else {
-                    moves.move_with(start, Square(end.0 + 1))
-                }
             } else {
                 moves.move_with(start, end)
             };

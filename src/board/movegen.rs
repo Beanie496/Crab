@@ -44,7 +44,11 @@ pub struct Lookup {
 // * Start pos == 6 bits, 0-63
 // * End pos == 6 bits, 0-63
 // * Flags == 2 bits.
-// * Promotion piece == 2 bits. Knight == `0b00`, bishop == `0b01`, etc.
+// * Extra bits: 2 bits.
+//
+// if `is_castling`, the extra bits will be the rook offset from the king dest
+// square, plus 2 (to fit in the 2 bits). If `is_promotion`, the extra bits
+// will be the promotion piece: Knight == `0b00`, bishop == `0b01`, etc.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Move(u16);
 
@@ -86,11 +90,6 @@ impl Display for Move {
         if self.is_promotion() {
             // we want the lowercase letter here
             write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
-        } else if self.is_castling() {
-            // castling is encoded as king takes rook, but it needs to be
-            // displayed as the king moving to where it actually goes
-            let end = Square((start.0 + end.0 + 1) / 2);
-            write!(f, "{start}{end}")
         } else {
             write!(f, "{start}{end}")
         }
@@ -136,7 +135,7 @@ impl Move {
     const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
     /// Shift for the promotion piece. It does not need a mask because shifting
     /// already removes unwanted bits.
-    const PIECE_SHIFT: usize = 14;
+    const EXTRA_BITS_SHIFT: usize = 14;
 }
 
 impl Board {
@@ -354,10 +353,6 @@ impl Board {
             self.fullmoves += 1;
         }
 
-        // this should also have `&& !is_castling`, but adding that check makes
-        // oerft a lot slower for some reason...gah
-        // do I make the whole of perft up to 10% slower just to account for
-        // one specific scenario that will probably never occur ever?
         if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
             self.halfmoves = 0;
         // 75-move rule: if 75 moves have been made by both players, the game
@@ -368,28 +363,52 @@ impl Board {
 
         self.clear_ep_square();
 
-        // since castling is encoded as king takes rook, castling has to be
-        // checked before checking for captures
-        if is_castling {
-            let king_start = start;
-            let rook_start = end;
-            let king_end = Square((start.0 + end.0 + 1) >> 1);
-            let rook_end = Square((start.0 + king_end.0) >> 1);
+        self.move_piece(start, end, piece, piece_type, us);
 
+        if captured_type != PieceType::NONE {
+            self.update_bb_piece(end_bb, captured_type, them);
+            self.remove_psq_piece(end, captured);
+            self.remove_phase_piece(captured);
+
+            // check if we need to unset the castling rights if we're capturing
+            // a rook
+            if captured_type == PieceType::ROOK {
+                let us_inner = us.0;
+                // this will be 0x81 if we're White (0x81 << 0) and
+                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
+                // the starting position of our rooks.
+                let rook_squares = Bitboard(0x81) << (us_inner * 56);
+                if !(end_bb & rook_squares).is_empty() {
+                    // 0 or 56 for queenside -> 0
+                    // 7 or 63 for kingside -> 1
+                    let is_kingside = end.0 & 1;
+                    // queenside -> 0b01
+                    // kingside -> 0b10
+                    // this replies upon knowing the internal representation of
+                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
+                    let flag = is_kingside + 1;
+                    self.unset_castling_right(them, CastlingRights(flag));
+                }
+            }
+        }
+
+        if is_castling {
             // if the king is castling out of check
-            if self.is_square_attacked(king_start) {
+            if self.is_square_attacked(start) {
                 return false;
             }
+            // if the king is castling into check
+            if self.is_square_attacked(end) {
+                return false;
+            }
+
+            let rook_start = Square(end.0.wrapping_add_signed(mv.offset()));
+            let rook_end = Square((start.0 + end.0) >> 1);
             // if the king is castling through check
             if self.is_square_attacked(rook_end) {
                 return false;
             }
-            // if the king is castling into check
-            if self.is_square_attacked(king_end) {
-                return false;
-            }
 
-            self.move_piece(king_start, king_end, piece, PieceType::KING, us);
             self.move_piece(
                 rook_start,
                 rook_end,
@@ -400,38 +419,9 @@ impl Board {
             );
 
             self.unset_castling_rights(us);
-        } else {
-            self.move_piece(start, end, piece, piece_type, us);
-
-            if captured_type != PieceType::NONE {
-                self.update_bb_piece(end_bb, captured_type, them);
-                self.remove_psq_piece(end, captured);
-                self.remove_phase_piece(captured);
-
-                // check if we need to unset the castling rights if we're capturing
-                // a rook
-                if captured_type == PieceType::ROOK {
-                    let us_inner = us.0;
-                    // this will be 0x81 if we're White (0x81 << 0) and
-                    // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
-                    // the starting position of our rooks.
-                    let rook_squares = Bitboard(0x81) << (us_inner * 56);
-                    if !(end_bb & rook_squares).is_empty() {
-                        // 0 or 56 for queenside -> 0
-                        // 7 or 63 for kingside -> 1
-                        let is_kingside = end.0 & 1;
-                        // queenside -> 0b01
-                        // kingside -> 0b10
-                        // this replies upon knowing the internal representation of
-                        // CastlingRights - 0b01 is queenside, 0b10 is kingside
-                        let flag = is_kingside + 1;
-                        self.unset_castling_right(them, CastlingRights(flag));
-                    }
-                }
-            }
-        }
-
-        if is_en_passant {
+        } else if is_double_pawn_push(start, end, piece) {
+            self.set_ep_square(Square((start.0 + end.0) >> 1));
+        } else if is_en_passant {
             let dest = Square(if us == Side::WHITE {
                 end.0 - 8
             } else {
@@ -439,8 +429,6 @@ impl Board {
             });
             let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
             self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
-        } else if is_double_pawn_push(start, end, piece) {
-            self.set_ep_square(Square((start.0 + end.0) >> 1));
         } else if is_promotion {
             let promotion_piece_type = mv.promotion_piece();
             let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
@@ -759,28 +747,32 @@ impl Move {
             if IS_KINGSIDE {
                 Self(
                     (Square::E1.0 as u16) << Self::START_SHIFT
-                        | (Square::H1.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING,
+                        | (Square::G1.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING
+                        | 3 << Self::EXTRA_BITS_SHIFT,
                 )
             } else {
                 Self(
                     (Square::E1.0 as u16) << Self::START_SHIFT
-                        | (Square::A1.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING,
+                        | (Square::C1.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING
+                        | 0 << Self::EXTRA_BITS_SHIFT,
                 )
             }
         } else {
             if IS_KINGSIDE {
                 Self(
                     (Square::E8.0 as u16) << Self::START_SHIFT
-                        | (Square::H8.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING,
+                        | (Square::G8.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING
+                        | 3 << Self::EXTRA_BITS_SHIFT,
                 )
             } else {
                 Self(
                     (Square::E8.0 as u16) << Self::START_SHIFT
-                        | (Square::A8.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING,
+                        | (Square::C8.0 as u16) << Self::END_SHIFT
+                        | Self::CASTLING
+                        | 0 << Self::EXTRA_BITS_SHIFT,
                 )
             }
         }
@@ -795,7 +787,7 @@ impl Move {
             (start.0 as u16) << Self::START_SHIFT
                 | (end.0 as u16) << Self::END_SHIFT
                 | Self::PROMOTION
-                | ((PIECE - 1) as u16) << Self::PIECE_SHIFT,
+                | ((PIECE - 1) as u16) << Self::EXTRA_BITS_SHIFT,
         )
     }
 
@@ -808,7 +800,7 @@ impl Move {
             u16::from(start.0) << Self::START_SHIFT
                 | u16::from(end.0) << Self::END_SHIFT
                 | Self::PROMOTION
-                | u16::from(promotion_piece.0 - 1) << Self::PIECE_SHIFT,
+                | u16::from(promotion_piece.0 - 1) << Self::EXTRA_BITS_SHIFT,
         )
     }
 
@@ -854,12 +846,23 @@ impl Move {
         self.0 & Self::FLAG_MASK == Self::PROMOTION
     }
 
-    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`. Can
-    /// only return a value from 1 to 4.
+    /// Returns the difference from the king destination square and the rook
+    /// starting square. Assumes `self.is_castling()`.
+    ///
+    /// Can only return -2 or 1.
+    #[inline]
+    #[must_use]
+    pub const fn offset(&self) -> i8 {
+        (self.0 >> Self::EXTRA_BITS_SHIFT) as i8 - 2
+    }
+
+    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`.
+    ///
+    /// The piece will only ever be a valid piece.
     #[inline]
     #[must_use]
     pub const fn promotion_piece(&self) -> PieceType {
-        PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
+        PieceType((self.0 >> Self::EXTRA_BITS_SHIFT) as u8 + 1)
     }
 
     /// Checks if the given start and end square match the start and end square
