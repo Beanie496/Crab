@@ -40,17 +40,24 @@ pub struct Lookup {
 }
 
 /// A wrapper for a move and associated methods.
-// From LSB onwards, a [`Move`] is as follows:
-// * Start pos == 6 bits, 0-63
-// * End pos == 6 bits, 0-63
-// * Flags == 2 bits.
-// * Extra bits: 2 bits.
-//
-// if `is_castling`, the extra bits will be the rook offset from the king dest
-// square, plus 2 (to fit in the 2 bits). If `is_promotion`, the extra bits
-// will be the promotion piece: Knight == `0b00`, bishop == `0b01`, etc.
+///
+/// Order is important here, which is why I've added the `repr` attribute -
+/// swapping the order of the fields, or swapping the squares, or both, will
+/// result in a slowdown.
+///
+/// If `is_castling`, the extra bits will be the rook offset from the king dest
+/// square, plus 2 (to fit in the 2 bits). If `is_promotion`, the extra bits
+/// will be the promotion piece: Knight == `0b00`, bishop == `0b01`, etc.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Move(u16);
+#[repr(C)]
+pub struct Move {
+    /// Contains: start square (0-63), in `0b00XX_XXXX`; and flags, in
+    /// `0bXX00_0000`.
+    lower: u8,
+    /// Contains: end square (0-63), in `0b00XX_XXXX`; and extra bits, in
+    /// `0bXX00_0000`.
+    upper: u8,
+}
 
 /// An stack of `Move`s.
 pub struct Moves {
@@ -85,8 +92,8 @@ pub static mut LOOKUPS: Lookup = Lookup::empty();
 impl Display for Move {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let start = Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8);
-        let end = Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8);
+        let start = self.start();
+        let end = self.end();
         if self.is_promotion() {
             // we want the lowercase letter here
             write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
@@ -111,31 +118,21 @@ impl Iterator for Moves {
 /// mutually exclusive.
 impl Move {
     /// Flag for castling.
-    pub const CASTLING: u16 = 0b0001_0000_0000_0000;
+    pub const CASTLING: u8 = 0b0100_0000;
     /// Flag for en passant.
-    pub const EN_PASSANT: u16 = 0b0010_0000_0000_0000;
+    pub const EN_PASSANT: u8 = 0b1000_0000;
     /// Flag for promotion.
-    pub const PROMOTION: u16 = 0b0011_0000_0000_0000;
+    pub const PROMOTION: u8 = 0b1100_0000;
     /// No flags.
-    pub const NORMAL: u16 = 0b0000_0000_0000_0000;
+    pub const NORMAL: u8 = 0b0000_0000;
     /// Mask for the start square.
-    const START_MASK: u16 = 0b11_1111;
-    /// Shift for the start square, after it has been masked.
-    const START_SHIFT: usize = 0;
-    /// Mask for the end square.
-    const END_MASK: u16 = 0b1111_1100_0000;
-    /// Shift for the end square, after it has been masked.
-    const END_SHIFT: usize = 6;
-    /// Mask for both the start and end square.
-    const SQUARE_MASK: u16 = 0b0000_1111_1111_1111;
-    /// Shift for the start and end square, after they have been masked.
-    const SQUARE_SHIFT: usize = 0;
+    const SQUARE_MASK: u8 = 0b11_1111;
     /// Mask for the flags. They do not need a shift because they simply need
     /// to be set or unset.
-    const FLAG_MASK: u16 = 0b0011_0000_0000_0000;
+    const FLAG_MASK: u8 = 0b1100_0000;
     /// Shift for the promotion piece. It does not need a mask because shifting
     /// already removes unwanted bits.
-    const EXTRA_BITS_SHIFT: usize = 14;
+    const EXTRA_BITS_SHIFT: usize = 6;
 }
 
 impl Board {
@@ -402,7 +399,7 @@ impl Board {
                 return false;
             }
 
-            let rook_start = Square(end.0.wrapping_add_signed(mv.offset()));
+            let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
             let rook_end = Square((start.0 + end.0) >> 1);
             // if the king is castling through check
             if self.is_square_attacked(rook_end) {
@@ -719,22 +716,20 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn new(start: Square, end: Square) -> Self {
-        Self(
-            (start.0 as u16) << Self::START_SHIFT
-                | (end.0 as u16) << Self::END_SHIFT
-                | Self::NORMAL,
-        )
+        Self {
+            lower: end.0,
+            upper: start.0 | Self::NORMAL,
+        }
     }
 
     /// Creates an en passant [`Move`] from `start` to `end`.
     #[inline]
     #[must_use]
     pub const fn new_en_passant(start: Square, end: Square) -> Self {
-        Self(
-            (start.0 as u16) << Self::START_SHIFT
-                | (end.0 as u16) << Self::END_SHIFT
-                | Self::EN_PASSANT,
-        )
+        Self {
+            lower: end.0,
+            upper: start.0 | Self::EN_PASSANT,
+        }
     }
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
@@ -745,35 +740,27 @@ impl Move {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
             if IS_KINGSIDE {
-                Self(
-                    (Square::E1.0 as u16) << Self::START_SHIFT
-                        | (Square::G1.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING
-                        | 3 << Self::EXTRA_BITS_SHIFT,
-                )
+                Self {
+                    lower: Square::G1.0 | 3 << Self::EXTRA_BITS_SHIFT,
+                    upper: Square::E1.0 | Self::CASTLING,
+                }
             } else {
-                Self(
-                    (Square::E1.0 as u16) << Self::START_SHIFT
-                        | (Square::C1.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING
-                        | 0 << Self::EXTRA_BITS_SHIFT,
-                )
+                Self {
+                    lower: Square::C1.0 | 0 << Self::EXTRA_BITS_SHIFT,
+                    upper: Square::E1.0 | Self::CASTLING,
+                }
             }
         } else {
             if IS_KINGSIDE {
-                Self(
-                    (Square::E8.0 as u16) << Self::START_SHIFT
-                        | (Square::G8.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING
-                        | 3 << Self::EXTRA_BITS_SHIFT,
-                )
+                Self {
+                    lower: Square::G8.0 | 3 << Self::EXTRA_BITS_SHIFT,
+                    upper: Square::E8.0 | Self::CASTLING,
+                }
             } else {
-                Self(
-                    (Square::E8.0 as u16) << Self::START_SHIFT
-                        | (Square::C8.0 as u16) << Self::END_SHIFT
-                        | Self::CASTLING
-                        | 0 << Self::EXTRA_BITS_SHIFT,
-                )
+                Self {
+                    lower: Square::C8.0 | 0 << Self::EXTRA_BITS_SHIFT,
+                    upper: Square::E8.0 | Self::CASTLING,
+                }
             }
         }
     }
@@ -783,77 +770,74 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
-        Self(
-            (start.0 as u16) << Self::START_SHIFT
-                | (end.0 as u16) << Self::END_SHIFT
-                | Self::PROMOTION
-                | ((PIECE - 1) as u16) << Self::EXTRA_BITS_SHIFT,
-        )
+        Self {
+            lower: end.0 | ((PIECE - 1) << Self::EXTRA_BITS_SHIFT),
+            upper: start.0 | Self::PROMOTION,
+        }
     }
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
     #[inline]
     #[must_use]
-    pub fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
-        Self(
-            u16::from(start.0) << Self::START_SHIFT
-                | u16::from(end.0) << Self::END_SHIFT
-                | Self::PROMOTION
-                | u16::from(promotion_piece.0 - 1) << Self::EXTRA_BITS_SHIFT,
-        )
+    pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
+        Self {
+            lower: end.0 | (promotion_piece.0 - 1) << Self::EXTRA_BITS_SHIFT,
+            upper: start.0 | Self::PROMOTION,
+        }
     }
 
     /// Creates a null [`Move`].
     #[inline]
     #[must_use]
     pub const fn null() -> Self {
-        Self(0)
+        Self { lower: 0, upper: 0 }
     }
 
     /// Calculates the start square of `self`.
     #[inline]
     #[must_use]
     pub const fn start(&self) -> Square {
-        Square(((self.0 & Self::START_MASK) >> Self::START_SHIFT) as u8)
+        Square(self.upper & Self::SQUARE_MASK)
     }
 
     /// Calculates the end square of `self`.
     #[inline]
     #[must_use]
     pub const fn end(&self) -> Square {
-        Square(((self.0 & Self::END_MASK) >> Self::END_SHIFT) as u8)
+        Square(self.lower & Self::SQUARE_MASK)
     }
 
     /// Checks if the move is castling.
     #[inline]
     #[must_use]
     pub const fn is_castling(&self) -> bool {
-        self.0 & Self::FLAG_MASK == Self::CASTLING
+        self.upper & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
     #[inline]
     #[must_use]
     pub const fn is_en_passant(&self) -> bool {
-        self.0 & Self::FLAG_MASK == Self::EN_PASSANT
+        self.upper & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the move is a promotion.
     #[inline]
     #[must_use]
     pub const fn is_promotion(&self) -> bool {
-        self.0 & Self::FLAG_MASK == Self::PROMOTION
+        self.upper & Self::FLAG_MASK == Self::PROMOTION
     }
 
-    /// Returns the difference from the king destination square and the rook
+    /// Returns the difference from the king destination square to the rook
     /// starting square. Assumes `self.is_castling()`.
     ///
     /// Can only return -2 or 1.
+    #[allow(clippy::cast_possible_wrap)]
     #[inline]
     #[must_use]
-    pub const fn offset(&self) -> i8 {
-        (self.0 >> Self::EXTRA_BITS_SHIFT) as i8 - 2
+    pub const fn rook_offset(&self) -> i8 {
+        (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
     }
 
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`.
@@ -862,17 +846,16 @@ impl Move {
     #[inline]
     #[must_use]
     pub const fn promotion_piece(&self) -> PieceType {
-        PieceType((self.0 >> Self::EXTRA_BITS_SHIFT) as u8 + 1)
+        PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
     }
 
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
     #[inline]
     #[must_use]
-    pub const fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
+    pub fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
-        (other.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
-            == (self.0 & Self::SQUARE_MASK) >> Self::SQUARE_SHIFT
+        *self == other
     }
 
     /// Checks if the given start square, end square and promotion piece match
