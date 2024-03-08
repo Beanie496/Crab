@@ -137,16 +137,16 @@ impl Iterator for BitIter {
 impl Bitboard {
     /// The squares betwen the White king and kingside rook in the starting
     /// position.
-    pub const CASTLING_SPACE_WK: Self = Self(0x0000_0000_0000_0060);
+    const CASTLING_SPACE_WK: Self = Self(0x0000_0000_0000_0060);
     /// The squares betwen the White king and queenside rook in the starting
     /// position.
-    pub const CASTLING_SPACE_WQ: Self = Self(0x0000_0000_0000_000e);
+    const CASTLING_SPACE_WQ: Self = Self(0x0000_0000_0000_000e);
     /// The squares betwen the Black king and kingside rook in the starting
     /// position.
-    pub const CASTLING_SPACE_BK: Self = Self(0x6000_0000_0000_0000);
+    const CASTLING_SPACE_BK: Self = Self(0x6000_0000_0000_0000);
     /// The squares betwen the Black king and queenside rook in the starting
     /// position.
-    pub const CASTLING_SPACE_BQ: Self = Self(0x0e00_0000_0000_0000);
+    const CASTLING_SPACE_BQ: Self = Self(0x0e00_0000_0000_0000);
     /// An empty bitboard: `0x0`.
     pub const EMPTY: Self = Self(0);
 }
@@ -217,6 +217,27 @@ impl Bitboard {
         let excluded_files_bb = (Self::rank_bb(Rank::RANK1) | Self::rank_bb(Rank::RANK8))
             & !Self::rank_bb(Rank::from(square));
         excluded_ranks_bb | excluded_files_bb
+    }
+
+    /// Returns the bits between the starting position of the king and the
+    /// rook, given `IS_WHITE` and `IS_KINGSIDE`.
+    #[inline]
+    #[must_use]
+    pub const fn castling_space<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
+        #[allow(clippy::collapsible_else_if)]
+        if IS_WHITE {
+            if IS_KINGSIDE {
+                Self::CASTLING_SPACE_WK
+            } else {
+                Self::CASTLING_SPACE_WQ
+            }
+        } else {
+            if IS_KINGSIDE {
+                Self::CASTLING_SPACE_BK
+            } else {
+                Self::CASTLING_SPACE_BQ
+            }
+        }
     }
 
     /// Returns the contents of `self`.

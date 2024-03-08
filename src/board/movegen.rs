@@ -165,28 +165,15 @@ impl Board {
     fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
         let occupancies = self.occupancies();
 
-        if IS_WHITE {
-            if self.can_castle_kingside::<true>()
-                && (occupancies & Bitboard::CASTLING_SPACE_WK).is_empty()
-            {
-                moves.push_move(Move::new_castle::<true, true>());
-            }
-            if self.can_castle_queenside::<true>()
-                && (occupancies & Bitboard::CASTLING_SPACE_WQ).is_empty()
-            {
-                moves.push_move(Move::new_castle::<true, false>());
-            }
-        } else {
-            if self.can_castle_kingside::<false>()
-                && (occupancies & Bitboard::CASTLING_SPACE_BK).is_empty()
-            {
-                moves.push_move(Move::new_castle::<false, true>());
-            }
-            if self.can_castle_queenside::<false>()
-                && (occupancies & Bitboard::CASTLING_SPACE_BQ).is_empty()
-            {
-                moves.push_move(Move::new_castle::<false, false>());
-            }
+        if self.can_castle_kingside::<IS_WHITE>()
+            && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
+        {
+            moves.push_move(Move::new_castle::<IS_WHITE, true>());
+        }
+        if self.can_castle_queenside::<IS_WHITE>()
+            && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
+        {
+            moves.push_move(Move::new_castle::<IS_WHITE, false>());
         }
     }
 
