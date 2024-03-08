@@ -862,15 +862,6 @@ impl Move {
         PieceType((self.0 >> Self::PIECE_SHIFT) as u8 + 1)
     }
 
-    /// Returns the difference between the king destination square and the rook
-    /// starting square. Assumes `self.is_promotion()`. Cannot return anything
-    /// other than -2 or 1.
-    #[inline]
-    #[must_use]
-    pub const fn castling_rook_offset(&self) -> i8 {
-        (self.0 >> Self::PIECE_SHIFT) as i8 - 2
-    }
-
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
     #[inline]
