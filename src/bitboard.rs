@@ -245,13 +245,6 @@ impl Bitboard {
         Self(0)
     }
 
-    /// Returns the contents of `self`.
-    #[inline]
-    #[must_use]
-    pub const fn inner(self) -> u64 {
-        self.0
-    }
-
     /// Tests if no bits in `self` are set.
     #[inline]
     #[must_use]
