@@ -1,6 +1,3 @@
-// These structs will always remain exhaustive.
-#![allow(clippy::exhaustive_structs)]
-
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
@@ -206,6 +203,7 @@ impl FromStr for Square {
 }
 
 /// The square difference in each of the 8 directions.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Direction {
     /// North.
     pub const N: Self = Self(8);
@@ -228,7 +226,7 @@ impl Direction {
 /// Enumerates files.
 ///
 /// To avoid casting everywhere, this isn't an enum.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl File {
     pub const FILE1: Self = Self(0);
     pub const FILE2: Self = Self(1);
@@ -241,6 +239,7 @@ impl File {
     pub const TOTAL: usize = 8;
 }
 
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl MoveType {
     /// All moves.
     pub const ALL: u8 = 0;
@@ -249,7 +248,7 @@ impl MoveType {
 }
 
 /// Enumerates pieces for White and Black.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Piece {
     pub const WPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::WHITE);
     pub const WKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::WHITE);
@@ -268,7 +267,7 @@ impl Piece {
 }
 
 /// Enumerates pieces.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl PieceType {
     pub const PAWN: Self = Self(0);
     pub const KNIGHT: Self = Self(1);
@@ -283,7 +282,7 @@ impl PieceType {
 /// Enumerates ranks.
 ///
 /// To avoid casting everywhere, this isn't an enum.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Rank {
     pub const RANK1: Self = Self(0);
     pub const RANK2: Self = Self(1);
@@ -299,7 +298,7 @@ impl Rank {
 /// Enumerates sides.
 ///
 /// To avoid casting everywhere, this isn't an enum.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Side {
     pub const BLACK: Self = Self(0);
     pub const WHITE: Self = Self(1);
@@ -310,10 +309,8 @@ impl Side {
 /// Enumerates squares. This engine uses little-endian rank-file mapping.
 ///
 /// To avoid casting everywhere, this isn't an enum.
-#[allow(missing_docs)]
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Square {
-    // fuck me, this seems dumb. Oh well, that's the price for not using an
-    // enum.
     pub const A1: Self = Self(0);
     pub const B1: Self = Self(1);
     pub const C1: Self = Self(2);
@@ -463,15 +460,5 @@ impl Square {
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
-    }
-
-    /// Flips the square of `self`.
-    ///
-    /// E.g. `a1` (`0`) -> `a8` (`56`), `b2` (`1`) -> `b7` (`57`), `b2` (`9`)
-    /// -> `g7` (`49`).
-    #[inline]
-    #[must_use]
-    pub const fn flip(self) -> Self {
-        Self(self.0 ^ 56)
     }
 }

@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [lints.clippy]
-nursery = "deny"
-pedantic = "deny"
-perf = "deny"
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
 absolute_paths = "deny"
 as_underscore = "deny"
 clone_on_ref_ptr = "deny"
@@ -72,13 +72,14 @@ unwrap_used = "deny"
 use_debug = "deny"
 verbose_file_reads = "deny"
 wildcard_enum_match_arm = "deny"
-# This codebase is (and will remain) small enough that casting will always be
-# from one value with a known range to another, so any kind of cast that loses
-# precision is either deliberate or will simply never truncate (e.g. casting a
-# usize within 0..=65 to a u8)
+# There are so many casts in chess engines that I just got tired of `allow`ing
+# them
 cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
 cast_precision_loss = "allow"
 cast_sign_loss = "allow"
+module_name_repetitions = "allow"
+too_many_lines = "allow"
 
 [lints.rust]
 # If I'm in the process of developing a feature, I would prefer to add the

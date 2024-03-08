@@ -7,7 +7,6 @@ use crate::{
 
 /// Performs negamax on `board`. Returns the evaluation of after searching
 /// to the given depth.
-#[allow(clippy::module_name_repetitions)]
 pub fn alpha_beta_search(
     search_info: &mut SearchInfo,
     board: &Board,

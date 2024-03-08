@@ -89,7 +89,7 @@ const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = 
 
 /// Creates piece-square tables for both sides from internal initial White-only
 /// piece-square tables.
-#[allow(clippy::module_name_repetitions, clippy::similar_names)]
+#[allow(clippy::similar_names)]
 pub const fn create_piece_square_tables() -> [[Score; Square::TOTAL]; Piece::TOTAL + 1] {
     let mut psqt = [[Score(0, 0); Square::TOTAL]; Piece::TOTAL + 1];
     cfor!(let mut piece = 0; piece < PieceType::TOTAL; piece += 1; {

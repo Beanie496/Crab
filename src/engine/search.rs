@@ -16,44 +16,47 @@ use alpha_beta::alpha_beta_search;
 mod alpha_beta;
 
 /// The principle variation: the current best sequence of moves for both sides.
-// non-circular queue, as all the moves are enqueued exactly once before all
-// the moves are dequeued exactly once (then it goes out of scope)
 // 512 bytes
-#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Clone)]
-pub struct Pv {
+struct Pv {
+    /// A non-circular queue of moves.
+    ///
+    /// All the moves are enqueued exactly once before all the moves are
+    /// dequeued exactly once (then it goes out of scope)
     moves: [Move; MAX_PLY],
+    /// Index of the first [`Move`]. This will be equal to `first_empty` if
+    /// there are no [`Move`]s.
     first_item: u8,
+    /// Index of the first empty space.
     first_empty: u8,
 }
 
 /// Information about a search.
-#[allow(clippy::module_name_repetitions)]
 struct SearchInfo {
     /// The depth to be searched.
-    pub depth: u8,
+    depth: u8,
     /// How long the search has been going.
-    pub time: Duration,
+    time: Duration,
     /// How many positions have been searched.
-    pub nodes: u64,
+    nodes: u64,
     /// The principle variation: the optimal sequence of moves for both sides.
-    pub pv: Pv,
+    pv: Pv,
     // ignore this for now
     //_multipv: [[Move]],
     /// The score of the position from the perspective of the side to move.
-    pub score: Eval,
+    score: Eval,
     /// Which move is currently being searched at root.
-    pub _currmove: Move,
+    _currmove: Move,
     /// Which move number is currently being searched at root.
-    pub _currmovenumber: u8,
+    _currmovenumber: u8,
     /// How full the transposition table is (in permill).
-    pub _hashfull: u16,
+    _hashfull: u16,
     /// How many positions have been reached on average per second.
-    pub nps: u64,
+    nps: u64,
     /// A channel to receive the 'stop' command from.
-    pub control_rx: Receiver<Stop>,
+    control_rx: Receiver<Stop>,
     /// Whether or not the search has received the 'stop' command.
-    pub has_stopped: bool,
+    has_stopped: bool,
 }
 
 /// Used to tell the search thread to stop.
@@ -111,9 +114,6 @@ impl Display for SearchInfo {
 impl Engine {
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
-    // this triggers because of `elapsed_us` and `elapsed_ms`, which are
-    // obviously different
-    #[allow(clippy::similar_names)]
     #[inline]
     pub fn start_search(&mut self, depth: Option<u8>) {
         let board_clone = self.board.clone();

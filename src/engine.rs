@@ -1,5 +1,4 @@
 use crate::board::Board;
-pub use search::Pv;
 use search::{Stop, ThreadState};
 
 /// For perft, as it's counting leaf nodes, not searching.
@@ -9,7 +8,6 @@ mod search;
 
 /// Master object that contains all the other major objects.
 #[non_exhaustive]
-#[allow(clippy::partial_pub_fields)]
 pub struct Engine {
     /// The internal board.
     ///

@@ -9,7 +9,6 @@ use crate::defs::{File, Rank, Square};
 // the idea for wrapping these types in structs and implementing a tonne of
 // methods/associated functions is taken from viridithas, so thanks cosmo
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
 pub struct Bitboard(pub u64);
 
 /// An iterator over the bits of a [`Bitboard`].

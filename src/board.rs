@@ -269,13 +269,6 @@ impl Board {
         self.mailbox.iter()
     }
 
-    /// Copies and returns the mailbox of `self`.
-    #[inline]
-    #[must_use]
-    pub const fn clone_mailbox(&self) -> [Piece; Square::TOTAL] {
-        self.mailbox
-    }
-
     /// Clears `self`.
     #[inline]
     pub fn clear_board(&mut self) {
@@ -360,7 +353,7 @@ impl Board {
     /// Sets `self.board` to the given FEN. It will check for basic errors,
     /// like the board having too many ranks, but not many more.
     // this function cannot panic as the only unwrap is on a hardcoded value
-    #[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     pub fn set_pos_to_fen(&mut self, position: &str) {
         self.clear_board();
@@ -667,13 +660,6 @@ impl Board {
         self.side_to_move = self.side_to_move.flip();
     }
 
-    /// Returns the bitboard of the given side.
-    #[inline]
-    #[must_use]
-    pub const fn side_any(&self, side: Side) -> Bitboard {
-        self.sides[side.to_index()]
-    }
-
     /// Returns the board of the side according to `IS_WHITE`.
     #[inline]
     #[must_use]
@@ -711,12 +697,6 @@ impl Board {
     #[inline]
     pub fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
-    }
-
-    /// Sets the default castling rights.
-    #[inline]
-    pub fn set_default_castling_rights(&mut self) {
-        self.castling_rights.set_to_default();
     }
 
     /// Unsets castling the given right for the given side.
@@ -965,11 +945,6 @@ impl CastlingRights {
     /// Adds the given right to `self`.
     fn add_right(&mut self, right: Self) {
         *self |= right;
-    }
-
-    /// Sets the rights of `self` to default.
-    fn set_to_default(&mut self) {
-        *self = Self::new();
     }
 
     /// Removes the given right from `self`. `right` does not already have to

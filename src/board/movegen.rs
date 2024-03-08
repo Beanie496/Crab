@@ -13,7 +13,7 @@ use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
 /// Items related to magic bitboards.
 pub mod magic;
 /// Useful functions for move generation specifically.
-pub mod util;
+mod util;
 
 /// Contains lookup tables for each piece.
 pub struct Lookup {
@@ -327,7 +327,6 @@ impl Board {
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move. Returns `true` if the given move is legal, `false`
     /// otherwise.
-    #[allow(clippy::too_many_lines)]
     #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
         let start = mv.start();
@@ -797,35 +796,35 @@ impl Move {
     /// Calculates the start square of `self`.
     #[inline]
     #[must_use]
-    pub const fn start(&self) -> Square {
+    pub const fn start(self) -> Square {
         Square(self.upper & Self::SQUARE_MASK)
     }
 
     /// Calculates the end square of `self`.
     #[inline]
     #[must_use]
-    pub const fn end(&self) -> Square {
+    pub const fn end(self) -> Square {
         Square(self.lower & Self::SQUARE_MASK)
     }
 
     /// Checks if the move is castling.
     #[inline]
     #[must_use]
-    pub const fn is_castling(&self) -> bool {
+    pub const fn is_castling(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
     #[inline]
     #[must_use]
-    pub const fn is_en_passant(&self) -> bool {
+    pub const fn is_en_passant(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the move is a promotion.
     #[inline]
     #[must_use]
-    pub const fn is_promotion(&self) -> bool {
+    pub const fn is_promotion(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::PROMOTION
     }
 
@@ -833,10 +832,9 @@ impl Move {
     /// starting square. Assumes `self.is_castling()`.
     ///
     /// Can only return -2 or 1.
-    #[allow(clippy::cast_possible_wrap)]
     #[inline]
     #[must_use]
-    pub const fn rook_offset(&self) -> i8 {
+    pub const fn rook_offset(self) -> i8 {
         (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
     }
 
@@ -845,7 +843,7 @@ impl Move {
     /// The piece will only ever be a valid piece.
     #[inline]
     #[must_use]
-    pub const fn promotion_piece(&self) -> PieceType {
+    pub const fn promotion_piece(self) -> PieceType {
         PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
     }
 
@@ -853,9 +851,9 @@ impl Move {
     /// contained within `self`.
     #[inline]
     #[must_use]
-    pub fn is_moving_from_to(&self, start: Square, end: Square) -> bool {
+    pub fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
-        *self == other
+        self == other
     }
 
     /// Checks if the given start square, end square and promotion piece match
@@ -863,13 +861,13 @@ impl Move {
     #[inline]
     #[must_use]
     pub fn is_moving_from_to_promo(
-        &self,
+        self,
         start: Square,
         end: Square,
         promotion_piece: PieceType,
     ) -> bool {
         let other = Self::new_promo_any(start, end, promotion_piece);
-        *self == other
+        self == other
     }
 }
 
@@ -882,20 +880,6 @@ impl Moves {
             moves: [Move::null(); MAX_LEGAL_MOVES],
             first_empty: 0,
         }
-    }
-
-    /// Returns if it's empty
-    #[inline]
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.first_empty == 0
-    }
-
-    /// Returns its length.
-    #[inline]
-    #[must_use]
-    pub const fn len(&self) -> usize {
-        self.first_empty
     }
 
     /// Finds and returns, if it exists, the move that has start square `start`
