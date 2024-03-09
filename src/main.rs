@@ -16,6 +16,8 @@ mod engine;
 mod evaluation;
 /// Handles UCI input.
 mod uci;
+/// Utility.
+mod util;
 
 fn main() {
     Uci::new().main_loop();

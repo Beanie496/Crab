@@ -6,6 +6,7 @@ use crate::{
     board::CastlingRights,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     out_of_bounds_is_unreachable,
+    util::Stack,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, is_double_pawn_push, sliding_attacks};
@@ -59,12 +60,10 @@ pub struct Move {
     upper: u8,
 }
 
-/// An stack of `Move`s.
+/// An stack of [`Move`]s.
 pub struct Moves {
     /// The internal array.
-    moves: [Move; MAX_LEGAL_MOVES],
-    /// The first index that can be written to.
-    first_empty: usize,
+    moves: Stack<Move, MAX_LEGAL_MOVES>,
 }
 
 /// The number of bitboards required to store all bishop attacks, where each
@@ -106,7 +105,6 @@ impl Display for Move {
 impl Iterator for Moves {
     type Item = Move;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.pop_move()
     }
@@ -877,8 +875,7 @@ impl Moves {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            moves: [Move::null(); MAX_LEGAL_MOVES],
-            first_empty: 0,
+            moves: Stack::new(),
         }
     }
 
@@ -889,9 +886,7 @@ impl Moves {
     /// returns `None` otherwise.
     #[inline]
     pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
-        self.moves
-            .into_iter()
-            .find(|&mv| mv.is_moving_from_to(start, end))
+        self.find(|&mv| mv.is_moving_from_to(start, end))
     }
 
     /// Finds and returns, if it exists, the move that has start square
@@ -906,36 +901,25 @@ impl Moves {
         end: Square,
         piece_type: PieceType,
     ) -> Option<Move> {
-        self.moves
-            .into_iter()
-            .find(|&mv| mv.is_moving_from_to_promo(start, end, piece_type))
+        self.find(|&mv| mv.is_moving_from_to_promo(start, end, piece_type))
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.
     #[inline]
     pub fn push_move(&mut self, mv: Move) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
-        self.moves[self.first_empty] = mv;
-        self.first_empty += 1;
+        self.moves.push(mv);
     }
 
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
     #[inline]
     pub fn pop_move(&mut self) -> Option<Move> {
-        (self.first_empty > 0).then(|| {
-            self.first_empty -= 1;
-            // SAFETY: If it does get reached, it will panic in debug.
-            unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.moves.len()) };
-            self.moves[self.first_empty]
-        })
+        self.moves.pop()
     }
 
-    /// Clears `self`. This doesn't actually zero any bits: it just resets the
-    /// head pointer, so it's O(1).
+    /// Clears `self`.
     #[inline]
     pub fn clear(&mut self) {
-        self.first_empty = 0;
+        self.moves.clear();
     }
 }
