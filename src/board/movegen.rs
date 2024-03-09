@@ -83,7 +83,7 @@ const ROOK_SIZE: usize = 102_400;
 /// Maximum number of legal moves that can be reached in a standard chess game.
 ///
 /// Example: `R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1`
-const MAX_LEGAL_MOVES: usize = 218;
+pub const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables used at runtime.
 // initialised at runtime
 pub static mut LOOKUPS: Lookup = Lookup::empty();

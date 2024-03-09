@@ -13,7 +13,7 @@ use crate::{
 };
 use movegen::Lookup;
 
-pub use movegen::{magic::find_magics, Move, Moves};
+pub use movegen::{magic::find_magics, Move, Moves, MAX_LEGAL_MOVES};
 
 /// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
 /// E.g. `0b1101` would be castling rights `KQq`.

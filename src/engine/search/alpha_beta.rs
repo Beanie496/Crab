@@ -1,4 +1,4 @@
-use super::{Pv, SearchInfo};
+use super::{ordering::ScoredMoves, Pv, SearchInfo};
 use crate::{
     board::{Board, Moves},
     defs::MoveType,
@@ -32,6 +32,9 @@ pub fn alpha_beta_search(
         }
     }
 
+    // how many moves in the future we are
+    let height = search_info.depth - depth;
+
     // Mate distance pruning
     // 4 options:
     // - Neither side is getting mated. Alpha and beta will remain unchanged,
@@ -47,8 +50,8 @@ pub fn alpha_beta_search(
     //   much the same as above but with reversed and negated alpha and beta.
     // - We both have a mate in x.
     //   * Can't happen. Either one side is getting mated or the other.
-    beta = beta.min(mate_in(search_info.depth - depth));
-    alpha = alpha.max(mated_in(search_info.depth - depth));
+    beta = beta.min(mate_in(height));
+    alpha = alpha.max(mated_in(height));
     if alpha >= beta {
         return beta;
     }
@@ -56,9 +59,11 @@ pub fn alpha_beta_search(
     let mut pv = Pv::new();
     let mut moves = Moves::new();
     board.generate_moves::<{ MoveType::ALL }>(&mut moves);
-    let mut total_moves = 0;
+    let mut scored_moves = ScoredMoves::score_moves(search_info, &mut moves, height);
+    scored_moves.sort();
 
-    for mv in moves {
+    let mut total_moves = 0;
+    for mv in scored_moves {
         let mut copy = board.clone();
         if !copy.make_move(mv) {
             continue;

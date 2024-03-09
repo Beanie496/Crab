@@ -14,10 +14,12 @@ use alpha_beta::alpha_beta_search;
 
 /// For carrying out the search.
 mod alpha_beta;
+/// Move ordering.
+mod ordering;
 
 /// The principle variation: the current best sequence of moves for both sides.
 // 512 bytes
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct Pv {
     /// A non-circular queue of moves.
     ///
@@ -57,6 +59,8 @@ struct SearchInfo {
     control_rx: Receiver<Stop>,
     /// Whether or not the search has received the 'stop' command.
     has_stopped: bool,
+    /// The previous PV.
+    history: Pv,
 }
 
 /// Used to tell the search thread to stop.
@@ -226,6 +230,7 @@ impl SearchInfo {
             nps: 0,
             control_rx,
             has_stopped: false,
+            history: Pv::new(),
         }
     }
 
@@ -275,6 +280,8 @@ fn iterative_deepening(mut search_info: SearchInfo, board: &Board, max_depth: u8
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
 
         println!("{search_info}");
+
+        search_info.history = search_info.pv;
     }
     println!("bestmove {best_move}");
 }

@@ -62,4 +62,10 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     pub fn clear(&mut self) {
         self.first_empty = 0;
     }
+
+    /// Returns a mutable slice to all of the elements of the stack.
+    // TODO: make this return a slice of T
+    pub fn get_mut_slice(&mut self) -> &mut [MaybeUninit<T>] {
+        &mut self.stack[0..self.first_empty]
+    }
 }
