@@ -159,7 +159,6 @@ impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     const fn new() -> Self {
         Self {
-            // TODO: `MaybeUninit` might be faster?
             moves: [Move::null(); MAX_PLY],
             first_item: 0,
             first_empty: 0,
