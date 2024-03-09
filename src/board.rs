@@ -73,7 +73,6 @@ pub struct Board {
 }
 
 impl Display for Board {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -91,28 +90,24 @@ impl Display for Board {
 impl BitAnd for CastlingRights {
     type Output = Self;
 
-    #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
         Self(self.0 & rhs.0)
     }
 }
 
 impl BitAndAssign for CastlingRights {
-    #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         self.0 &= rhs.0;
     }
 }
 
 impl BitOrAssign for CastlingRights {
-    #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
     }
 }
 
 impl Display for CastlingRights {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::new();
         if self.can_castle_kingside::<true>() {
@@ -137,7 +132,6 @@ impl Display for CastlingRights {
 impl Not for CastlingRights {
     type Output = Self;
 
-    #[inline]
     fn not(self) -> Self::Output {
         Self(!self.0)
     }
@@ -146,7 +140,6 @@ impl Not for CastlingRights {
 impl Shl<u8> for CastlingRights {
     type Output = Self;
 
-    #[inline]
     fn shl(self, rhs: u8) -> Self::Output {
         Self(self.0 << rhs)
     }
@@ -170,7 +163,6 @@ impl CastlingRights {
 }
 
 impl Default for Board {
-    #[inline]
     fn default() -> Self {
         let mut board = Self {
             mailbox: Self::default_mailbox(),
@@ -192,7 +184,6 @@ impl Default for Board {
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
-    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Lookup::init();
@@ -264,13 +255,11 @@ impl Board {
     }
 
     /// Returns an iterator over the internal mailbox. a1 b1, etc.
-    #[inline]
     pub fn mailbox_iter(&self) -> Iter<'_, Piece> {
         self.mailbox.iter()
     }
 
     /// Clears `self`.
-    #[inline]
     pub fn clear_board(&mut self) {
         self.mailbox = Self::empty_mailbox();
         self.pieces = Self::no_pieces();
@@ -281,7 +270,6 @@ impl Board {
     }
 
     /// Pretty-prints the current state of the board.
-    #[inline]
     pub fn pretty_print(&self) {
         for r in (0..Rank::TOTAL as u8).rev() {
             print!("{} | ", r + 1);
@@ -297,7 +285,6 @@ impl Board {
     }
 
     /// Gets the current FEN representation of the board state.
-    #[inline]
     #[must_use]
     pub fn current_fen_string(&self) -> String {
         self.to_string()
@@ -305,7 +292,6 @@ impl Board {
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
-    #[inline]
     pub fn play_moves(&mut self, moves_str: &str) {
         let mut moves = Moves::new();
         let mut copy = self.clone();
@@ -354,7 +340,6 @@ impl Board {
     /// like the board having too many ranks, but not many more.
     // this function cannot panic as the only unwrap is on a hardcoded value
     #[allow(clippy::missing_panics_doc)]
-    #[inline]
     pub fn set_pos_to_fen(&mut self, position: &str) {
         self.clear_board();
 
@@ -497,7 +482,6 @@ impl Board {
     // the unwraps are called on values that logically can not be `None`, so
     // this can not panic
     #[allow(clippy::missing_panics_doc)]
-    #[inline]
     #[must_use]
     pub fn stringify_board(&self) -> String {
         let mut ret_str = String::new();
@@ -538,13 +522,11 @@ impl Board {
     }
 
     /// Resets the board.
-    #[inline]
     pub fn set_startpos(&mut self) {
         *self = Self::default();
     }
 
     /// Returns the piece on `square`.
-    #[inline]
     #[must_use]
     pub fn piece_on(&self, square: Square) -> Piece {
         // SAFETY: If it does get reached, it will panic in debug.
@@ -553,7 +535,6 @@ impl Board {
     }
 
     /// Returns the piece bitboard given by `PIECE`.
-    #[inline]
     #[must_use]
     pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
         self.pieces[PIECE]
@@ -561,7 +542,6 @@ impl Board {
 
     /// Adds a piece to square `square` for side `side`. Assumes there is no
     /// piece on the square to be written to.
-    #[inline]
     pub fn add_piece(&mut self, square: Square, piece: Piece) {
         let square_bb = Bitboard::from(square);
         let side = Side::from(piece);
@@ -577,7 +557,6 @@ impl Board {
     /// Technically most of these parameters could be calculated instead of
     /// passed by argument, but it resulted in a noticeable slowdown when they
     /// were removed.
-    #[inline]
     pub fn remove_piece(
         &mut self,
         square: Square,
@@ -598,7 +577,6 @@ impl Board {
     /// [`move_psq_piece`](Board::move_psq_piece).
     ///
     /// Use the three different functions separately if needed.
-    #[inline]
     fn move_piece(
         &mut self,
         start: Square,
@@ -616,7 +594,6 @@ impl Board {
     }
 
     /// Sets the piece on `square` in the mailbox to `piece`.
-    #[inline]
     pub fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
@@ -624,7 +601,6 @@ impl Board {
     }
 
     /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
-    #[inline]
     pub fn unset_mailbox_piece(&mut self, square: Square) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
@@ -635,33 +611,28 @@ impl Board {
     ///
     /// `piece` is assumed to exist at the start square: the piece is given as
     /// an argument instead of calculated for reasons of speed.
-    #[inline]
     pub fn move_mailbox_piece(&mut self, start: Square, end: Square, piece: Piece) {
         self.unset_mailbox_piece(start);
         self.set_mailbox_piece(end, piece);
     }
 
     /// Returns the side to move.
-    #[inline]
     #[must_use]
     pub const fn side_to_move(&self) -> Side {
         self.side_to_move
     }
 
     /// Sets side to move to `side`.
-    #[inline]
     pub fn set_side_to_move(&mut self, side: Side) {
         self.side_to_move = side;
     }
 
     /// Flip the side to move.
-    #[inline]
     pub fn flip_side(&mut self) {
         self.side_to_move = self.side_to_move.flip();
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
-    #[inline]
     #[must_use]
     pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
@@ -673,40 +644,34 @@ impl Board {
 
     /// Returns the string representation of the current side to move: 'w' if
     /// White and 'b' if Black.
-    #[inline]
     #[must_use]
     pub const fn side_to_move_as_char(&self) -> char {
         (b'b' + self.side_to_move().0 * 21) as char
     }
 
     /// Calculates if the given side can castle kingside.
-    #[inline]
     #[must_use]
     pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_kingside::<IS_WHITE>()
     }
 
     /// Calculates if the given side can castle queenside.
-    #[inline]
     #[must_use]
     pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_queenside::<IS_WHITE>()
     }
 
     /// Adds the given right to the castling rights.
-    #[inline]
     pub fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
     }
 
     /// Unsets castling the given right for the given side.
-    #[inline]
     pub fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
         self.castling_rights.remove_right(side, right);
     }
 
     /// Clears the castling rights for the given side.
-    #[inline]
     pub fn unset_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
     }
@@ -715,34 +680,29 @@ impl Board {
     ///
     /// E.g. `KQq` if the White king can castle both ways and the Black king
     /// can only castle queenside.
-    #[inline]
     #[must_use]
     pub fn stringify_castling_rights(&self) -> String {
         self.castling_rights.to_string()
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
-    #[inline]
     #[must_use]
     pub const fn ep_square(&self) -> Square {
         self.ep_square
     }
 
     /// Sets the en passant square to [`Square::NONE`].
-    #[inline]
     pub fn clear_ep_square(&mut self) {
         self.ep_square = Square::NONE;
     }
 
     /// Sets the en passant square to `square`.
-    #[inline]
     pub fn set_ep_square(&mut self, square: Square) {
         self.ep_square = square;
     }
 
     /// Returns the string representation of the current en passant square: the
     /// square if there is one (e.g. "b3") or "-" if there is none.
-    #[inline]
     #[must_use]
     pub fn stringify_ep_square(&self) -> String {
         let ep_square = self.ep_square();
@@ -754,27 +714,23 @@ impl Board {
     }
 
     /// Returns halfmoves since last capture or pawn move.
-    #[inline]
     #[must_use]
     pub const fn halfmoves(&self) -> u8 {
         self.halfmoves
     }
 
     /// Sets halfmoves.
-    #[inline]
     pub fn set_halfmoves(&mut self, count: u8) {
         self.halfmoves = count;
     }
 
     /// Returns the current move number.
-    #[inline]
     #[must_use]
     pub const fn fullmoves(&self) -> u16 {
         self.fullmoves
     }
 
     /// Sets fullmoves.
-    #[inline]
     pub fn set_fullmoves(&mut self, count: u16) {
         self.fullmoves = count;
     }
@@ -782,7 +738,6 @@ impl Board {
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
-    #[inline]
     #[must_use]
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let square = Square::from_pos(rank, file);
@@ -791,7 +746,6 @@ impl Board {
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
-    #[inline]
     fn toggle_piece_bb(&mut self, piece: PieceType, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.pieces.len()) };
@@ -799,7 +753,6 @@ impl Board {
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `side`.
-    #[inline]
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
@@ -808,7 +761,6 @@ impl Board {
 
     /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
     /// the side bitboard of `side`.
-    #[inline]
     fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
         self.toggle_piece_bb(piece_type, bb);
         self.toggle_side_bb(side, bb);
@@ -833,7 +785,6 @@ impl Board {
     ///
     /// Since this value is incrementally upadated, this function is zero-cost
     /// to call.
-    #[inline]
     #[must_use]
     pub const fn psq(&self) -> Score {
         self.psq_accumulator
@@ -841,7 +792,6 @@ impl Board {
 
     /// Adds the piece-square table value for `piece` at `square` to the psqt
     /// accumulator.
-    #[inline]
     fn add_psq_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
@@ -852,7 +802,6 @@ impl Board {
 
     /// Removes the piece-square table value for `piece` at `square` from the
     /// psqt accumulator.
-    #[inline]
     fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
@@ -864,7 +813,6 @@ impl Board {
     /// Updates the piece-square table accumulator by adding the difference
     /// between the psqt value of the start and end square (which can be
     /// negative).
-    #[inline]
     fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
         self.remove_psq_piece(start, piece);
         self.add_psq_piece(end, piece);
@@ -874,14 +822,12 @@ impl Board {
     ///
     /// Since this value is incrementally upadated, this function is zero-cost
     /// to call.
-    #[inline]
     #[must_use]
     pub const fn phase(&self) -> u8 {
         self.phase_accumulator
     }
 
     /// Adds `piece` to `self.phase`.
-    #[inline]
     fn add_phase_piece(&mut self, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
@@ -889,7 +835,6 @@ impl Board {
     }
 
     /// Removes `piece` from `self.phase`.
-    #[inline]
     fn remove_phase_piece(&mut self, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
@@ -897,7 +842,6 @@ impl Board {
     }
 
     /// Tests if the king is in check.
-    #[inline]
     #[must_use]
     pub fn is_in_check(&self) -> bool {
         self.is_square_attacked(self.king_square())

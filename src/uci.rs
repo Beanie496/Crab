@@ -13,7 +13,6 @@ const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 
 impl Uci {
     /// Creates a new instance of [`Uci`](Self).
-    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -28,7 +27,6 @@ impl Uci {
     ///
     /// Panics if [`read_line()`](`std::io::BufRead::read_line`) returns an
     /// [`Err`].
-    #[inline]
     pub fn main_loop(&mut self) -> ! {
         let mut input = String::new();
         loop {

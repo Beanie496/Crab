@@ -78,7 +78,6 @@ pub struct ThreadState<Tx, Handle> {
 const MAX_PLY: usize = u8::MAX as usize;
 
 impl Display for Pv {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
         for mv in 0..self.len() {
@@ -93,14 +92,12 @@ impl Display for Pv {
 impl Iterator for Pv {
     type Item = Move;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
     }
 }
 
 impl Display for SearchInfo {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -118,7 +115,6 @@ impl Display for SearchInfo {
 impl Engine {
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
-    #[inline]
     pub fn start_search(&mut self, depth: Option<u8>) {
         let board_clone = self.board.clone();
         let depth = depth.unwrap_or(u8::MAX);
@@ -146,7 +142,6 @@ impl Engine {
     /// # Panics
     ///
     /// Panics if `self` couldn't join on the search thread.
-    #[inline]
     pub fn stop_search(&mut self) {
         // we don't particularly care if it's already stopped, we just want it
         // to stop.

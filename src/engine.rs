@@ -19,7 +19,6 @@ pub struct Engine {
 }
 
 impl Clone for Engine {
-    #[inline]
     fn clone(&self) -> Self {
         Self {
             board: self.board.clone(),
@@ -31,7 +30,6 @@ impl Clone for Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
-    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -42,14 +40,12 @@ impl Engine {
 
     /// Sets `self.board` to the given FEN and moves, as given by the
     /// `position` UCI command. Unexpected/incorrect tokens will be ignored.
-    #[inline]
     pub fn set_position(&mut self, position: &str, moves: &str) {
         self.board.set_pos_to_fen(position);
         self.board.play_moves(moves);
     }
 
     /// Calls [`pretty_print`](Board::pretty_print) on the internal board.
-    #[inline]
     pub fn pretty_print_board(&self) {
         self.board.pretty_print();
     }

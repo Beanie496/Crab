@@ -67,7 +67,6 @@ impl ScoredMoves {
                 .cmp(&unsafe { mv2.assume_init_read() }.score)
         });
     }
-
 }
 
 impl ScoredMoves {

@@ -46,14 +46,12 @@ pub struct Score(pub Eval, pub Eval);
 impl Add for Score {
     type Output = Self;
 
-    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
 
 impl AddAssign for Score {
-    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0;
         self.1 += rhs.1;
@@ -61,7 +59,6 @@ impl AddAssign for Score {
 }
 
 impl Display for Score {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Score({}, {})", self.0, self.1)
     }
@@ -70,7 +67,6 @@ impl Display for Score {
 impl Neg for Score {
     type Output = Self;
 
-    #[inline]
     fn neg(mut self) -> Self {
         self.0 = -self.0;
         self.1 = -self.1;
@@ -79,7 +75,6 @@ impl Neg for Score {
 }
 
 impl SubAssign for Score {
-    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
         self.1 -= rhs.1;
@@ -101,7 +96,6 @@ impl Score {
 /// various heuristics.
 ///
 /// Currently just calculates material balance with piece-square tables.
-#[inline]
 #[must_use]
 pub fn evaluate(board: &Board) -> Eval {
     let score = board.psq();

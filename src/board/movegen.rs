@@ -89,7 +89,6 @@ pub const MAX_LEGAL_MOVES: usize = 218;
 pub static mut LOOKUPS: Lookup = Lookup::empty();
 
 impl Display for Move {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let start = self.start();
         let end = self.end();
@@ -136,7 +135,6 @@ impl Move {
 impl Board {
     /// Generates all legal moves for the current position and puts them in
     /// `moves`.
-    #[inline]
     pub fn generate_moves<const MOVE_TYPE: u8>(&self, moves: &mut Moves) {
         if self.side_to_move() == Side::WHITE {
             self.generate_pawn_moves::<true, MOVE_TYPE>(moves);
@@ -325,7 +323,6 @@ impl Board {
     /// Makes the given move on the internal board. `mv` is assumed to be a
     /// valid move. Returns `true` if the given move is legal, `false`
     /// otherwise.
-    #[inline]
     pub fn make_move(&mut self, mv: Move) -> bool {
         let start = mv.start();
         let end = mv.end();
@@ -466,7 +463,6 @@ impl Board {
     }
 
     /// Tests if `square` is attacked by an enemy piece.
-    #[inline]
     #[must_use]
     pub fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
@@ -519,7 +515,6 @@ impl Lookup {
     /// Initialises the tables of [`LOOKUPS`].
     // for some reason clippy _doesn't_ complain if I remove this
     // attribute. I'll add it anyway though.
-    #[inline]
     pub fn init() {
         // SAFETY: These functions write to a mutable static before anything
         // else reads from it.
@@ -652,7 +647,6 @@ impl Lookup {
     }
 
     /// Finds the pawn attacks from `square`.
-    #[inline]
     pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
@@ -662,7 +656,6 @@ impl Lookup {
     }
 
     /// Finds the knight attacks from `square`.
-    #[inline]
     pub fn knight_attacks(&self, square: Square) -> Bitboard {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.knight_attacks.len()) };
@@ -670,7 +663,6 @@ impl Lookup {
     }
 
     /// Finds the king attacks from `square`.
-    #[inline]
     pub fn king_attacks(&self, square: Square) -> Bitboard {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.king_attacks.len()) };
@@ -678,7 +670,6 @@ impl Lookup {
     }
 
     /// Finds the bishop attacks from `square` with the given blockers.
-    #[inline]
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
@@ -689,7 +680,6 @@ impl Lookup {
     }
 
     /// Finds the rook attacks from `square` with the given blockers.
-    #[inline]
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
@@ -700,7 +690,6 @@ impl Lookup {
     }
 
     /// Finds the queen attacks from `square` with the given blockers.
-    #[inline]
     pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
         self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
     }
@@ -710,7 +699,6 @@ impl Move {
     /// Creates a normal [`Move`] from `start` to `end`.
     ///
     /// This function cannot be used for special moves like castling.
-    #[inline]
     #[must_use]
     pub const fn new(start: Square, end: Square) -> Self {
         Self {
@@ -720,7 +708,6 @@ impl Move {
     }
 
     /// Creates an en passant [`Move`] from `start` to `end`.
-    #[inline]
     #[must_use]
     pub const fn new_en_passant(start: Square, end: Square) -> Self {
         Self {
@@ -731,7 +718,6 @@ impl Move {
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
     /// White and if the side of the board is kingside.
-    #[inline]
     #[must_use]
     pub const fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
         #[allow(clippy::collapsible_else_if)]
@@ -764,7 +750,6 @@ impl Move {
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    #[inline]
     #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
         Self {
@@ -775,7 +760,6 @@ impl Move {
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    #[inline]
     #[must_use]
     pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
         Self {
@@ -785,42 +769,36 @@ impl Move {
     }
 
     /// Creates a null [`Move`].
-    #[inline]
     #[must_use]
     pub const fn null() -> Self {
         Self { lower: 0, upper: 0 }
     }
 
     /// Calculates the start square of `self`.
-    #[inline]
     #[must_use]
     pub const fn start(self) -> Square {
         Square(self.upper & Self::SQUARE_MASK)
     }
 
     /// Calculates the end square of `self`.
-    #[inline]
     #[must_use]
     pub const fn end(self) -> Square {
         Square(self.lower & Self::SQUARE_MASK)
     }
 
     /// Checks if the move is castling.
-    #[inline]
     #[must_use]
     pub const fn is_castling(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
-    #[inline]
     #[must_use]
     pub const fn is_en_passant(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the move is a promotion.
-    #[inline]
     #[must_use]
     pub const fn is_promotion(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::PROMOTION
@@ -830,7 +808,6 @@ impl Move {
     /// starting square. Assumes `self.is_castling()`.
     ///
     /// Can only return -2 or 1.
-    #[inline]
     #[must_use]
     pub const fn rook_offset(self) -> i8 {
         (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
@@ -839,7 +816,6 @@ impl Move {
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`.
     ///
     /// The piece will only ever be a valid piece.
-    #[inline]
     #[must_use]
     pub const fn promotion_piece(self) -> PieceType {
         PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
@@ -847,7 +823,6 @@ impl Move {
 
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
-    #[inline]
     #[must_use]
     pub fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
@@ -856,7 +831,6 @@ impl Move {
 
     /// Checks if the given start square, end square and promotion piece match
     /// the start, end square and promotion piece contained within `self`.
-    #[inline]
     #[must_use]
     pub fn is_moving_from_to_promo(
         self,
@@ -871,7 +845,6 @@ impl Move {
 
 impl Moves {
     /// Creates an empty [`Moves`] object.
-    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -884,7 +857,6 @@ impl Moves {
     ///
     /// Returns `Some(mv)` if a `Move` does match the start and end square;
     /// returns `None` otherwise.
-    #[inline]
     pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
         self.find(|&mv| mv.is_moving_from_to(start, end))
     }
@@ -894,7 +866,6 @@ impl Moves {
     ///
     /// Returns `Some(mv)` if a `Move` does match the criteria; returns `None`
     /// otherwise.
-    #[inline]
     pub fn move_with_promo(
         &mut self,
         start: Square,
@@ -905,20 +876,17 @@ impl Moves {
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.
-    #[inline]
     pub fn push_move(&mut self, mv: Move) {
         self.moves.push(mv);
     }
 
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
-    #[inline]
     pub fn pop_move(&mut self) -> Option<Move> {
         self.moves.pop()
     }
 
     /// Clears `self`.
-    #[inline]
     pub fn clear(&mut self) {
         self.moves.clear();
     }

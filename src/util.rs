@@ -17,7 +17,6 @@ pub struct Stack<T: Copy, const SIZE: usize> {
 impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
     type Item = T;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.pop()
     }
@@ -25,7 +24,6 @@ impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
 
 impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     /// Creates an empty [`Stack`].
-    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -35,7 +33,6 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     }
 
     /// Pushes an item onto the stack.
-    #[inline]
     pub fn push(&mut self, item: T) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.stack.len()) };
@@ -45,7 +42,6 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
 
     /// Pops an item off the stack. Returns `Some(move)` if there are `> 0`
     /// items, otherwise returns `None`.
-    #[inline]
     pub fn pop(&mut self) -> Option<T> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
@@ -58,7 +54,6 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     }
 
     /// Clears `self`.
-    #[inline]
     pub fn clear(&mut self) {
         self.first_empty = 0;
     }

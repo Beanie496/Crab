@@ -76,14 +76,12 @@ const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
 ];
 
 impl From<Piece> for char {
-    #[inline]
     fn from(piece: Piece) -> Self {
         PIECE_CHARS[piece.to_index()]
     }
 }
 
 impl From<PieceType> for char {
-    #[inline]
     fn from(piece_type: PieceType) -> Self {
         // default to lowercase, or Black
         let piece = Piece::from_piecetype(piece_type, Side::BLACK);
@@ -92,14 +90,12 @@ impl From<PieceType> for char {
 }
 
 impl From<Square> for File {
-    #[inline]
     fn from(square: Square) -> Self {
         Self(square.0 & 7)
     }
 }
 
 impl From<char> for Piece {
-    #[inline]
     fn from(piece: char) -> Self {
         match piece {
             'P' => Self::WPAWN,
@@ -120,7 +116,6 @@ impl From<char> for Piece {
 }
 
 impl From<char> for PieceType {
-    #[inline]
     fn from(piece: char) -> Self {
         let piece = piece.to_ascii_lowercase();
         match piece {
@@ -136,14 +131,12 @@ impl From<char> for PieceType {
 }
 
 impl From<Piece> for PieceType {
-    #[inline]
     fn from(piece: Piece) -> Self {
         Self(piece.0 >> 1)
     }
 }
 
 impl From<Square> for Rank {
-    #[inline]
     fn from(square: Square) -> Self {
         Self(square.0 >> 3)
     }
@@ -151,14 +144,12 @@ impl From<Square> for Rank {
 
 impl From<Piece> for Side {
     /// Returns the side of `self`.
-    #[inline]
     fn from(piece: Piece) -> Self {
         Self(piece.0 & 1)
     }
 }
 
 impl Display for Square {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -175,7 +166,6 @@ impl FromStr for Square {
     /// Converts a string representation of a square (e.g. "e4") into a
     /// [`Square`]. Will return `Ok(Self)` if the square is valid,
     /// `Ok(Self::NONE)` if the square is "-" and `Err(ParseError)` otherwise.
-    #[inline]
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         if string == "-" {
             return Ok(Self::NONE);
@@ -381,14 +371,12 @@ impl Square {
 
 impl Piece {
     /// Creates a [`Piece`] from a [`PieceType`] and a [`Side`].
-    #[inline]
     #[must_use]
     pub const fn from_piecetype(piece: PieceType, side: Side) -> Self {
         Self((piece.0 << 1) + side.0)
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[inline]
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
@@ -397,7 +385,6 @@ impl Piece {
 
 impl PieceType {
     /// Returns the contents of `self` as a `usize`.
-    #[inline]
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
@@ -410,7 +397,6 @@ impl Side {
     /// e.g. `Side::WHITE.flip() == Side::BLACK`.
     ///
     /// The result is undefined if `self` isn't `Side::WHITE` or `Side::BLACK`.
-    #[inline]
     #[must_use]
     pub const fn flip(self) -> Self {
         Self(self.0 ^ 1)
@@ -418,14 +404,12 @@ impl Side {
 
     /// Returns the contents of `self` as a bool: White is `true`, Black is
     /// `false`.
-    #[inline]
     #[must_use]
     pub const fn to_bool(self) -> bool {
         self.0 != 0
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[inline]
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
@@ -434,21 +418,18 @@ impl Side {
 
 impl Square {
     /// Converts `rank` and `file` into a [`Square`].
-    #[inline]
     #[must_use]
     pub const fn from_pos(rank: Rank, file: File) -> Self {
         Self(rank.0 * 8 + file.0)
     }
 
     /// Finds the horizontal distance between `self` and `other_square`
-    #[inline]
     #[must_use]
     pub fn horizontal_distance(self, other_square: Self) -> u8 {
         File::from(self).0.abs_diff(File::from(other_square).0)
     }
 
     /// Checks if `self` is within the board.
-    #[inline]
     #[must_use]
     pub fn is_valid(self) -> bool {
         // `sq` is unsigned so it can't be less than 0.
@@ -456,7 +437,6 @@ impl Square {
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[inline]
     #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
