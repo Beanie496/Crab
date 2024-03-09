@@ -135,22 +135,24 @@ impl Move {
 impl Board {
     /// Generates all legal moves for the current position and puts them in
     /// `moves`.
-    pub fn generate_moves<const MOVE_TYPE: u8>(&self, moves: &mut Moves) {
+    pub fn generate_moves<const MOVE_TYPE: u8>(&self) -> Moves {
+        let mut moves = Moves::new();
         if self.side_to_move() == Side::WHITE {
-            self.generate_pawn_moves::<true, MOVE_TYPE>(moves);
-            self.generate_non_sliding_moves::<true, MOVE_TYPE>(moves);
-            self.generate_sliding_moves::<true, MOVE_TYPE>(moves);
+            self.generate_pawn_moves::<true, MOVE_TYPE>(&mut moves);
+            self.generate_non_sliding_moves::<true, MOVE_TYPE>(&mut moves);
+            self.generate_sliding_moves::<true, MOVE_TYPE>(&mut moves);
             if MOVE_TYPE == MoveType::ALL {
-                self.generate_castling::<true>(moves);
+                self.generate_castling::<true>(&mut moves);
             }
         } else {
-            self.generate_pawn_moves::<false, MOVE_TYPE>(moves);
-            self.generate_non_sliding_moves::<false, MOVE_TYPE>(moves);
-            self.generate_sliding_moves::<false, MOVE_TYPE>(moves);
+            self.generate_pawn_moves::<false, MOVE_TYPE>(&mut moves);
+            self.generate_non_sliding_moves::<false, MOVE_TYPE>(&mut moves);
+            self.generate_sliding_moves::<false, MOVE_TYPE>(&mut moves);
             if MOVE_TYPE == MoveType::ALL {
-                self.generate_castling::<false>(moves);
+                self.generate_castling::<false>(&mut moves);
             }
         }
+        moves
     }
 
     /// Generates the castling moves for the given side.

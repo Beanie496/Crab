@@ -293,7 +293,6 @@ impl Board {
     /// Takes a sequence of moves and feeds them to the board. Will stop and
     /// return if any of the moves are incorrect. Not implemented yet.
     pub fn play_moves(&mut self, moves_str: &str) {
-        let mut moves = Moves::new();
         let mut copy = self.clone();
 
         // `split()` will always return at least 1 element even if the initial
@@ -303,7 +302,7 @@ impl Board {
         }
 
         for mv in moves_str.split(' ') {
-            copy.generate_moves::<{ MoveType::ALL }>(&mut moves);
+            let mut moves = copy.generate_moves::<{ MoveType::ALL }>();
 
             // I don't particularly want to deal with non-ascii characters
             #[allow(clippy::string_slice)]

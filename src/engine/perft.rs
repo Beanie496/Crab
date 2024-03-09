@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use super::Engine;
 use crate::{
-    board::{Board, Moves},
+    board::{Board},
     defs::MoveType,
 };
 
@@ -32,8 +32,7 @@ impl Engine {
             }
         }
 
-        let mut moves = Moves::new();
-        self.board.generate_moves::<{ MoveType::ALL }>(&mut moves);
+        let moves = self.board.generate_moves::<{ MoveType::ALL }>();
 
         let mut total = 0;
         for mv in moves {
@@ -63,8 +62,7 @@ impl Engine {
             return 1;
         }
 
-        let mut moves = Moves::new();
-        board.generate_moves::<{ MoveType::ALL }>(&mut moves);
+        let moves = board.generate_moves::<{ MoveType::ALL }>();
 
         let mut total = 0;
         for mv in moves {

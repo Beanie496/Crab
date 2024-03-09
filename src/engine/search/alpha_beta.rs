@@ -1,6 +1,6 @@
 use super::{ordering::ScoredMoves, Pv, SearchInfo};
 use crate::{
-    board::{Board, Moves},
+    board::{Board},
     defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW},
 };
@@ -57,8 +57,7 @@ pub fn alpha_beta_search(
     }
 
     let mut pv = Pv::new();
-    let mut moves = Moves::new();
-    board.generate_moves::<{ MoveType::ALL }>(&mut moves);
+    let mut moves = board.generate_moves::<{ MoveType::ALL }>();
     let mut scored_moves = ScoredMoves::score_moves(search_info, &mut moves, height);
     scored_moves.sort();
 
@@ -120,8 +119,7 @@ fn quiescent_search(
         alpha = stand_pat;
     }
 
-    let mut moves = Moves::new();
-    board.generate_moves::<{ MoveType::CAPTURES }>(&mut moves);
+    let moves = board.generate_moves::<{ MoveType::CAPTURES }>();
 
     for mv in moves {
         let mut copy = board.clone();
