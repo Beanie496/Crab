@@ -184,7 +184,6 @@ impl Default for Board {
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
-    #[must_use]
     pub fn new() -> Self {
         Lookup::init();
         Self::default()
@@ -285,7 +284,6 @@ impl Board {
     }
 
     /// Gets the current FEN representation of the board state.
-    #[must_use]
     pub fn current_fen_string(&self) -> String {
         self.to_string()
     }
@@ -481,7 +479,6 @@ impl Board {
     // the unwraps are called on values that logically can not be `None`, so
     // this can not panic
     #[allow(clippy::missing_panics_doc)]
-    #[must_use]
     pub fn stringify_board(&self) -> String {
         let mut ret_str = String::new();
         let mut empty_squares = 0;
@@ -526,7 +523,6 @@ impl Board {
     }
 
     /// Returns the piece on `square`.
-    #[must_use]
     pub fn piece_on(&self, square: Square) -> Piece {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
@@ -534,7 +530,6 @@ impl Board {
     }
 
     /// Returns the piece bitboard given by `PIECE`.
-    #[must_use]
     pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
         self.pieces[PIECE]
     }
@@ -616,7 +611,6 @@ impl Board {
     }
 
     /// Returns the side to move.
-    #[must_use]
     pub const fn side_to_move(&self) -> Side {
         self.side_to_move
     }
@@ -632,7 +626,6 @@ impl Board {
     }
 
     /// Returns the board of the side according to `IS_WHITE`.
-    #[must_use]
     pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
             self.sides[Side::WHITE.to_index()]
@@ -643,19 +636,16 @@ impl Board {
 
     /// Returns the string representation of the current side to move: 'w' if
     /// White and 'b' if Black.
-    #[must_use]
     pub const fn side_to_move_as_char(&self) -> char {
         (b'b' + self.side_to_move().0 * 21) as char
     }
 
     /// Calculates if the given side can castle kingside.
-    #[must_use]
     pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_kingside::<IS_WHITE>()
     }
 
     /// Calculates if the given side can castle queenside.
-    #[must_use]
     pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_queenside::<IS_WHITE>()
     }
@@ -679,13 +669,11 @@ impl Board {
     ///
     /// E.g. `KQq` if the White king can castle both ways and the Black king
     /// can only castle queenside.
-    #[must_use]
     pub fn stringify_castling_rights(&self) -> String {
         self.castling_rights.to_string()
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
-    #[must_use]
     pub const fn ep_square(&self) -> Square {
         self.ep_square
     }
@@ -702,7 +690,6 @@ impl Board {
 
     /// Returns the string representation of the current en passant square: the
     /// square if there is one (e.g. "b3") or "-" if there is none.
-    #[must_use]
     pub fn stringify_ep_square(&self) -> String {
         let ep_square = self.ep_square();
         if ep_square == Square::NONE {
@@ -713,7 +700,6 @@ impl Board {
     }
 
     /// Returns halfmoves since last capture or pawn move.
-    #[must_use]
     pub const fn halfmoves(&self) -> u8 {
         self.halfmoves
     }
@@ -724,7 +710,6 @@ impl Board {
     }
 
     /// Returns the current move number.
-    #[must_use]
     pub const fn fullmoves(&self) -> u16 {
         self.fullmoves
     }
@@ -737,7 +722,6 @@ impl Board {
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
-    #[must_use]
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let square = Square::from_pos(rank, file);
         let piece = self.piece_on(square);
@@ -784,7 +768,6 @@ impl Board {
     ///
     /// Since this value is incrementally upadated, this function is zero-cost
     /// to call.
-    #[must_use]
     pub const fn psq(&self) -> Score {
         self.psq_accumulator
     }
@@ -821,7 +804,6 @@ impl Board {
     ///
     /// Since this value is incrementally upadated, this function is zero-cost
     /// to call.
-    #[must_use]
     pub const fn phase(&self) -> u8 {
         self.phase_accumulator
     }
@@ -841,7 +823,6 @@ impl Board {
     }
 
     /// Tests if the king is in check.
-    #[must_use]
     pub fn is_in_check(&self) -> bool {
         self.is_square_attacked(self.king_square())
     }

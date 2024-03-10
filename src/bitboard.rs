@@ -139,7 +139,6 @@ impl Bitboard {
 impl Bitboard {
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
     /// given position set.
-    #[must_use]
     pub fn from_pos(rank: Rank, file: File) -> Self {
         Self::from(Square::from_pos(rank, file))
     }
@@ -147,7 +146,6 @@ impl Bitboard {
     /// Returns the given file represented on a bitboard.
     ///
     /// e.g. `file_bb(File::FILE2) == 0x0202020202020202`.
-    #[must_use]
     pub const fn file_bb(file: File) -> Self {
         Self(0x0101_0101_0101_0101 << file.0)
     }
@@ -155,7 +153,6 @@ impl Bitboard {
     /// Returns the given rank represented on a bitboard.
     ///
     /// e.g. `rank_bb(Rank::RANK2) == 0x000000000000ff00`.
-    #[must_use]
     pub const fn rank_bb(rank: Rank) -> Self {
         Self(0xff << (rank.0 * 8))
     }
@@ -191,7 +188,6 @@ impl Bitboard {
     /// 0 0 0 0 0 0 0 1
     /// X 0 0 0 0 0 0 1
     /// ```
-    #[must_use]
     pub fn edges_without(square: Square) -> Self {
         let excluded_ranks_bb = (Self::file_bb(File::FILE1) | Self::file_bb(File::FILE8))
             & !Self::file_bb(File::from(square));
@@ -202,7 +198,6 @@ impl Bitboard {
 
     /// Returns the bits between the starting position of the king and the
     /// rook, given `IS_WHITE` and `IS_KINGSIDE`.
-    #[must_use]
     pub const fn castling_space<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
@@ -221,20 +216,17 @@ impl Bitboard {
     }
 
     /// Returns an empty bitboard.
-    #[must_use]
     pub const fn empty() -> Self {
         Self(0)
     }
 
     /// Tests if no bits in `self` are set.
-    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.0 == Self::empty().0
     }
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
     /// `self` one square south.
-    #[must_use]
     pub const fn pawn_push<const IS_WHITE: bool>(self) -> Self {
         if IS_WHITE {
             self.north()
@@ -244,31 +236,26 @@ impl Bitboard {
     }
 
     /// Shifts `self` one square north without wrapping.
-    #[must_use]
     pub const fn north(self) -> Self {
         Self(self.0 << 8)
     }
 
     /// Shifts `self` one square east without wrapping.
-    #[must_use]
     pub const fn east(self) -> Self {
         Self(self.0 << 1 & !Self::file_bb(File::FILE1).0)
     }
 
     /// Shifts `self` one square south without wrapping.
-    #[must_use]
     pub const fn south(self) -> Self {
         Self(self.0 >> 8)
     }
 
     /// Shifts `self` one square west without wrapping.
-    #[must_use]
     pub const fn west(self) -> Self {
         Self(self.0 >> 1 & !Self::file_bb(File::FILE8).0)
     }
 
     /// Clears the least significant bit of `self` and returns it.
-    #[must_use]
     pub fn pop_lsb(&mut self) -> Self {
         let popped_bit = self.0 & self.0.wrapping_neg();
         self.0 ^= popped_bit;
@@ -277,7 +264,6 @@ impl Bitboard {
 
     /// Converts the position of the least significant bit of `self` to a
     /// [`Square`].
-    #[must_use]
     pub const fn to_square(self) -> Square {
         Square(self.0.trailing_zeros() as u8)
     }
@@ -286,7 +272,6 @@ impl Bitboard {
 impl BitIter {
     /// Clears the least significant bit of `self` and converts the position of
     /// that bit to a [`Square`].
-    #[must_use]
     pub fn pop_next_square(&mut self) -> Square {
         let shift = self.0.trailing_zeros();
         self.0 ^= 1 << shift;

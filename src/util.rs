@@ -24,7 +24,6 @@ impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
 
 impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     /// Creates an empty [`Stack`].
-    #[must_use]
     pub const fn new() -> Self {
         Self {
             stack: [MaybeUninit::uninit(); SIZE],

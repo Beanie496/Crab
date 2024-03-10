@@ -96,7 +96,6 @@ impl Score {
 /// various heuristics.
 ///
 /// Currently just calculates material balance with piece-square tables.
-#[must_use]
 pub fn evaluate(board: &Board) -> Eval {
     let score = board.psq();
     let phase = board.phase();
@@ -110,13 +109,11 @@ pub fn evaluate(board: &Board) -> Eval {
 }
 
 /// Calculates the evaluation if we're mating in `depth` halfmoves.
-#[must_use]
 pub fn mate_in(depth: u8) -> Eval {
     MATE - Eval::from(depth)
 }
 
 /// Calculates the evaluation if we're getting mated in `depth` halfmoves.
-#[must_use]
 pub fn mated_in(depth: u8) -> Eval {
     -MATE + Eval::from(depth)
 }

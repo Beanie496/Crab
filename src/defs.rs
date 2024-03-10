@@ -371,13 +371,11 @@ impl Square {
 
 impl Piece {
     /// Creates a [`Piece`] from a [`PieceType`] and a [`Side`].
-    #[must_use]
     pub const fn from_piecetype(piece: PieceType, side: Side) -> Self {
         Self((piece.0 << 1) + side.0)
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
@@ -385,7 +383,6 @@ impl Piece {
 
 impl PieceType {
     /// Returns the contents of `self` as a `usize`.
-    #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
@@ -397,20 +394,17 @@ impl Side {
     /// e.g. `Side::WHITE.flip() == Side::BLACK`.
     ///
     /// The result is undefined if `self` isn't `Side::WHITE` or `Side::BLACK`.
-    #[must_use]
     pub const fn flip(self) -> Self {
         Self(self.0 ^ 1)
     }
 
     /// Returns the contents of `self` as a bool: White is `true`, Black is
     /// `false`.
-    #[must_use]
     pub const fn to_bool(self) -> bool {
         self.0 != 0
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
@@ -418,26 +412,22 @@ impl Side {
 
 impl Square {
     /// Converts `rank` and `file` into a [`Square`].
-    #[must_use]
     pub const fn from_pos(rank: Rank, file: File) -> Self {
         Self(rank.0 * 8 + file.0)
     }
 
     /// Finds the horizontal distance between `self` and `other_square`
-    #[must_use]
     pub fn horizontal_distance(self, other_square: Self) -> u8 {
         File::from(self).0.abs_diff(File::from(other_square).0)
     }
 
     /// Checks if `self` is within the board.
-    #[must_use]
     pub fn is_valid(self) -> bool {
         // `sq` is unsigned so it can't be less than 0.
         self <= Self::H8
     }
 
     /// Returns the contents of `self` as a `usize`.
-    #[must_use]
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }

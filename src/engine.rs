@@ -30,7 +30,6 @@ impl Clone for Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
-    #[must_use]
     pub fn new() -> Self {
         Self {
             board: Board::new(),

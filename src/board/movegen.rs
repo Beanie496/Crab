@@ -465,7 +465,6 @@ impl Board {
     }
 
     /// Tests if `square` is attacked by an enemy piece.
-    #[must_use]
     pub fn is_square_attacked(&self, square: Square) -> bool {
         let occupancies = self.occupancies();
         let us = self.side_to_move();
@@ -701,20 +700,17 @@ impl Move {
     /// Creates a normal [`Move`] from `start` to `end`.
     ///
     /// This function cannot be used for special moves like castling.
-    #[must_use]
     pub const fn new(start: Square, end: Square) -> Self {
         Self::base(start, end).flag(Self::NORMAL)
     }
 
     /// Creates an en passant [`Move`] from `start` to `end`.
-    #[must_use]
     pub const fn new_en_passant(start: Square, end: Square) -> Self {
         Self::base(start, end).flag(Self::EN_PASSANT)
     }
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
     /// White and if the side of the board is kingside.
-    #[must_use]
     pub const fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
@@ -742,7 +738,6 @@ impl Move {
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
         Self::base(start, end)
             .flag(Self::PROMOTION)
@@ -751,7 +746,6 @@ impl Move {
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    #[must_use]
     pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
         Self::base(start, end)
             .flag(Self::PROMOTION)
@@ -759,37 +753,31 @@ impl Move {
     }
 
     /// Creates a null [`Move`].
-    #[must_use]
     pub const fn null() -> Self {
         Self::base(Square(0), Square(0))
     }
 
     /// Calculates the start square of `self`.
-    #[must_use]
     pub const fn start(self) -> Square {
         Square(self.upper & Self::SQUARE_MASK)
     }
 
     /// Calculates the end square of `self`.
-    #[must_use]
     pub const fn end(self) -> Square {
         Square(self.lower & Self::SQUARE_MASK)
     }
 
     /// Checks if the move is castling.
-    #[must_use]
     pub const fn is_castling(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
-    #[must_use]
     pub const fn is_en_passant(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the move is a promotion.
-    #[must_use]
     pub const fn is_promotion(self) -> bool {
         self.upper & Self::FLAG_MASK == Self::PROMOTION
     }
@@ -798,7 +786,6 @@ impl Move {
     /// starting square. Assumes `self.is_castling()`.
     ///
     /// Can only return -2 or 1.
-    #[must_use]
     pub const fn rook_offset(self) -> i8 {
         (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
     }
@@ -806,14 +793,12 @@ impl Move {
     /// Returns the piece to be promoted to. Assumes `self.is_promotion()`.
     ///
     /// The piece will only ever be a valid piece.
-    #[must_use]
     pub const fn promotion_piece(self) -> PieceType {
         PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
     }
 
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
-    #[must_use]
     pub fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
         self == other
@@ -821,7 +806,6 @@ impl Move {
 
     /// Checks if the given start square, end square and promotion piece match
     /// the start, end square and promotion piece contained within `self`.
-    #[must_use]
     pub fn is_moving_from_to_promo(
         self,
         start: Square,
@@ -857,7 +841,6 @@ impl Move {
 
 impl Moves {
     /// Creates an empty [`Moves`] object.
-    #[must_use]
     pub const fn new() -> Self {
         Self {
             moves: Stack::new(),
