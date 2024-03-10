@@ -34,7 +34,7 @@ struct Pv {
 }
 
 /// Information about a search.
-struct SearchInfo {
+pub struct SearchInfo {
     /// The depth to be searched.
     depth: u8,
     /// How long the search has been going.

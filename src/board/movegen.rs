@@ -105,7 +105,7 @@ impl Iterator for Moves {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.pop_move()
+        self.pop()
     }
 }
 
@@ -162,12 +162,12 @@ impl Board {
         if self.can_castle_kingside::<IS_WHITE>()
             && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
         {
-            moves.push_move(Move::new_castle::<IS_WHITE, true>());
+            moves.push(Move::new_castle::<IS_WHITE, true>());
         }
         if self.can_castle_queenside::<IS_WHITE>()
             && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
         {
-            moves.push_move(Move::new_castle::<IS_WHITE, false>());
+            moves.push(Move::new_castle::<IS_WHITE, false>());
         }
     }
 
@@ -197,7 +197,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.knight_attacks(knight) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new(knight, target));
+                moves.push(Move::new(knight, target));
             }
         }
 
@@ -206,7 +206,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.king_attacks(king) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new(king, target));
+                moves.push(Move::new(king, target));
             }
         }
     }
@@ -244,10 +244,10 @@ impl Board {
             // captures in the same loop.
             if MOVE_TYPE == MoveType::CAPTURES {
                 for target in normal_captures {
-                    moves.push_move(Move::new(pawn_sq, target));
+                    moves.push(Move::new(pawn_sq, target));
                 }
                 for target in ep_targets {
-                    moves.push_move(Move::new_en_passant(pawn_sq, target));
+                    moves.push(Move::new_en_passant(pawn_sq, target));
                 }
                 continue;
             }
@@ -267,16 +267,16 @@ impl Board {
             let normal_targets = targets ^ promotion_targets;
 
             for target in normal_targets {
-                moves.push_move(Move::new(pawn_sq, target));
+                moves.push(Move::new(pawn_sq, target));
             }
             for target in ep_targets {
-                moves.push_move(Move::new_en_passant(pawn_sq, target));
+                moves.push(Move::new_en_passant(pawn_sq, target));
             }
             for target in promotion_targets {
-                moves.push_move(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ PieceType::BISHOP.0 }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ PieceType::ROOK.0 }>(pawn_sq, target));
-                moves.push_move(Move::new_promo::<{ PieceType::QUEEN.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(pawn_sq, target));
             }
         }
     }
@@ -299,7 +299,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new(bishop, target));
+                moves.push(Move::new(bishop, target));
             }
         }
 
@@ -308,7 +308,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new(rook, target));
+                moves.push(Move::new(rook, target));
             }
         }
 
@@ -317,7 +317,7 @@ impl Board {
             // SAFETY: Instantiating `self` initialises `LOOKUP`.
             let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & target_squares;
             for target in targets {
-                moves.push_move(Move::new(queen, target));
+                moves.push(Move::new(queen, target));
             }
         }
     }
@@ -878,13 +878,13 @@ impl Moves {
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.
-    pub fn push_move(&mut self, mv: Move) {
+    pub fn push(&mut self, mv: Move) {
         self.moves.push(mv);
     }
 
     /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
     /// moves, otherwise returns `None`.
-    pub fn pop_move(&mut self) -> Option<Move> {
+    pub fn pop(&mut self) -> Option<Move> {
         self.moves.pop()
     }
 

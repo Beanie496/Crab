@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::SearchInfo;
 use crate::{
     board::{Move, Moves, MAX_LEGAL_MOVES},
@@ -5,25 +7,27 @@ use crate::{
     util::Stack,
 };
 
-/// A scored move.
-#[derive(Copy, Clone)]
+/// An ordered [`ScoredMoves`] instance.
 #[allow(clippy::missing_docs_in_private_items)]
-struct ScoredMove {
-    mv: Move,
-    /// A score.
-    ///
-    /// This is currently +INF for PV moves and 0 otherwise, but is subject to
-    /// change.
-    score: Eval,
+pub struct OrderedMoves {
+    ordered_moves: ScoredMoves,
 }
 
-/// A stack of scored moves.
+/// A [`Move`] that has been given a certain score.
+#[allow(clippy::missing_docs_in_private_items)]
+#[derive(Clone, Copy)]
+struct ScoredMove {
+    score: Eval,
+    mv: Move,
+}
+
+/// A stack of [`ScoredMove`]s.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct ScoredMoves {
-    moves: Stack<ScoredMove, MAX_LEGAL_MOVES>,
+    scored_moves: Stack<ScoredMove, MAX_LEGAL_MOVES>,
 }
 
-impl Iterator for ScoredMoves {
+impl Iterator for OrderedMoves {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -31,41 +35,60 @@ impl Iterator for ScoredMoves {
     }
 }
 
-impl ScoredMove {
-    /// Creates a new [`ScoredMove`] from a [`Move`] and a score ([`Eval`]).
-    const fn new(mv: Move, score: Eval) -> Self {
-        Self { mv, score }
-    }
-}
-
-impl ScoredMoves {
-    /// Scores the moves in `moves` given the information in `search_info` and
-    /// the current height.
-    pub fn score_moves(search_info: &SearchInfo, moves: &mut Moves, height: u8) -> Self {
+impl FromIterator<ScoredMove> for ScoredMoves {
+    fn from_iter<T: IntoIterator<Item = ScoredMove>>(moves: T) -> Self {
         let mut scored_moves = Self::new();
 
-        for mv in moves {
-            // always search the PV first
-            if search_info.history.get(usize::from(height)) == mv {
-                scored_moves.push(ScoredMove::new(mv, Eval::MAX));
-            } else {
-                scored_moves.push(ScoredMove::new(mv, 0));
-            }
+        for scored_move in moves {
+            scored_moves.push(scored_move);
         }
 
         scored_moves
     }
+}
 
-    /// Sorts the scored moves in `self` based on their score.
-    pub fn sort(&mut self) {
-        self.moves.get_mut_slice().sort_by(|mv1, mv2| {
-            // SAFETY: the slice we're sorting contains only initialised
-            // elements
-            unsafe { mv1.assume_init_read() }
-                .score
-                // SAFETY: ditto
-                .cmp(&unsafe { mv2.assume_init_read() }.score)
-        });
+impl Moves {
+    /// Scores the moves in `moves`, given the information in `search_info` and
+    /// the current height.
+    pub fn score(self, search_info: &SearchInfo, height: u8) -> ScoredMoves {
+        self.map(|mv| ScoredMove::new(mv, search_info, height))
+            .collect()
+    }
+}
+
+impl OrderedMoves {
+    /// Sorts the moves in [`ScoredMoves`] based on their score.
+    fn new(mut scored_moves: ScoredMoves) -> Self {
+        scored_moves.sort_by(|mv1, mv2| mv1.score.cmp(&mv2.score));
+        Self {
+            ordered_moves: scored_moves,
+        }
+    }
+
+    /// Pops a [`ScoredMove`] off the stack.
+    fn pop(&mut self) -> Option<ScoredMove> {
+        self.ordered_moves.pop()
+    }
+}
+
+impl ScoredMove {
+    /// Scores a [`Move`] based off the information in `search_info` and
+    /// `height`.
+    pub fn new(mv: Move, search_info: &SearchInfo, height: u8) -> Self {
+        // always search the PV first
+        let score = if search_info.history.get(usize::from(height)) == mv {
+            Eval::MAX
+        } else {
+            0
+        };
+        Self { score, mv }
+    }
+}
+
+impl ScoredMoves {
+    /// Sorts the moves in the stack based on their score.
+    pub fn sort(self) -> OrderedMoves {
+        OrderedMoves::new(self)
     }
 }
 
@@ -73,17 +96,26 @@ impl ScoredMoves {
     /// Creates a new, uninitialised stack of [`ScoredMove`]s.
     const fn new() -> Self {
         Self {
-            moves: Stack::new(),
+            scored_moves: Stack::new(),
         }
     }
 
-    /// Pushes a [`ScoredMove`] onto the stack.
-    fn push(&mut self, mv: ScoredMove) {
-        self.moves.push(mv);
+    /// Sorts the [`ScoredMoves`] in the stack based on the comparator
+    /// function, `cmp`.
+    fn sort_by<F>(&mut self, cmp: F)
+    where
+        F: FnMut(&ScoredMove, &ScoredMove) -> Ordering,
+    {
+        self.scored_moves.sort_by(cmp);
     }
 
     /// Pops a [`ScoredMove`] off the stack.
     fn pop(&mut self) -> Option<ScoredMove> {
-        self.moves.pop()
+        self.scored_moves.pop()
+    }
+
+    /// Pushes a [`ScoredMove`] onto the stack.
+    fn push(&mut self, scored_move: ScoredMove) {
+        self.scored_moves.push(scored_move);
     }
 }

@@ -1,4 +1,4 @@
-use std::mem::MaybeUninit;
+use std::{cmp::Ordering, mem::MaybeUninit};
 
 use crate::out_of_bounds_is_unreachable;
 
@@ -58,9 +58,16 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         self.first_empty = 0;
     }
 
-    /// Returns a mutable slice to all of the elements of the stack.
-    // TODO: make this return a slice of T
-    pub fn get_mut_slice(&mut self) -> &mut [MaybeUninit<T>] {
-        &mut self.stack[0..self.first_empty]
+    /// Sorts the elements in the stack with the comparator function, `cmp`.
+    pub fn sort_by<F>(&mut self, mut cmp: F)
+    where
+        F: FnMut(&T, &T) -> Ordering,
+    {
+        self.stack[0..self.first_empty].sort_by(|a, b| {
+            // SAFETY: only the initialised elements are sorted
+            cmp(&unsafe { a.assume_init_read() }, &unsafe {
+                b.assume_init_read()
+            })
+        });
     }
 }

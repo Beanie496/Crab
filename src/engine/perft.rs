@@ -1,10 +1,7 @@
 use std::time::Instant;
 
 use super::Engine;
-use crate::{
-    board::{Board},
-    defs::MoveType,
-};
+use crate::{board::Board, defs::MoveType};
 
 impl Engine {
     /// Outputs and returns the number of leaf nodes `depth` moves in the
