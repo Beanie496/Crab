@@ -76,6 +76,9 @@ impl ScoredMove {
     /// `height`.
     pub fn new(mv: Move, search_info: &SearchInfo, height: u8) -> Self {
         // always search the PV first
+        // technically this will be reading from 1 past the end of the PV if
+        // we're at a leaf node, but since it will just be a null move, it can
+        // safely be compared against
         let score = if search_info.history.get(usize::from(height)) == mv {
             Eval::MAX
         } else {
