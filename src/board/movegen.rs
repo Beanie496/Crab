@@ -514,8 +514,6 @@ impl Board {
 
 impl Lookup {
     /// Initialises the tables of [`LOOKUPS`].
-    // for some reason clippy _doesn't_ complain if I remove this
-    // attribute. I'll add it anyway though.
     pub fn init() {
         // SAFETY: These functions write to a mutable static before anything
         // else reads from it.
