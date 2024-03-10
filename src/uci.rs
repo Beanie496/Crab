@@ -1,4 +1,9 @@
-use std::{io, process::exit, str::Split};
+use std::{
+    io,
+    process::exit,
+    str::{FromStr, Split},
+    time::Duration,
+};
 
 use crate::{board::find_magics, defs::PieceType, engine::Engine};
 
@@ -6,6 +11,27 @@ use crate::{board::find_magics, defs::PieceType, engine::Engine};
 pub struct Uci {
     /// The engine.
     engine: Engine,
+}
+
+/// The limits of a search: how much time is allocated, etc.
+#[derive(Default)]
+pub struct Limits {
+    /// White's time left.
+    pub wtime: Option<Duration>,
+    /// Black's time left.
+    pub btime: Option<Duration>,
+    /// White's increment.
+    pub winc: Option<Duration>,
+    /// Black's increment.
+    pub binc: Option<Duration>,
+    /// Moves until the next time control, otherwise sudden death.
+    pub movestogo: Option<u8>,
+    /// Maximum search depth.
+    pub depth: Option<u8>,
+    /// Maximum node count.
+    pub nodes: Option<u64>,
+    /// Exact thinking time.
+    pub movetime: Option<Duration>,
 }
 
 /// The starting position as a FEN string.
@@ -39,26 +65,26 @@ impl Uci {
 
     /// Starts the search, given the rest of the tokens after `go`.
     fn go(&mut self, line: &mut Split<'_, char>) {
-        let mut depth = None;
+        let mut limits = Limits::default();
 
         while let Some(token) = line.next() {
-            // just depth for now
-            #[allow(clippy::single_match)]
             match token {
-                "depth" => {
-                    if let Some(result) = line.next() {
-                        if let Ok(d) = result.parse::<u8>() {
-                            if d != 0 {
-                                depth = Some(d);
-                            }
-                        }
-                    }
-                }
+                "wtime" => limits.wtime = parse_next_num(line).map(Duration::from_millis),
+                "btime" => limits.btime = parse_next_num(line).map(Duration::from_millis),
+                "winc" => limits.winc = parse_next_num(line).map(Duration::from_millis),
+                "binc" => limits.binc = parse_next_num(line).map(Duration::from_millis),
+                "movestogo" => limits.movestogo = parse_next_num(line),
+                "depth" => limits.depth = parse_next_num(line),
+                "nodes" => limits.nodes = parse_next_num(line),
+                "movetime" => limits.movetime = parse_next_num(line).map(Duration::from_millis),
+                // if depth is specified and then `infinite` is give, the
+                // latter should override the former
+                "infinite" => limits.depth = None,
                 _ => (),
             }
         }
 
-        self.engine.start_search(depth);
+        self.engine.start_search(limits);
     }
 
     /// Given an iterator over the remaining space-delimited tokens of a `position`
@@ -124,7 +150,7 @@ impl Uci {
                     /* Start calculating from the current position,
                      * as specified by the "position" command.
                      * The next element should be one of the following:
-                     * - searchmoves: restrict search to one of the specified moves
+                     * - searchmoves: restrict search to the specified moves
                      * - ponder: start searching in pondering mode.  Don't
                      *   implement this.
                      * - wtime: White has x ms left
@@ -203,4 +229,19 @@ impl Uci {
             unreachable!("Each line should have at least 1 iterable element.");
         }
     }
+}
+
+/// Parses the next unsigned integer.
+///
+/// If the next token is a valid number, is not 0, and fits within `T`, it
+/// returns `Some(T)`; otherwise, it returns `None`.
+fn parse_next_num<T: TryFrom<u128> + FromStr>(line: &mut Split<'_, char>) -> Option<T> {
+    if let Some(result) = line.next() {
+        if let Ok(result) = result.parse::<u128>() {
+            if result != 0 {
+                return result.try_into().ok();
+            }
+        }
+    }
+    None
 }

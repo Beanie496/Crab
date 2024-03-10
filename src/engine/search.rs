@@ -9,6 +9,7 @@ use super::Engine;
 use crate::{
     board::{Board, Move},
     evaluation::{Eval, INF_EVAL},
+    uci::Limits,
 };
 use alpha_beta::alpha_beta_search;
 
@@ -41,7 +42,7 @@ struct PvIter {
 
 /// Information about a search.
 pub struct SearchInfo {
-    /// The depth to be searched.
+    /// The depth currently being searched.
     depth: u8,
     /// How long the search has been going.
     time: Duration,
@@ -67,6 +68,8 @@ pub struct SearchInfo {
     has_stopped: bool,
     /// The previous PV.
     history: Pv,
+    /// The limits of the search: how much time both sides have, etc.
+    limits: Limits,
 }
 
 /// Used to tell the search thread to stop.
@@ -130,12 +133,11 @@ impl Display for SearchInfo {
 impl Engine {
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
-    pub fn start_search(&mut self, depth: Option<u8>) {
+    pub fn start_search(&mut self, limits: Limits) {
         let board_clone = self.board.clone();
-        let depth = depth.unwrap_or(u8::MAX);
         let (control_tx, control_rx) = channel();
 
-        let search_info = SearchInfo::new(control_rx);
+        let search_info = SearchInfo::new(control_rx, limits);
 
         // The inner thread spawned runs the iterative deepening loop. It sends
         // the information to `info_rx`. The outer thread spawned prints any
@@ -147,7 +149,7 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(search_info, &board_clone, depth);
+                iterative_deepening(search_info, &board_clone);
             }),
         ));
     }
@@ -236,7 +238,7 @@ impl Pv {
 impl SearchInfo {
     /// Creates a new [`SearchInfo`] with the initial information that searches
     /// start with.
-    const fn new(control_rx: Receiver<Stop>) -> Self {
+    const fn new(control_rx: Receiver<Stop>, limits: Limits) -> Self {
         Self {
             depth: 0,
             time: Duration::ZERO,
@@ -250,6 +252,7 @@ impl SearchInfo {
             control_rx,
             has_stopped: false,
             history: Pv::new(),
+            limits,
         }
     }
 
@@ -272,13 +275,13 @@ impl<T, U> ThreadState<T, U> {
 /// Performs iterative deepening.
 ///
 /// Since there is no move ordering or TT, this is currently a slowdown.
-fn iterative_deepening(mut search_info: SearchInfo, board: &Board, max_depth: u8) {
+fn iterative_deepening(mut search_info: SearchInfo, board: &Board) {
     let time = Instant::now();
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
 
-    for depth in 1..=max_depth {
+    for depth in 1..=search_info.limits.depth.unwrap_or(u8::MAX) {
         search_info.pv.clear();
         search_info.depth += 1;
 
