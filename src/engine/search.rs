@@ -287,16 +287,12 @@ fn iterative_deepening(mut search_info: SearchInfo, board: &Board) {
 
         let eval = alpha_beta_search(&mut search_info, &board.clone(), -beta, -alpha, depth);
 
+        best_move = search_info.pv.get(0);
+
         if search_info.has_stopped {
-            // if the search gets stopped before even depth 1 gets finished,
-            // make the best move whatever the best move in the search was
-            if depth == 1 {
-                best_move = search_info.pv.get(0);
-            }
             break;
         }
 
-        best_move = search_info.pv.get(0);
         search_info.time = time.elapsed();
         search_info.score = eval;
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
