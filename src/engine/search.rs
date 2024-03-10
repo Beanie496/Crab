@@ -139,6 +139,11 @@ impl Engine {
 
         let search_info = SearchInfo::new(control_rx, limits);
 
+        assert!(
+            self.search_thread_state.is_none(),
+            "Starting a search when one is already going"
+        );
+
         // The inner thread spawned runs the iterative deepening loop. It sends
         // the information to `info_rx`. The outer thread spawned prints any
         // information received through `info_rx`, blocking until it does. When
