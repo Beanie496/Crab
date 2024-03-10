@@ -33,6 +33,12 @@ struct Pv {
     first_empty: u8,
 }
 
+/// An iterator over a [`Pv`].
+#[allow(clippy::missing_docs_in_private_items)]
+struct PvIter {
+    pv: Pv,
+}
+
 /// Information about a search.
 pub struct SearchInfo {
     /// The depth to be searched.
@@ -89,11 +95,20 @@ impl Display for Pv {
     }
 }
 
-impl Iterator for Pv {
+impl IntoIterator for Pv {
+    type Item = Move;
+    type IntoIter = PvIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PvIter::new(self)
+    }
+}
+
+impl Iterator for PvIter {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.dequeue()
+        self.pv.dequeue()
     }
 }
 
@@ -154,6 +169,15 @@ impl Engine {
     }
 }
 
+impl PvIter {
+    /// Creates a new [`PvIter`].
+    // this function will be inlined anyway
+    #[allow(clippy::large_types_passed_by_value)]
+    const fn new(pv: Pv) -> Self {
+        Self { pv }
+    }
+}
+
 impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     const fn new() -> Self {
@@ -165,10 +189,10 @@ impl Pv {
     }
 
     /// Appends the [`Move`]s from `other_pv` to `self`.
-    fn append_pv(&mut self, other_pv: &mut Self) {
+    fn append_pv(&mut self, other_pv: &Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
-        for mv in other_pv {
+        for mv in other_pv.into_iter() {
             self.enqueue(mv);
         }
     }
