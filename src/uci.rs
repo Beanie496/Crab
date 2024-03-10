@@ -63,73 +63,6 @@ impl Uci {
         }
     }
 
-    /// Starts the search, given the rest of the tokens after `go`.
-    fn go(&mut self, line: &mut Split<'_, char>) {
-        let mut limits = Limits::default();
-
-        while let Some(token) = line.next() {
-            match token {
-                "wtime" => limits.wtime = parse_next_num(line).map(Duration::from_millis),
-                "btime" => limits.btime = parse_next_num(line).map(Duration::from_millis),
-                "winc" => limits.winc = parse_next_num(line).map(Duration::from_millis),
-                "binc" => limits.binc = parse_next_num(line).map(Duration::from_millis),
-                "movestogo" => limits.movestogo = parse_next_num(line),
-                "depth" => limits.depth = parse_next_num(line),
-                "nodes" => limits.nodes = parse_next_num(line),
-                "movetime" => limits.movetime = parse_next_num(line).map(Duration::from_millis),
-                // if depth is specified and then `infinite` is give, the
-                // latter should override the former
-                "infinite" => limits.depth = None,
-                _ => (),
-            }
-        }
-
-        self.engine.start_search(limits);
-    }
-
-    /// Given an iterator over the remaining space-delimited tokens of a `position`
-    /// command, removes all empty strings and concatenate the remaining tokens
-    /// into a [`String`] for the FEN and moves each with a space between each
-    /// token.
-    fn handle_position(&mut self, line: &mut Split<'_, char>) {
-        let fen = match line.next() {
-            Some("startpos") => {
-                // ensure the next token is "moves" if there is one
-                if let Some(token) = line.next() {
-                    if token != "moves" {
-                        return;
-                    }
-                }
-                STARTPOS.to_string()
-            }
-            Some("fen") => {
-                let mut fen = String::new();
-                line.take_while(|token| *token != "moves")
-                    .filter(|token| !token.is_empty())
-                    // I COULD use `map()` then `collect()` but that's an unnecessary heap
-                    // allocation for each token
-                    .for_each(|token| {
-                        fen.push_str(token);
-                        fen.push(' ');
-                    });
-                // remove the trailing space
-                fen.pop();
-                fen
-            }
-            _ => return,
-        };
-
-        let mut moves = String::new();
-        line.filter(|token| !token.is_empty()).for_each(|token| {
-            moves.push_str(token);
-            moves.push(' ');
-        });
-        // remove the trailing space
-        moves.pop();
-
-        self.engine.set_position(&fen, &moves);
-    }
-
     /// Dissects `line` according to the UCI protocol.
     fn handle_input_line(&mut self, line: &str) {
         let mut line = line.trim().split(' ');
@@ -228,6 +161,73 @@ impl Uci {
         } else {
             unreachable!("Each line should have at least 1 iterable element.");
         }
+    }
+
+    /// Starts the search, given the rest of the tokens after `go`.
+    fn go(&mut self, line: &mut Split<'_, char>) {
+        let mut limits = Limits::default();
+
+        while let Some(token) = line.next() {
+            match token {
+                "wtime" => limits.wtime = parse_next_num(line).map(Duration::from_millis),
+                "btime" => limits.btime = parse_next_num(line).map(Duration::from_millis),
+                "winc" => limits.winc = parse_next_num(line).map(Duration::from_millis),
+                "binc" => limits.binc = parse_next_num(line).map(Duration::from_millis),
+                "movestogo" => limits.movestogo = parse_next_num(line),
+                "depth" => limits.depth = parse_next_num(line),
+                "nodes" => limits.nodes = parse_next_num(line),
+                "movetime" => limits.movetime = parse_next_num(line).map(Duration::from_millis),
+                // if depth is specified and then `infinite` is give, the
+                // latter should override the former
+                "infinite" => limits.depth = None,
+                _ => (),
+            }
+        }
+
+        self.engine.start_search(limits);
+    }
+
+    /// Given an iterator over the remaining space-delimited tokens of a `position`
+    /// command, removes all empty strings and concatenate the remaining tokens
+    /// into a [`String`] for the FEN and moves each with a space between each
+    /// token.
+    fn handle_position(&mut self, line: &mut Split<'_, char>) {
+        let fen = match line.next() {
+            Some("startpos") => {
+                // ensure the next token is "moves" if there is one
+                if let Some(token) = line.next() {
+                    if token != "moves" {
+                        return;
+                    }
+                }
+                STARTPOS.to_string()
+            }
+            Some("fen") => {
+                let mut fen = String::new();
+                line.take_while(|token| *token != "moves")
+                    .filter(|token| !token.is_empty())
+                    // I COULD use `map()` then `collect()` but that's an unnecessary heap
+                    // allocation for each token
+                    .for_each(|token| {
+                        fen.push_str(token);
+                        fen.push(' ');
+                    });
+                // remove the trailing space
+                fen.pop();
+                fen
+            }
+            _ => return,
+        };
+
+        let mut moves = String::new();
+        line.filter(|token| !token.is_empty()).for_each(|token| {
+            moves.push_str(token);
+            moves.push(' ');
+        });
+        // remove the trailing space
+        moves.pop();
+
+        self.engine.set_position(&fen, &moves);
     }
 }
 
