@@ -7,7 +7,6 @@ mod perft;
 mod search;
 
 /// Master object that contains all the other major objects.
-#[non_exhaustive]
 pub struct Engine {
     /// The internal board.
     ///
