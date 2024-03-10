@@ -1,4 +1,4 @@
-//! Crab, a UCI-compatible chess engine for my A-level project written in Rust.
+//! Crab, a UCI-compatible chess engine written in Rust.
 
 use uci::Uci;
 
