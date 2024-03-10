@@ -815,9 +815,7 @@ impl Move {
         let other = Self::new_promo_any(start, end, promotion_piece);
         self == other
     }
-}
 
-impl Move {
     /// Creates a base [`Move`] with the given start and end square.
     const fn base(start: Square, end: Square) -> Self {
         Self {

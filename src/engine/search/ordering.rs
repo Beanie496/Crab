@@ -86,18 +86,16 @@ impl ScoredMove {
 }
 
 impl ScoredMoves {
-    /// Sorts the moves in the stack based on their score.
-    pub fn sort(self) -> OrderedMoves {
-        OrderedMoves::new(self)
-    }
-}
-
-impl ScoredMoves {
     /// Creates a new, uninitialised stack of [`ScoredMove`]s.
     const fn new() -> Self {
         Self {
             scored_moves: Stack::new(),
         }
+    }
+
+    /// Sorts the moves in the stack based on their score.
+    pub fn sort(self) -> OrderedMoves {
+        OrderedMoves::new(self)
     }
 
     /// Sorts the [`ScoredMoves`] in the stack based on the comparator
