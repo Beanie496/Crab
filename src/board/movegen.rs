@@ -703,19 +703,13 @@ impl Move {
     /// This function cannot be used for special moves like castling.
     #[must_use]
     pub const fn new(start: Square, end: Square) -> Self {
-        Self {
-            lower: end.0,
-            upper: start.0 | Self::NORMAL,
-        }
+        Self::base(start, end).flag(Self::NORMAL)
     }
 
     /// Creates an en passant [`Move`] from `start` to `end`.
     #[must_use]
     pub const fn new_en_passant(start: Square, end: Square) -> Self {
-        Self {
-            lower: end.0,
-            upper: start.0 | Self::EN_PASSANT,
-        }
+        Self::base(start, end).flag(Self::EN_PASSANT)
     }
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
@@ -725,27 +719,23 @@ impl Move {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
             if IS_KINGSIDE {
-                Self {
-                    lower: Square::G1.0 | 3 << Self::EXTRA_BITS_SHIFT,
-                    upper: Square::E1.0 | Self::CASTLING,
-                }
+                Self::base(Square::E1, Square::G1)
+                    .flag(Self::CASTLING)
+                    .extra_bits(3)
             } else {
-                Self {
-                    lower: Square::C1.0 | 0 << Self::EXTRA_BITS_SHIFT,
-                    upper: Square::E1.0 | Self::CASTLING,
-                }
+                Self::base(Square::E1, Square::C1)
+                    .flag(Self::CASTLING)
+                    .extra_bits(0)
             }
         } else {
             if IS_KINGSIDE {
-                Self {
-                    lower: Square::G8.0 | 3 << Self::EXTRA_BITS_SHIFT,
-                    upper: Square::E8.0 | Self::CASTLING,
-                }
+                Self::base(Square::E8, Square::G8)
+                    .flag(Self::CASTLING)
+                    .extra_bits(3)
             } else {
-                Self {
-                    lower: Square::C8.0 | 0 << Self::EXTRA_BITS_SHIFT,
-                    upper: Square::E8.0 | Self::CASTLING,
-                }
+                Self::base(Square::E8, Square::C8)
+                    .flag(Self::CASTLING)
+                    .extra_bits(0)
             }
         }
     }
@@ -754,26 +744,24 @@ impl Move {
     /// `end`.
     #[must_use]
     pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
-        Self {
-            lower: end.0 | ((PIECE - 1) << Self::EXTRA_BITS_SHIFT),
-            upper: start.0 | Self::PROMOTION,
-        }
+        Self::base(start, end)
+            .flag(Self::PROMOTION)
+            .extra_bits(PIECE - 1)
     }
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
     #[must_use]
     pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
-        Self {
-            lower: end.0 | (promotion_piece.0 - 1) << Self::EXTRA_BITS_SHIFT,
-            upper: start.0 | Self::PROMOTION,
-        }
+        Self::base(start, end)
+            .flag(Self::PROMOTION)
+            .extra_bits(promotion_piece.0 - 1)
     }
 
     /// Creates a null [`Move`].
     #[must_use]
     pub const fn null() -> Self {
-        Self { lower: 0, upper: 0 }
+        Self::base(Square(0), Square(0))
     }
 
     /// Calculates the start square of `self`.
@@ -842,6 +830,28 @@ impl Move {
     ) -> bool {
         let other = Self::new_promo_any(start, end, promotion_piece);
         self == other
+    }
+}
+
+impl Move {
+    /// Creates a base [`Move`] with the given start and end square.
+    const fn base(start: Square, end: Square) -> Self {
+        Self {
+            lower: end.0,
+            upper: start.0,
+        }
+    }
+
+    /// Adds the given flag to `self`.
+    const fn flag(mut self, flag: u8) -> Self {
+        self.upper |= flag;
+        self
+    }
+
+    /// Adds the given extra bits to `self`.
+    const fn extra_bits(mut self, extra_bits: u8) -> Self {
+        self.lower |= extra_bits << Self::EXTRA_BITS_SHIFT;
+        self
     }
 }
 
