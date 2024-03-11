@@ -261,12 +261,6 @@ impl Bitboard {
         self.0 ^= popped_bit;
         Self(popped_bit)
     }
-
-    /// Converts the position of the least significant bit of `self` to a
-    /// [`Square`].
-    pub const fn to_square(self) -> Square {
-        Square(self.0.trailing_zeros() as u8)
-    }
 }
 
 impl BitIter {

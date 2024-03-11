@@ -3,6 +3,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::bitboard::Bitboard;
+
 /// Tells the compiler that `index` cannot match or exceed `bound`.
 ///
 /// # Panics
@@ -146,6 +148,13 @@ impl From<Piece> for Side {
     /// Returns the side of `self`.
     fn from(piece: Piece) -> Self {
         Self(piece.0 & 1)
+    }
+}
+
+impl From<Bitboard> for Square {
+    /// Converts the position of the LSB of `bb` to a [`Square`].
+    fn from(bb: Bitboard) -> Self {
+        Self(bb.0.trailing_zeros() as u8)
     }
 }
 

@@ -599,7 +599,7 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     let mut pawns = board.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
     while !pawns.is_empty() {
         let pawn = pawns.pop_lsb();
-        let pawn_sq = pawn.to_square();
+        let pawn_sq = Square::from(pawn);
 
         let potential_captures = if IS_WHITE {
             // SAFETY: Instantiating `board` initialises `LOOKUP`.

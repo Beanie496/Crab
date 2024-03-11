@@ -957,9 +957,8 @@ impl Board {
     fn king_square(&self) -> Square {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
-        (self.piece::<{ PieceType::KING.to_index() }>()
+        Square::from(self.piece::<{ PieceType::KING.to_index() }>()
             & self.sides[self.side_to_move().to_index()])
-        .to_square()
     }
 
     /// Tests if `square` is attacked by an enemy piece.
