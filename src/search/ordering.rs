@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 
 use super::SearchInfo;
 use crate::{
-    board::{Move, Moves, MAX_LEGAL_MOVES},
     evaluation::Eval,
+    movegen::{Move, Moves, MAX_LEGAL_MOVES},
     util::Stack,
 };
 

@@ -4,17 +4,23 @@ use uci::Uci;
 
 /// For unit testing.
 mod bench;
-/// A container for [`Bitboard`](bitboard::Bitboard).
+/// Items associated with [`Bitboard`](bitboard::Bitboard).
 mod bitboard;
-/// Items related to the board. Mainly [`Board`](board::Board).
+/// Items associated with [`Board`](board::Board).
 mod board;
 /// Definitions and enumerations.
 mod defs;
-/// A container for [`Engine`](engine::Engine).
+/// Items associated with [`Engine`](engine::Engine).
 mod engine;
-/// For evaluation.
+/// Items related to evaluation.
 mod evaluation;
-/// Handles UCI input.
+/// Items related to move generation.
+mod movegen;
+/// Perft: see <https://www.chessprogramming.org/Perft>.
+mod perft;
+/// The search.
+mod search;
+/// UCI input.
 mod uci;
 /// Utility.
 mod util;

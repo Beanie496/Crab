@@ -139,7 +139,7 @@ impl Bitboard {
 impl Bitboard {
     /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
     /// given position set.
-    pub fn from_pos(rank: Rank, file: File) -> Self {
+    fn from_pos(rank: Rank, file: File) -> Self {
         Self::from(Square::from_pos(rank, file))
     }
 

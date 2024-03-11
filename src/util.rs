@@ -1,6 +1,10 @@
 use std::{cmp::Ordering, mem::MaybeUninit};
 
-use crate::out_of_bounds_is_unreachable;
+use crate::{
+    bitboard::Bitboard,
+    defs::{Piece, PieceType, Rank, Square},
+    out_of_bounds_is_unreachable,
+};
 
 /// A generic stack.
 ///
@@ -69,4 +73,20 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
             })
         });
     }
+}
+
+/// Checks if the move is a double pawn push.
+pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
+    if PieceType::from(piece) != PieceType::PAWN {
+        return false;
+    }
+    let start_bb = Bitboard::from(start);
+    let end_bb = Bitboard::from(end);
+    if (start_bb & (Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7))).is_empty() {
+        return false;
+    }
+    if (end_bb & (Bitboard::rank_bb(Rank::RANK4) | Bitboard::rank_bb(Rank::RANK5))).is_empty() {
+        return false;
+    }
+    true
 }

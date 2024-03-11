@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{board::find_magics, defs::PieceType, engine::Engine};
+use crate::{defs::PieceType, engine::Engine, movegen::magic::find_magics};
 
 /// Used to store state for [`Self::main_loop()`].
 pub struct Uci {

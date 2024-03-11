@@ -3,10 +3,11 @@ use crate::{
     board::Board,
     defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW},
+    movegen::generate_moves,
 };
 
-/// Performs negamax on `board`. Returns the evaluation of after searching
-/// to the given depth.
+/// Performs a search on `board`. Returns the evaluation of after searching to
+/// the given depth.
 pub fn alpha_beta_search(
     search_info: &mut SearchInfo,
     board: &Board,
@@ -57,8 +58,7 @@ pub fn alpha_beta_search(
     }
 
     let mut pv = Pv::new();
-    let moves = board
-        .generate_moves::<{ MoveType::ALL }>()
+    let moves = generate_moves::<{ MoveType::ALL }>(board)
         .score(search_info, height)
         .sort();
 
@@ -120,7 +120,7 @@ fn quiescent_search(
         alpha = stand_pat;
     }
 
-    let moves = board.generate_moves::<{ MoveType::CAPTURES }>();
+    let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
 
     for mv in moves {
         let mut copy = board.clone();

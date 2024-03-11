@@ -1,7 +1,6 @@
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl},
-    slice::Iter,
     str::FromStr,
 };
 
@@ -9,20 +8,16 @@ use crate::{
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
+    movegen::{generate_moves, Lookup, Move, LOOKUPS},
     out_of_bounds_is_unreachable,
+    util::is_double_pawn_push,
 };
-use movegen::Lookup;
-
-pub use movegen::{magic::find_magics, Move, Moves, MAX_LEGAL_MOVES};
 
 /// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
 /// E.g. `0b1101` would be castling rights `KQq`.
 #[derive(Clone, Copy, Eq, PartialEq)]
 // The inner value of a wrapper does not need to be documented.
 pub struct CastlingRights(u8);
-
-/// Items related to move generation.
-mod movegen;
 
 /// Calls the method `set_startpos()` on `board`, prints `msg` using
 /// `println!()`, then returns.
@@ -253,21 +248,6 @@ impl Board {
         [Bitboard::empty(); Side::TOTAL]
     }
 
-    /// Returns an iterator over the internal mailbox. a1 b1, etc.
-    pub fn mailbox_iter(&self) -> Iter<'_, Piece> {
-        self.mailbox.iter()
-    }
-
-    /// Clears `self`.
-    pub fn clear_board(&mut self) {
-        self.mailbox = Self::empty_mailbox();
-        self.pieces = Self::no_pieces();
-        self.sides = Self::no_sides();
-        self.side_to_move = Side::NONE;
-        self.castling_rights = CastlingRights::none();
-        self.ep_square = Square::NONE;
-    }
-
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
         for r in (0..Rank::TOTAL as u8).rev() {
@@ -280,57 +260,7 @@ impl Board {
         println!("    ---------------");
         println!("    a b c d e f g h");
         println!();
-        println!("FEN: {}", self.current_fen_string());
-    }
-
-    /// Gets the current FEN representation of the board state.
-    pub fn current_fen_string(&self) -> String {
-        self.to_string()
-    }
-
-    /// Takes a sequence of moves and feeds them to the board. Will stop and
-    /// return if any of the moves are incorrect. Not implemented yet.
-    pub fn play_moves(&mut self, moves_str: &str) {
-        let mut copy = self.clone();
-
-        // `split()` will always return at least 1 element even if the initial
-        // string is empty
-        if moves_str.is_empty() {
-            return;
-        }
-
-        for mv in moves_str.split(' ') {
-            let mut moves = copy.generate_moves::<{ MoveType::ALL }>();
-
-            // I don't particularly want to deal with non-ascii characters
-            #[allow(clippy::string_slice)]
-            let Ok(start) = Square::from_str(&mv[0..=1]) else {
-                return println!("Start square of a move is not valid");
-            };
-            #[allow(clippy::string_slice)]
-            let Ok(end) = Square::from_str(&mv[2..=3]) else {
-                return println!("End square of a move is not valid");
-            };
-            // Each move should be exactly 4 characters; if it's a promotion,
-            // the last char will be the promotion char.
-            let mv = if mv.len() == 5 {
-                // SAFETY: It's not possible for it to be `None`.
-                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
-                moves.move_with_promo(start, end, PieceType::from(promotion_char))
-            } else {
-                moves.move_with(start, end)
-            };
-
-            let Some(mv) = mv else {
-                return println!("Illegal move");
-            };
-
-            if !copy.make_move(mv) {
-                return println!("Illegal move");
-            }
-            moves.clear();
-        }
-        *self = copy;
+        println!("FEN: {self}");
     }
 
     /// Sets `self.board` to the given FEN. It will check for basic errors,
@@ -472,6 +402,263 @@ impl Board {
         });
     }
 
+    /// Takes a sequence of moves and feeds them to the board. Will stop and
+    /// return if any of the moves are incorrect. Not implemented yet.
+    pub fn play_moves(&mut self, moves_str: &str) {
+        let mut copy = self.clone();
+
+        // `split()` will always return at least 1 element even if the initial
+        // string is empty
+        if moves_str.is_empty() {
+            return;
+        }
+
+        for mv in moves_str.split(' ') {
+            let mut moves = generate_moves::<{ MoveType::ALL }>(&copy);
+
+            // I don't particularly want to deal with non-ascii characters
+            #[allow(clippy::string_slice)]
+            let Ok(start) = Square::from_str(&mv[0..=1]) else {
+                return println!("Start square of a move is not valid");
+            };
+            #[allow(clippy::string_slice)]
+            let Ok(end) = Square::from_str(&mv[2..=3]) else {
+                return println!("End square of a move is not valid");
+            };
+            // Each move should be exactly 4 characters; if it's a promotion,
+            // the last char will be the promotion char.
+            let mv = if mv.len() == 5 {
+                // SAFETY: It's not possible for it to be `None`.
+                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
+                moves.move_with_promo(start, end, PieceType::from(promotion_char))
+            } else {
+                moves.move_with(start, end)
+            };
+
+            let Some(mv) = mv else {
+                return println!("Illegal move");
+            };
+
+            if !copy.make_move(mv) {
+                return println!("Illegal move");
+            }
+            moves.clear();
+        }
+        *self = copy;
+    }
+
+    /// Returns the piece bitboard given by `PIECE`.
+    pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
+        self.pieces[PIECE]
+    }
+
+    /// Returns the board of the side according to `IS_WHITE`.
+    pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
+        if IS_WHITE {
+            self.sides[Side::WHITE.to_index()]
+        } else {
+            self.sides[Side::BLACK.to_index()]
+        }
+    }
+
+    /// Returns all the occupied squares on the board.
+    pub fn occupancies(&self) -> Bitboard {
+        self.side::<true>() | self.side::<false>()
+    }
+
+    /// Returns the side to move.
+    pub const fn side_to_move(&self) -> Side {
+        self.side_to_move
+    }
+
+    /// Calculates if the given side can castle kingside.
+    pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_kingside::<IS_WHITE>()
+    }
+
+    /// Calculates if the given side can castle queenside.
+    pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
+        self.castling_rights.can_castle_queenside::<IS_WHITE>()
+    }
+
+    /// Returns the en passant square, which might be [`Square::NONE`].
+    pub const fn ep_square(&self) -> Square {
+        self.ep_square
+    }
+
+    /// Returns halfmoves since last capture or pawn move.
+    pub const fn halfmoves(&self) -> u8 {
+        self.halfmoves
+    }
+
+    /// Returns the current move number.
+    pub const fn fullmoves(&self) -> u16 {
+        self.fullmoves
+    }
+
+    /// Calculates the current material + piece-square table balance.
+    ///
+    /// Since this value is incrementally upadated, this function is zero-cost
+    /// to call.
+    pub const fn psq(&self) -> Score {
+        self.psq_accumulator
+    }
+
+    /// Gets the phase of the game. 0 is midgame and 24 is endgame.
+    ///
+    /// Since this value is incrementally upadated, this function is zero-cost
+    /// to call.
+    pub const fn phase(&self) -> u8 {
+        self.phase_accumulator
+    }
+
+    /// Tests if the king is in check.
+    pub fn is_in_check(&self) -> bool {
+        self.is_square_attacked(self.king_square())
+    }
+
+    /// Makes the given move on the internal board. `mv` is assumed to be a
+    /// valid move. Returns `true` if the given move is legal, `false`
+    /// otherwise.
+    pub fn make_move(&mut self, mv: Move) -> bool {
+        let start = mv.start();
+        let end = mv.end();
+        let is_promotion = mv.is_promotion();
+        let is_castling = mv.is_castling();
+        let is_en_passant = mv.is_en_passant();
+
+        let piece = self.piece_on(start);
+        let piece_type = PieceType::from(piece);
+        let captured = self.piece_on(end);
+        let captured_type = PieceType::from(captured);
+        let us = Side::from(piece);
+        let them = us.flip();
+        let start_bb = Bitboard::from(start);
+        let end_bb = Bitboard::from(end);
+
+        self.halfmoves += 1;
+        if us == Side::BLACK {
+            self.fullmoves += 1;
+        }
+
+        if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
+            self.halfmoves = 0;
+        // 75-move rule: if 75 moves have been made by both players, the game
+        // is adjucated as a draw. So the 151st move is illegal.
+        } else if self.halfmoves > 150 {
+            return false;
+        }
+
+        self.clear_ep_square();
+
+        self.move_piece(start, end, piece, piece_type, us);
+
+        if captured_type != PieceType::NONE {
+            self.update_bb_piece(end_bb, captured_type, them);
+            self.remove_psq_piece(end, captured);
+            self.remove_phase_piece(captured);
+
+            // check if we need to unset the castling rights if we're capturing
+            // a rook
+            if captured_type == PieceType::ROOK {
+                let us_inner = us.0;
+                // this will be 0x81 if we're White (0x81 << 0) and
+                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
+                // the starting position of our rooks.
+                let rook_squares = Bitboard(0x81) << (us_inner * 56);
+                if !(end_bb & rook_squares).is_empty() {
+                    // 0 or 56 for queenside -> 0
+                    // 7 or 63 for kingside -> 1
+                    let is_kingside = end.0 & 1;
+                    // queenside -> 0b01
+                    // kingside -> 0b10
+                    // this replies upon knowing the internal representation of
+                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
+                    let flag = is_kingside + 1;
+                    self.unset_castling_right(them, CastlingRights(flag));
+                }
+            }
+        }
+
+        if is_castling {
+            // if the king is castling out of check
+            if self.is_square_attacked(start) {
+                return false;
+            }
+            // if the king is castling into check
+            if self.is_square_attacked(end) {
+                return false;
+            }
+
+            let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
+            let rook_end = Square((start.0 + end.0) >> 1);
+            // if the king is castling through check
+            if self.is_square_attacked(rook_end) {
+                return false;
+            }
+
+            self.move_piece(
+                rook_start,
+                rook_end,
+                // `captured` is equivalent but slower
+                Piece::from_piecetype(PieceType::ROOK, us),
+                PieceType::ROOK,
+                us,
+            );
+
+            self.unset_castling_rights(us);
+        } else if is_double_pawn_push(start, end, piece) {
+            self.set_ep_square(Square((start.0 + end.0) >> 1));
+        } else if is_en_passant {
+            let dest = Square(if us == Side::WHITE {
+                end.0 - 8
+            } else {
+                end.0 + 8
+            });
+            let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
+            self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
+        } else if is_promotion {
+            let promotion_piece_type = mv.promotion_piece();
+            let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
+
+            // overwrite the pawn on the mailbox
+            self.set_mailbox_piece(end, promotion_piece);
+
+            // remove the pawn
+            self.toggle_piece_bb(piece_type, end_bb);
+            self.remove_psq_piece(end, piece);
+            self.remove_phase_piece(piece);
+
+            // add the promotion piece
+            self.toggle_piece_bb(promotion_piece_type, end_bb);
+            self.add_psq_piece(end, promotion_piece);
+            self.add_phase_piece(promotion_piece);
+        }
+
+        if self.is_square_attacked(self.king_square()) {
+            return false;
+        }
+
+        // this is basically the same as a few lines ago but with start square
+        // instead of end
+        if piece_type == PieceType::ROOK {
+            let them_inner = them.0;
+            let rook_squares = Bitboard(0x81) << (them_inner * 56);
+            if !(start_bb & rook_squares).is_empty() {
+                let is_kingside = start.0 & 1;
+                let flag = is_kingside + 1;
+                self.unset_castling_right(us, CastlingRights(flag));
+            }
+        }
+        if piece_type == PieceType::KING {
+            self.unset_castling_rights(us);
+        }
+
+        self.flip_side();
+
+        true
+    }
+
     /// Converts the current board to a string.
     ///
     /// e.g. the starting position would be
@@ -479,7 +666,7 @@ impl Board {
     // the unwraps are called on values that logically can not be `None`, so
     // this can not panic
     #[allow(clippy::missing_panics_doc)]
-    pub fn stringify_board(&self) -> String {
+    fn stringify_board(&self) -> String {
         let mut ret_str = String::new();
         let mut empty_squares = 0;
         // I can't just iterate over the piece board normally: the board goes
@@ -517,53 +704,28 @@ impl Board {
         ret_str
     }
 
+    /// Clears `self`.
+    fn clear_board(&mut self) {
+        self.mailbox = Self::empty_mailbox();
+        self.pieces = Self::no_pieces();
+        self.sides = Self::no_sides();
+        self.side_to_move = Side::NONE;
+        self.castling_rights = CastlingRights::none();
+        self.ep_square = Square::NONE;
+    }
+
     /// Resets the board.
-    pub fn set_startpos(&mut self) {
+    fn set_startpos(&mut self) {
         *self = Self::default();
     }
 
-    /// Returns the piece on `square`.
-    pub fn piece_on(&self, square: Square) -> Piece {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()]
-    }
-
-    /// Returns the piece bitboard given by `PIECE`.
-    pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
-        self.pieces[PIECE]
-    }
-
-    /// Adds a piece to square `square` for side `side`. Assumes there is no
-    /// piece on the square to be written to.
-    pub fn add_piece(&mut self, square: Square, piece: Piece) {
-        let square_bb = Bitboard::from(square);
-        let side = Side::from(piece);
-        self.set_mailbox_piece(square, piece);
-        self.toggle_piece_bb(PieceType::from(piece), square_bb);
-        self.toggle_side_bb(side, square_bb);
-        self.add_psq_piece(square, piece);
-        self.add_phase_piece(piece);
-    }
-
-    /// Removes `piece` from `square`.
-    ///
-    /// Technically most of these parameters could be calculated instead of
-    /// passed by argument, but it resulted in a noticeable slowdown when they
-    /// were removed.
-    pub fn remove_piece(
-        &mut self,
-        square: Square,
-        piece: Piece,
-        piece_type: PieceType,
-        side: Side,
-    ) {
-        let bb = Bitboard::from(square);
-        self.unset_mailbox_piece(square);
-        self.toggle_piece_bb(piece_type, bb);
-        self.toggle_side_bb(side, bb);
-        self.remove_psq_piece(square, piece);
-        self.remove_phase_piece(piece);
+    /// Finds the piece on the given rank and file and converts it to its
+    /// character representation. If no piece is on the square, returns '0'
+    /// instead.
+    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
+        let square = Square::from_pos(rank, file);
+        let piece = self.piece_on(square);
+        char::from(piece)
     }
 
     /// A wrapper over [`move_mailbox_piece`](Board::move_mailbox_piece),
@@ -587,145 +749,67 @@ impl Board {
         self.move_psq_piece(start, end, piece);
     }
 
-    /// Sets the piece on `square` in the mailbox to `piece`.
-    pub fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
+    /// Returns the piece on `square`.
+    fn piece_on(&self, square: Square) -> Piece {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()] = piece;
+        self.mailbox[square.to_index()]
     }
 
-    /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
-    pub fn unset_mailbox_piece(&mut self, square: Square) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()] = Piece::NONE;
+    /// Adds a piece to square `square` for side `side`. Assumes there is no
+    /// piece on the square to be written to.
+    fn add_piece(&mut self, square: Square, piece: Piece) {
+        let square_bb = Bitboard::from(square);
+        let side = Side::from(piece);
+        self.set_mailbox_piece(square, piece);
+        self.toggle_piece_bb(PieceType::from(piece), square_bb);
+        self.toggle_side_bb(side, square_bb);
+        self.add_psq_piece(square, piece);
+        self.add_phase_piece(piece);
+    }
+
+    /// Removes `piece` from `square`.
+    ///
+    /// Technically most of these parameters could be calculated instead of
+    /// passed by argument, but it resulted in a noticeable slowdown when they
+    /// were removed.
+    fn remove_piece(&mut self, square: Square, piece: Piece, piece_type: PieceType, side: Side) {
+        let bb = Bitboard::from(square);
+        self.unset_mailbox_piece(square);
+        self.toggle_piece_bb(piece_type, bb);
+        self.toggle_side_bb(side, bb);
+        self.remove_psq_piece(square, piece);
+        self.remove_phase_piece(piece);
     }
 
     /// Moves `piece` from `start` to `end` in the mailbox.
     ///
     /// `piece` is assumed to exist at the start square: the piece is given as
     /// an argument instead of calculated for reasons of speed.
-    pub fn move_mailbox_piece(&mut self, start: Square, end: Square, piece: Piece) {
+    fn move_mailbox_piece(&mut self, start: Square, end: Square, piece: Piece) {
         self.unset_mailbox_piece(start);
         self.set_mailbox_piece(end, piece);
     }
 
-    /// Returns the side to move.
-    pub const fn side_to_move(&self) -> Side {
-        self.side_to_move
+    /// Sets the piece on `square` in the mailbox to `piece`.
+    fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
+        self.mailbox[square.to_index()] = piece;
     }
 
-    /// Sets side to move to `side`.
-    pub fn set_side_to_move(&mut self, side: Side) {
-        self.side_to_move = side;
+    /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
+    fn unset_mailbox_piece(&mut self, square: Square) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
+        self.mailbox[square.to_index()] = Piece::NONE;
     }
 
-    /// Flip the side to move.
-    pub fn flip_side(&mut self) {
-        self.side_to_move = self.side_to_move.flip();
-    }
-
-    /// Returns the board of the side according to `IS_WHITE`.
-    pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
-        if IS_WHITE {
-            self.sides[Side::WHITE.to_index()]
-        } else {
-            self.sides[Side::BLACK.to_index()]
-        }
-    }
-
-    /// Returns the string representation of the current side to move: 'w' if
-    /// White and 'b' if Black.
-    pub const fn side_to_move_as_char(&self) -> char {
-        (b'b' + self.side_to_move().0 * 21) as char
-    }
-
-    /// Calculates if the given side can castle kingside.
-    pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_kingside::<IS_WHITE>()
-    }
-
-    /// Calculates if the given side can castle queenside.
-    pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_queenside::<IS_WHITE>()
-    }
-
-    /// Adds the given right to the castling rights.
-    pub fn add_castling_right(&mut self, right: CastlingRights) {
-        self.castling_rights.add_right(right);
-    }
-
-    /// Unsets castling the given right for the given side.
-    pub fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
-        self.castling_rights.remove_right(side, right);
-    }
-
-    /// Clears the castling rights for the given side.
-    pub fn unset_castling_rights(&mut self, side: Side) {
-        self.castling_rights.clear_side(side);
-    }
-
-    /// Converts the current castling rights into their string representation.
-    ///
-    /// E.g. `KQq` if the White king can castle both ways and the Black king
-    /// can only castle queenside.
-    pub fn stringify_castling_rights(&self) -> String {
-        self.castling_rights.to_string()
-    }
-
-    /// Returns the en passant square, which might be [`Square::NONE`].
-    pub const fn ep_square(&self) -> Square {
-        self.ep_square
-    }
-
-    /// Sets the en passant square to [`Square::NONE`].
-    pub fn clear_ep_square(&mut self) {
-        self.ep_square = Square::NONE;
-    }
-
-    /// Sets the en passant square to `square`.
-    pub fn set_ep_square(&mut self, square: Square) {
-        self.ep_square = square;
-    }
-
-    /// Returns the string representation of the current en passant square: the
-    /// square if there is one (e.g. "b3") or "-" if there is none.
-    pub fn stringify_ep_square(&self) -> String {
-        let ep_square = self.ep_square();
-        if ep_square == Square::NONE {
-            "-".to_string()
-        } else {
-            ep_square.to_string()
-        }
-    }
-
-    /// Returns halfmoves since last capture or pawn move.
-    pub const fn halfmoves(&self) -> u8 {
-        self.halfmoves
-    }
-
-    /// Sets halfmoves.
-    pub fn set_halfmoves(&mut self, count: u8) {
-        self.halfmoves = count;
-    }
-
-    /// Returns the current move number.
-    pub const fn fullmoves(&self) -> u16 {
-        self.fullmoves
-    }
-
-    /// Sets fullmoves.
-    pub fn set_fullmoves(&mut self, count: u16) {
-        self.fullmoves = count;
-    }
-
-    /// Finds the piece on the given rank and file and converts it to its
-    /// character representation. If no piece is on the square, returns '0'
-    /// instead.
-    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
-        let square = Square::from_pos(rank, file);
-        let piece = self.piece_on(square);
-        char::from(piece)
+    /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
+    /// the side bitboard of `side`.
+    fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
+        self.toggle_piece_bb(piece_type, bb);
+        self.toggle_side_bb(side, bb);
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
@@ -742,11 +826,74 @@ impl Board {
         self.sides[side.to_index()] ^= bb;
     }
 
-    /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
-    /// the side bitboard of `side`.
-    fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
-        self.toggle_piece_bb(piece_type, bb);
-        self.toggle_side_bb(side, bb);
+    /// Sets side to move to `side`.
+    fn set_side_to_move(&mut self, side: Side) {
+        self.side_to_move = side;
+    }
+
+    /// Flip the side to move.
+    fn flip_side(&mut self) {
+        self.side_to_move = self.side_to_move.flip();
+    }
+
+    /// Returns the string representation of the current side to move: 'w' if
+    /// White and 'b' if Black.
+    const fn side_to_move_as_char(&self) -> char {
+        (b'b' + self.side_to_move().0 * 21) as char
+    }
+
+    /// Converts the current castling rights into their string representation.
+    ///
+    /// E.g. `KQq` if the White king can castle both ways and the Black king
+    /// can only castle queenside.
+    fn stringify_castling_rights(&self) -> String {
+        self.castling_rights.to_string()
+    }
+
+    /// Adds the given right to the castling rights.
+    fn add_castling_right(&mut self, right: CastlingRights) {
+        self.castling_rights.add_right(right);
+    }
+
+    /// Unsets castling the given right for the given side.
+    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
+        self.castling_rights.remove_right(side, right);
+    }
+
+    /// Clears the castling rights for the given side.
+    fn unset_castling_rights(&mut self, side: Side) {
+        self.castling_rights.clear_side(side);
+    }
+
+    /// Returns the string representation of the current en passant square: the
+    /// square if there is one (e.g. "b3") or "-" if there is none.
+    fn stringify_ep_square(&self) -> String {
+        let ep_square = self.ep_square();
+        if ep_square == Square::NONE {
+            "-".to_string()
+        } else {
+            ep_square.to_string()
+        }
+    }
+
+    /// Sets the en passant square to `square`.
+    fn set_ep_square(&mut self, square: Square) {
+        self.ep_square = square;
+    }
+
+    /// Sets the en passant square to [`Square::NONE`].
+    fn clear_ep_square(&mut self) {
+        self.ep_square = Square::NONE;
+    }
+
+    /// Sets halfmoves.
+    fn set_halfmoves(&mut self, count: u8) {
+        self.halfmoves = count;
+    }
+
+    /// Sets fullmoves.
+    fn set_fullmoves(&mut self, count: u16) {
+        self.fullmoves = count;
     }
 
     /// Recalculates the accumulators from scratch. Prefer to use functions
@@ -755,7 +902,7 @@ impl Board {
         let mut score = Score(0, 0);
         let mut phase = 0;
 
-        for (square, piece) in self.mailbox_iter().enumerate() {
+        for (square, piece) in self.mailbox.iter().enumerate() {
             score += PIECE_SQUARE_TABLES[piece.to_index()][square];
             phase += PHASE_WEIGHTS[piece.to_index()];
         }
@@ -764,12 +911,12 @@ impl Board {
         self.phase_accumulator = phase;
     }
 
-    /// Calculates the current material + piece-square table balance.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn psq(&self) -> Score {
-        self.psq_accumulator
+    /// Updates the piece-square table accumulator by adding the difference
+    /// between the psqt value of the start and end square (which can be
+    /// negative).
+    fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
+        self.remove_psq_piece(start, piece);
+        self.add_psq_piece(end, piece);
     }
 
     /// Adds the piece-square table value for `piece` at `square` to the psqt
@@ -792,22 +939,6 @@ impl Board {
         self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
-    /// Updates the piece-square table accumulator by adding the difference
-    /// between the psqt value of the start and end square (which can be
-    /// negative).
-    fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
-        self.remove_psq_piece(start, piece);
-        self.add_psq_piece(end, piece);
-    }
-
-    /// Gets the phase of the game. 0 is midgame and 24 is endgame.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn phase(&self) -> u8 {
-        self.phase_accumulator
-    }
-
     /// Adds `piece` to `self.phase`.
     fn add_phase_piece(&mut self, piece: Piece) {
         // SAFETY: If it does get reached, it will panic in debug.
@@ -822,11 +953,6 @@ impl Board {
         self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
     }
 
-    /// Tests if the king is in check.
-    pub fn is_in_check(&self) -> bool {
-        self.is_square_attacked(self.king_square())
-    }
-
     /// Calculates the square the king is on.
     fn king_square(&self) -> Square {
         // SAFETY: If it does get reached, it will panic in debug.
@@ -834,6 +960,48 @@ impl Board {
         (self.piece::<{ PieceType::KING.to_index() }>()
             & self.sides[self.side_to_move().to_index()])
         .to_square()
+    }
+
+    /// Tests if `square` is attacked by an enemy piece.
+    fn is_square_attacked(&self, square: Square) -> bool {
+        let occupancies = self.occupancies();
+        let us = self.side_to_move();
+        let them = us.flip();
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(them.to_index(), self.sides.len()) };
+        let them_bb = self.sides[them.to_index()];
+
+        // SAFETY: Instantiating `self` initialises `LOOKUP`.
+        let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
+        // SAFETY: Ditto.
+        let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
+        // SAFETY: Ditto.
+        let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
+        // SAFETY: Ditto.
+        let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
+        // SAFETY: Ditto.
+        let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
+
+        let pawns = self.piece::<{ PieceType::PAWN.to_index() }>();
+        let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>();
+        let bishops = self.piece::<{ PieceType::BISHOP.to_index() }>();
+        let rooks = self.piece::<{ PieceType::ROOK.to_index() }>();
+        let queens = self.piece::<{ PieceType::QUEEN.to_index() }>();
+        let kings = self.piece::<{ PieceType::KING.to_index() }>();
+
+        let is_attacked_by_pawns = pawn_attacks & pawns;
+        let is_attacked_by_knights = knight_attacks & knights;
+        let is_attacked_by_kings = king_attacks & kings;
+        let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
+        let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
+
+        !((is_attacked_by_pawns
+            | is_attacked_by_knights
+            | is_attacked_by_kings
+            | is_attacked_diagonally
+            | is_attacked_orthogonally)
+            & them_bb)
+            .is_empty()
     }
 }
 

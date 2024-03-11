@@ -1,14 +1,13 @@
 use std::{
     fmt::{self, Display, Formatter},
-    sync::mpsc::{channel, Receiver, Sender},
-    thread::{spawn, JoinHandle},
+    sync::mpsc::Receiver,
     time::{Duration, Instant},
 };
 
-use super::Engine;
 use crate::{
-    board::{Board, Move},
+    board::Board,
     evaluation::{Eval, INF_EVAL},
+    movegen::Move,
     uci::Limits,
 };
 use alpha_beta::alpha_beta_search;
@@ -75,14 +74,6 @@ pub struct SearchInfo {
 /// Used to tell the search thread to stop.
 pub struct Stop;
 
-/// Used to lump together a transmitter and a join handle into the same
-/// [`Option`].
-#[allow(clippy::missing_docs_in_private_items)]
-pub struct ThreadState<Tx, Handle> {
-    tx: Sender<Tx>,
-    handle: JoinHandle<Handle>,
-}
-
 /// The maximum depth this engine supports.
 const MAX_PLY: usize = u8::MAX as usize;
 
@@ -127,52 +118,6 @@ impl Display for SearchInfo {
             self.score,
             self.nps,
         )
-    }
-}
-
-impl Engine {
-    /// Start the search. Runs to infinity if `depth == None`, otherwise runs
-    /// to depth `Some(depth)`.
-    pub fn start_search(&mut self, limits: Limits) {
-        let board_clone = self.board.clone();
-        let (control_tx, control_rx) = channel();
-
-        let search_info = SearchInfo::new(control_rx, limits);
-
-        assert!(
-            self.search_thread_state.is_none(),
-            "Starting a search when one is already going"
-        );
-
-        // The inner thread spawned runs the iterative deepening loop. It sends
-        // the information to `info_rx`. The outer thread spawned prints any
-        // information received through `info_rx`, blocking until it does. When
-        // the search finishes, both threads terminate.
-        // I don't like spawning two threads, but I don't really have a choice
-        // if I don't want users of my API not to have to implement
-        // parallelism.
-        self.search_thread_state = Some(ThreadState::new(
-            control_tx,
-            spawn(move || {
-                iterative_deepening(search_info, &board_clone);
-            }),
-        ));
-    }
-
-    /// Stops the search, if any.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` couldn't join on the search thread.
-    pub fn stop_search(&mut self) {
-        // we don't particularly care if it's already stopped, we just want it
-        // to stop.
-        #[allow(unused_must_use)]
-        if let Some(state) = self.search_thread_state.take() {
-            state.tx.send(Stop);
-            #[allow(clippy::unwrap_used)]
-            state.handle.join().unwrap();
-        }
     }
 }
 
@@ -243,7 +188,7 @@ impl Pv {
 impl SearchInfo {
     /// Creates a new [`SearchInfo`] with the initial information that searches
     /// start with.
-    const fn new(control_rx: Receiver<Stop>, limits: Limits) -> Self {
+    pub const fn new(control_rx: Receiver<Stop>, limits: Limits) -> Self {
         Self {
             depth: 0,
             time: Duration::ZERO,
@@ -270,17 +215,10 @@ impl SearchInfo {
     }
 }
 
-impl<T, U> ThreadState<T, U> {
-    /// Creates a new [`ThreadState`] from a transmitter and handle.
-    const fn new(tx: Sender<T>, handle: JoinHandle<U>) -> Self {
-        Self { tx, handle }
-    }
-}
-
 /// Performs iterative deepening.
 ///
 /// Since there is no move ordering or TT, this is currently a slowdown.
-fn iterative_deepening(mut search_info: SearchInfo, board: &Board) {
+pub fn iterative_deepening(mut search_info: SearchInfo, board: &Board) {
     let time = Instant::now();
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
