@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     board::Board,
+    defs::Side,
     perft::perft,
-    search::{iterative_deepening, SearchInfo, Stop},
-    uci::Limits,
+    search::{iterative_deepening, Depth, Limits, SearchInfo, Stop},
 };
 
 /// Master object that contains all the other major objects.
@@ -68,7 +68,7 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(search_info, &board_clone);
+                iterative_deepening(&board_clone, search_info);
             }),
         ));
     }
@@ -96,8 +96,13 @@ impl Engine {
 
     /// Runs [`perft`] with the given parameters and the current
     /// board.
-    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&self, depth: u8) -> u64 {
+    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&self, depth: Depth) -> u64 {
         perft::<SHOULD_PRINT, IS_TIMED>(&self.board.clone(), depth)
+    }
+
+    /// Returns the sode to move on the current board.
+    pub const fn side_to_move(&self) -> Side {
+        self.board.side_to_move()
     }
 }
 

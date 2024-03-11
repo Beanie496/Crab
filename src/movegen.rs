@@ -416,9 +416,13 @@ impl Move {
 
     /// Checks if the given start and end square match the start and end square
     /// contained within `self`.
-    pub fn is_moving_from_to(self, start: Square, end: Square) -> bool {
+    pub const fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
-        self == other
+        // if the start and end square are the same, xoring them together
+        // will be 0
+        (self.lower ^ other.lower) & Self::SQUARE_MASK
+            | (self.upper ^ other.upper) & Self::SQUARE_MASK
+            == 0
     }
 
     /// Checks if the given start square, end square and promotion piece match
