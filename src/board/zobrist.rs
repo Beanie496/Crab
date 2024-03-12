@@ -111,8 +111,11 @@ impl ZobristKeys {
             castling_rights[i] = rand!(seed);
         });
 
-        cfor!(let mut piece = 0; piece < Square::TOTAL; piece += 1; {
-            ep[piece] = rand!(seed);
+        cfor!(let mut square = Square::A3.0; square <= Square::H3.0; square += 1; {
+            ep[square as usize] = rand!(seed);
+        });
+        cfor!(let mut square = Square::A6.0; square <= Square::H6.0; square += 1; {
+            ep[square as usize] = rand!(seed);
         });
 
         Self {

@@ -770,6 +770,7 @@ impl Board {
 
     /// Flip the side to move.
     fn flip_side(&mut self) {
+        self.toggle_zobrist_side();
         self.side_to_move = self.side_to_move.flip();
     }
 
