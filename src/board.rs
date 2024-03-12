@@ -19,15 +19,6 @@ use crate::{
 // The inner value of a wrapper does not need to be documented.
 pub struct CastlingRights(u8);
 
-/// Calls the method `set_startpos()` on `board`, prints `msg` using
-/// `println!()`, then returns.
-macro_rules! reset_board_print_return {
-    ($board:expr, $msg:expr) => {{
-        $board.set_startpos();
-        return println!($msg);
-    }};
-}
-
 /// The board. It contains information about the current board state and can
 /// generate pseudo-legal moves. It is small (134 bytes) so it uses copy-make.
 #[derive(Clone)]
@@ -263,81 +254,55 @@ impl Board {
         println!("FEN: {self}");
     }
 
-    /// Sets `self.board` to the given FEN. It will check for basic errors,
-    /// like the board having too many ranks, but not many more.
-    // this function cannot panic as the only unwrap is on a hardcoded value
-    #[allow(clippy::missing_panics_doc)]
+    /// Sets `self.board` to the given FEN.
+    ///
+    /// This function does practically no error checking because that's up to
+    /// the GUI. If it does catch an error, it will panic.
+    #[allow(clippy::unwrap_used)]
     pub fn set_pos_to_fen(&mut self, position: &str) {
+        if position.is_empty() {
+            return;
+        }
+
         self.clear_board();
 
         let mut iter = position.split(' ');
-        let Some(board) = iter.next() else {
-            reset_board_print_return!(self, "Error: need to pass a board");
-        };
+        let board = iter.next().unwrap();
         let side_to_move = iter.next();
         let castling_rights = iter.next();
         let ep_square = iter.next();
         let halfmoves = iter.next();
         let fullmoves = iter.next();
 
-        // 1. the board itself. 1 of each king isn't checked. Hey, garbage in,
-        // garbage out!
-        // split into 2 to check for overflow easily
-        let mut rank_idx = 8u8;
-        let mut file_idx = 0;
+        // 1. the board itself
+        let mut square = 56;
         let ranks = board.split('/');
         for rank in ranks {
-            // if the board has too many ranks, this would eventually underflow
-            // and panic, so wrapping sub needed
-            rank_idx = rank_idx.wrapping_sub(1);
             for piece in rank.chars() {
                 // if it's a number, skip over that many files
                 if ('0'..='8').contains(&piece) {
                     // `piece` is from 0 to 8 inclusive so the unwrap cannot
                     // panic
-                    #[allow(clippy::unwrap_used)]
                     let empty_squares = piece.to_digit(10).unwrap() as u8;
-                    file_idx += empty_squares;
+                    square += empty_squares;
                 } else {
-                    let piece_num = Piece::from(piece);
-                    if piece_num == Piece::NONE {
-                        reset_board_print_return!(self, "Error: \"{piece}\" is not a valid piece.");
-                    }
+                    let piece = Piece::from(piece);
 
-                    self.add_piece(Square::from_pos(Rank(rank_idx), File(file_idx)), piece_num);
+                    self.add_piece(Square(square), piece);
 
-                    file_idx += 1;
+                    square += 1;
                 }
             }
-            // if there are too few/many files in that rank, reset and return
-            if file_idx != 8 {
-                reset_board_print_return!(self, "Error: FEN is invalid");
-            }
-
-            file_idx = 0;
-        }
-        // if there are too many/few ranks in the board, reset and return
-        if rank_idx != 0 {
-            reset_board_print_return!(self, "Error: FEN is invalid (incorrect number of ranks)");
+            square = square.wrapping_sub(16);
         }
 
         // 2. side to move
         if let Some(stm) = side_to_move {
             if stm == "w" {
                 self.set_side_to_move(Side::WHITE);
-            } else if stm == "b" {
-                self.set_side_to_move(Side::BLACK);
             } else {
-                reset_board_print_return!(
-                    self,
-                    "Error: Side to move \"{stm}\" is not \"w\" or \"b\""
-                );
+                self.set_side_to_move(Side::BLACK);
             }
-        } else {
-            // I've decided that everything apart from the board can be omitted
-            // and guessed, so if there's nothing given, default to White to
-            // move.
-            self.set_side_to_move(Side::WHITE);
         }
 
         // 3. castling rights
@@ -348,95 +313,47 @@ impl Board {
                     'Q' => self.add_castling_right(CastlingRights::Q),
                     'k' => self.add_castling_right(CastlingRights::k),
                     'q' => self.add_castling_right(CastlingRights::q),
-                    '-' => (),
-                    _ => {
-                        reset_board_print_return!(
-                            self,
-                            "Error: castling right \"{right}\" is not valid"
-                        );
-                    }
+                    _ => (),
                 }
             }
         }
 
         // 4. en passant
-        self.set_ep_square(if let Some(ep) = ep_square {
-            if let Ok(square) = ep.parse::<Square>() {
-                square
-            } else {
-                reset_board_print_return!(
-                    self,
-                    "Error: En passant square \"{ep}\" is not a valid square"
-                );
-            }
-        } else {
-            Square::NONE
-        });
+        let ep_square = ep_square.map_or(Square::NONE, |ep| ep.parse::<Square>().unwrap());
+        self.set_ep_square(ep_square);
 
         // 5. halfmoves
-        self.set_halfmoves(if let Some(hm) = halfmoves {
-            if let Ok(hm) = hm.parse::<u8>() {
-                hm
-            } else {
-                reset_board_print_return!(
-                    self,
-                    "Error: Invalid number (\"{hm}\") given for halfmove counter"
-                );
-            }
-        } else {
-            0
-        });
+        let halfmoves = halfmoves.map_or(0, |hm| hm.parse::<u8>().unwrap());
+        self.set_halfmoves(halfmoves);
 
         // 6. fullmoves
-        self.set_fullmoves(if let Some(fm) = fullmoves {
-            if let Ok(fm) = fm.parse::<u16>() {
-                fm
-            } else {
-                reset_board_print_return!(
-                    self,
-                    "Error: Invalid number (\"{fm}\") given for fullmove counter"
-                );
-            }
-        } else {
-            0
-        });
+        let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
+        self.set_fullmoves(fullmoves);
     }
 
-    /// Takes a sequence of moves and feeds them to the board. Will stop and
-    /// return if any of the moves are incorrect. Not implemented yet.
+    /// Takes a sequence of moves in long algebraic notation and feeds them to
+    /// the board. If a move is invalid or illegal, it panics.
+    #[allow(clippy::unwrap_used)]
     pub fn play_moves(&mut self, moves_str: &str) {
-        let mut copy = self.clone();
-
-        // `split()` will always return at least 1 element even if the initial
-        // string is empty
+        // UCI says it's ok to have no moves
         if moves_str.is_empty() {
             return;
         }
 
+        let mut copy = self.clone();
+
+        #[allow(clippy::string_slice)]
         for mv in moves_str.split(' ') {
             let mut moves = generate_moves::<{ MoveType::ALL }>(&copy);
 
-            // I don't particularly want to deal with non-ascii characters
-            #[allow(clippy::string_slice)]
-            let Ok(start) = Square::from_str(&mv[0..=1]) else {
-                return println!("Start square of a move is not valid");
-            };
-            #[allow(clippy::string_slice)]
-            let Ok(end) = Square::from_str(&mv[2..=3]) else {
-                return println!("End square of a move is not valid");
-            };
+            let start = Square::from_str(&mv[0..=1]).unwrap();
+            let end = Square::from_str(&mv[2..=3]).unwrap();
 
-            let mv = moves.move_with(start, end);
+            let mv = moves.move_with(start, end).unwrap();
 
-            let Some(mv) = mv else {
-                return println!("Illegal move");
-            };
-
-            if !copy.make_move(mv) {
-                return println!("Illegal move");
-            }
-            moves.clear();
+            assert!(copy.make_move(mv), "Illegal move");
         }
+
         *self = copy;
     }
 
@@ -709,11 +626,6 @@ impl Board {
         self.fullmoves = 1;
         self.psq_accumulator = Score(0, 0);
         self.phase_accumulator = 0;
-    }
-
-    /// Resets the board.
-    fn set_startpos(&mut self) {
-        *self = Self::default();
     }
 
     /// Finds the piece on the given rank and file and converts it to its

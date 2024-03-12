@@ -40,6 +40,7 @@ pub struct File(pub u8);
 pub struct MoveType;
 
 /// The error that happens if a parsed string is invalid.
+#[derive(Debug)]
 pub struct ParseError;
 
 /// A piece, containing the type of piece and side.

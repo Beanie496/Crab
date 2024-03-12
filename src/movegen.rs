@@ -465,11 +465,6 @@ impl Moves {
     pub fn pop(&mut self) -> Option<Move> {
         self.moves.pop()
     }
-
-    /// Clears `self`.
-    pub fn clear(&mut self) {
-        self.moves.clear();
-    }
 }
 
 /// Generates all legal moves for the current position and puts them in

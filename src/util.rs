@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{cmp::Ordering, mem::MaybeUninit};
 
 use crate::{
