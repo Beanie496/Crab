@@ -9,8 +9,8 @@ use crate::{
 /// Performs a search on `board`. Returns the evaluation of after searching to
 /// the given depth.
 pub fn alpha_beta_search(
-    search_info: &mut SearchInfo,
     board: &Board,
+    search_info: &mut SearchInfo,
     mut alpha: Eval,
     mut beta: Eval,
     depth: u8,
@@ -69,7 +69,7 @@ pub fn alpha_beta_search(
             continue;
         }
 
-        let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
+        let result = -alpha_beta_search(&copy, search_info, -beta, -alpha, depth - 1);
         search_info.nodes += 1;
 
         // This position is too good - our opponent is guaranteed a worse
@@ -111,6 +111,12 @@ fn quiescent_search(
     mut alpha: Eval,
     beta: Eval,
 ) -> Eval {
+    // Stop if needed. The return value isn't important because it will be
+    // discarded anyway.
+    if search_info.should_stop() {
+        return 0;
+    }
+
     let stand_pat = evaluate(board);
 
     if stand_pat >= beta {

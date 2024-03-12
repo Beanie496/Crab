@@ -5,33 +5,17 @@ use std::{
     time::Duration,
 };
 
-use crate::{defs::PieceType, engine::Engine, movegen::magic::find_magics};
+use crate::{
+    defs::{PieceType, Side},
+    engine::Engine,
+    movegen::magic::find_magics,
+    search::Limits,
+};
 
 /// Used to store state for [`Self::main_loop()`].
+#[allow(clippy::missing_docs_in_private_items)]
 pub struct Uci {
-    /// The engine.
     engine: Engine,
-}
-
-/// The limits of a search: how much time is allocated, etc.
-#[derive(Default)]
-pub struct Limits {
-    /// White's time left.
-    pub wtime: Option<Duration>,
-    /// Black's time left.
-    pub btime: Option<Duration>,
-    /// White's increment.
-    pub winc: Option<Duration>,
-    /// Black's increment.
-    pub binc: Option<Duration>,
-    /// Moves until the next time control, otherwise sudden death.
-    pub movestogo: Option<u8>,
-    /// Maximum search depth.
-    pub depth: Option<u8>,
-    /// Maximum node count.
-    pub nodes: Option<u64>,
-    /// Exact thinking time.
-    pub movetime: Option<Duration>,
 }
 
 /// The starting position as a FEN string.
@@ -169,17 +153,33 @@ impl Uci {
 
         while let Some(token) = line.next() {
             match token {
-                "wtime" => limits.wtime = parse_next_num(line).map(Duration::from_millis),
-                "btime" => limits.btime = parse_next_num(line).map(Duration::from_millis),
-                "winc" => limits.winc = parse_next_num(line).map(Duration::from_millis),
-                "binc" => limits.binc = parse_next_num(line).map(Duration::from_millis),
-                "movestogo" => limits.movestogo = parse_next_num(line),
-                "depth" => limits.depth = parse_next_num(line),
-                "nodes" => limits.nodes = parse_next_num(line),
-                "movetime" => limits.movetime = parse_next_num(line).map(Duration::from_millis),
+                "wtime" => {
+                    if self.engine.side_to_move() == Side::WHITE {
+                        limits.set_time(parse_next_num(line).map(Duration::from_millis));
+                    }
+                }
+                "btime" => {
+                    if self.engine.side_to_move() == Side::BLACK {
+                        limits.set_time(parse_next_num(line).map(Duration::from_millis));
+                    }
+                }
+                "winc" => {
+                    if self.engine.side_to_move() == Side::WHITE {
+                        limits.set_inc(parse_next_num(line).map(Duration::from_millis));
+                    }
+                }
+                "binc" => {
+                    if self.engine.side_to_move() == Side::BLACK {
+                        limits.set_inc(parse_next_num(line).map(Duration::from_millis));
+                    }
+                }
+                "movestogo" => limits.set_moves_to_go(parse_next_num(line)),
+                "depth" => limits.set_depth(parse_next_num(line)),
+                "nodes" => limits.set_nodes(parse_next_num(line)),
+                "movetime" => limits.set_movetime(parse_next_num(line).map(Duration::from_millis)),
                 // if depth is specified and then `infinite` is give, the
                 // latter should override the former
-                "infinite" => limits.depth = None,
+                "infinite" => limits.set_infinite(),
                 _ => (),
             }
         }
