@@ -400,8 +400,6 @@ impl Board {
         } else {
             0
         });
-
-        self.refresh_accumulators();
     }
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
@@ -439,8 +437,6 @@ impl Board {
             }
             moves.clear();
         }
-        copy.refresh_accumulators();
-
         *self = copy;
     }
 
