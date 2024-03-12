@@ -389,7 +389,7 @@ impl SearchInfo {
     ///
     /// Assumes that this is being called at the end of the loop.
     pub fn should_exit_loop(&mut self, duration: Duration) -> bool {
-        if self.should_stop() {
+        if self.should_stop() || self.depth >= Depth::MAX {
             return true;
         }
 
