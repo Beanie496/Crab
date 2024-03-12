@@ -425,15 +425,8 @@ impl Board {
             let Ok(end) = Square::from_str(&mv[2..=3]) else {
                 return println!("End square of a move is not valid");
             };
-            // Each move should be exactly 4 characters; if it's a promotion,
-            // the last char will be the promotion char.
-            let mv = if mv.len() == 5 {
-                // SAFETY: It's not possible for it to be `None`.
-                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
-                moves.move_with_promo(start, end, PieceType::from(promotion_char))
-            } else {
-                moves.move_with(start, end)
-            };
+
+            let mv = moves.move_with(start, end);
 
             let Some(mv) = mv else {
                 return println!("Illegal move");
