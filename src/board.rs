@@ -1,6 +1,6 @@
 use std::{
     fmt::{self, Display, Formatter},
-    ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
     str::FromStr,
 };
 
@@ -112,6 +112,14 @@ impl BitAnd for CastlingRights {
 impl BitAndAssign for CastlingRights {
     fn bitand_assign(&mut self, rhs: Self) {
         self.0 &= rhs.0;
+    }
+}
+
+impl BitOr for CastlingRights {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
     }
 }
 
@@ -444,7 +452,6 @@ impl Board {
         let captured_type = PieceType::from(captured);
         let us = Side::from(piece);
         let them = us.flip();
-        let start_bb = Bitboard::from(start);
         let end_bb = Bitboard::from(end);
 
         self.halfmoves += 1;
@@ -462,6 +469,9 @@ impl Board {
 
         self.clear_ep_square();
         self.toggle_zobrist_ep_square(self.ep_square());
+        // it's easiest just to unset them now and then re-set them later
+        // rather than doing additional checks
+        self.toggle_zobrist_castling_rights(self.castling_rights());
 
         self.move_piece(start, end, piece, piece_type, us);
 
@@ -474,22 +484,20 @@ impl Board {
             // check if we need to unset the castling rights if we're capturing
             // a rook
             if captured_type == PieceType::ROOK {
-                let us_inner = us.0;
-                // this will be 0x81 if we're White (0x81 << 0) and
-                // 0x8100000000000000 if we're Black (0x81 << 56). This mask is
-                // the starting position of our rooks.
-                let rook_squares = Bitboard(0x81) << (us_inner * 56);
-                if !(end_bb & rook_squares).is_empty() {
-                    // 0 or 56 for queenside -> 0
-                    // 7 or 63 for kingside -> 1
-                    let is_kingside = end.0 & 1;
-                    // queenside -> 0b01
-                    // kingside -> 0b10
-                    // this replies upon knowing the internal representation of
-                    // CastlingRights - 0b01 is queenside, 0b10 is kingside
-                    let flag = is_kingside + 1;
-                    self.remove_castling_right(them, CastlingRights(flag));
-                    self.toggle_zobrist_castling_rights(CastlingRights(flag));
+                match end {
+                    Square::A1 => {
+                        self.remove_castling_right(CastlingRights::Q);
+                    }
+                    Square::H1 => {
+                        self.remove_castling_right(CastlingRights::K);
+                    }
+                    Square::A8 => {
+                        self.remove_castling_right(CastlingRights::q);
+                    }
+                    Square::H8 => {
+                        self.remove_castling_right(CastlingRights::k);
+                    }
+                    _ => (),
                 }
             }
         }
@@ -521,8 +529,6 @@ impl Board {
             );
 
             self.remove_castling_rights(us);
-            // TODO: this is broken if one of our rights is missing
-            self.toggle_zobrist_castling_rights(CastlingRights(0b11 << (us.0 * 2)));
         } else if is_double_pawn_push(start, end, piece) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
@@ -560,24 +566,28 @@ impl Board {
             return false;
         }
 
-        // this is basically the same as a few lines ago but with start square
-        // instead of end
         if piece_type == PieceType::ROOK {
-            let them_inner = them.0;
-            let rook_squares = Bitboard(0x81) << (them_inner * 56);
-            if !(start_bb & rook_squares).is_empty() {
-                let is_kingside = start.0 & 1;
-                let flag = is_kingside + 1;
-                self.remove_castling_right(us, CastlingRights(flag));
-                self.toggle_zobrist_castling_rights(CastlingRights(flag));
+            match start {
+                Square::A1 => {
+                    self.remove_castling_right(CastlingRights::Q);
+                }
+                Square::H1 => {
+                    self.remove_castling_right(CastlingRights::K);
+                }
+                Square::A8 => {
+                    self.remove_castling_right(CastlingRights::q);
+                }
+                Square::H8 => {
+                    self.remove_castling_right(CastlingRights::k);
+                }
+                _ => (),
             }
         }
         if piece_type == PieceType::KING {
             self.remove_castling_rights(us);
-            // TODO: again, this is broken
-            self.toggle_zobrist_castling_rights(CastlingRights(0b11 << (us.0 * 2)));
         }
 
+        self.toggle_zobrist_castling_rights(self.castling_rights());
         self.flip_side();
 
         true
@@ -783,8 +793,8 @@ impl Board {
     }
 
     /// Unsets castling the given right for the given side.
-    fn remove_castling_right(&mut self, side: Side, right: CastlingRights) {
-        self.castling_rights.remove_right(side, right);
+    fn remove_castling_right(&mut self, right: CastlingRights) {
+        self.castling_rights.remove_right(right);
     }
 
     /// Clears the castling rights for the given side.
@@ -910,25 +920,21 @@ impl CastlingRights {
         *self |= right;
     }
 
-    /// Removes the given right from `self`. `right` does not already have to
-    /// be set to be removed.
-    fn remove_right(&mut self, side: Side, right: Self) {
-        // `side.0 * 2` is 0 for Black and 2 for White. Thus, if `right` is
-        // `0brr`, `right << side.0` is `0brr00` for White and `0brr` for
-        // Black.
-        *self &= !(right << (side.0 * 2));
+    /// Removes the given right from `self`.
+    fn remove_right(&mut self, right: Self) {
+        debug_assert!(
+            right.0.count_ones() == 1,
+            "`right` contains multiple rights"
+        );
+        *self &= !right;
     }
 
     /// Clears the rights for `side`.
     fn clear_side(&mut self, side: Side) {
-        debug_assert_eq!(
-            Side::WHITE.0,
-            1,
-            "This function relies on White being 1 and Black 0"
-        );
-        // `side * 2` is 2 for White and 0 for Black. `0b11 << (side * 2)` is
-        // a mask for the bits for White or Black. `&`ing the rights with
-        // `!(0b11 << (side * 2))` will clear the bits on the given side.
-        *self &= Self(!(0b11 << (side.0 * 2)));
+        if side == Side::WHITE {
+            *self &= Self::k | Self::q;
+        } else {
+            *self &= Self::K | Self::Q;
+        }
     }
 }
