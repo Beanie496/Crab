@@ -400,6 +400,8 @@ impl Board {
         } else {
             0
         });
+
+        self.refresh_accumulators();
     }
 
     /// Takes a sequence of moves and feeds them to the board. Will stop and
@@ -437,6 +439,8 @@ impl Board {
             }
             moves.clear();
         }
+        copy.refresh_accumulators();
+
         *self = copy;
     }
 
@@ -705,6 +709,10 @@ impl Board {
         self.side_to_move = Side::NONE;
         self.castling_rights = CastlingRights::none();
         self.ep_square = Square::NONE;
+        self.halfmoves = 0;
+        self.fullmoves = 1;
+        self.psq_accumulator = Score(0, 0);
+        self.phase_accumulator = 0;
     }
 
     /// Resets the board.
