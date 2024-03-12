@@ -1,17 +1,8 @@
 use super::Score;
-use crate::defs::{Piece, PieceType, Side, Square};
-
-/// A C-style `for` loop to allow easier looping in `const` functions.
-// idea for this is from viridithas
-macro_rules! cfor {
-    ($stmt:stmt; $cond:expr; $expr:expr; $body:block) => {{
-        $stmt
-        while ($cond) {
-            $body;
-            $expr;
-        }
-    }}
-}
+use crate::{
+    cfor,
+    defs::{Piece, PieceType, Side, Square},
+};
 
 /// Values in centipawns for each piece.
 ///

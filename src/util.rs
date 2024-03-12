@@ -8,6 +8,19 @@ use crate::{
     out_of_bounds_is_unreachable,
 };
 
+/// A C-style `for` loop to allow easier looping in `const` functions.
+// idea for this is from viridithas
+#[macro_export]
+macro_rules! cfor {
+    ($stmt:stmt; $cond:expr; $expr:expr; $body:block) => {{
+        $stmt
+        while ($cond) {
+            $body;
+            $expr;
+        }
+    }}
+}
+
 /// A generic stack.
 ///
 /// The point of this is to custom-make my own methods. Since this is a binary

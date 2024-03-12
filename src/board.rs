@@ -7,16 +7,21 @@ use std::{
 use crate::{
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
-    evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
+    evaluation::Score,
     movegen::{generate_moves, Lookup, Move, LOOKUPS},
     out_of_bounds_is_unreachable,
     util::is_double_pawn_push,
 };
+use zobrist::Key;
+
+/// Evaluation accumulators.
+mod accumulators;
+/// Functions for zobrist hashing.
+mod zobrist;
 
 /// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
 /// E.g. `0b1101` would be castling rights `KQq`.
 #[derive(Clone, Copy, Eq, PartialEq)]
-// The inner value of a wrapper does not need to be documented.
 pub struct CastlingRights(u8);
 
 /// The board. It contains information about the current board state and can
@@ -56,6 +61,29 @@ pub struct Board {
     /// `psq_val` uses this value to lerp between its midgame and
     /// endgame values. It is incrementally updated.
     phase_accumulator: u8,
+    /// The current zobrist key of the board.
+    zobrist: Key,
+}
+
+impl Default for Board {
+    fn default() -> Self {
+        let mut board = Self {
+            mailbox: Self::default_mailbox(),
+            pieces: Self::default_pieces(),
+            sides: Self::default_sides(),
+            side_to_move: Side::WHITE,
+            castling_rights: CastlingRights::new(),
+            ep_square: Square::NONE,
+            halfmoves: 0,
+            fullmoves: 1,
+            psq_accumulator: Score(0, 0),
+            phase_accumulator: 0,
+            zobrist: 0,
+        };
+        board.refresh_accumulators();
+        board.refresh_zobrist();
+        board
+    }
 }
 
 impl Display for Board {
@@ -148,25 +176,6 @@ impl CastlingRights {
     pub const NONE: Self = Self(0b0000);
 }
 
-impl Default for Board {
-    fn default() -> Self {
-        let mut board = Self {
-            mailbox: Self::default_mailbox(),
-            pieces: Self::default_pieces(),
-            sides: Self::default_sides(),
-            side_to_move: Side::WHITE,
-            castling_rights: CastlingRights::new(),
-            ep_square: Square::NONE,
-            halfmoves: 0,
-            fullmoves: 1,
-            psq_accumulator: Score(0, 0),
-            phase_accumulator: 0,
-        };
-        board.refresh_accumulators();
-        board
-    }
-}
-
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
@@ -252,6 +261,7 @@ impl Board {
         println!("    a b c d e f g h");
         println!();
         println!("FEN: {self}");
+        println!("Zobrist key: {}", self.zobrist());
     }
 
     /// Sets `self.board` to the given FEN.
@@ -329,6 +339,8 @@ impl Board {
         // 6. fullmoves
         let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
         self.set_fullmoves(fullmoves);
+
+        self.refresh_zobrist();
     }
 
     /// Takes a sequence of moves in long algebraic notation and feeds them to
@@ -381,6 +393,11 @@ impl Board {
         self.side_to_move
     }
 
+    /// Returns the castling rights.
+    const fn castling_rights(&self) -> CastlingRights {
+        self.castling_rights
+    }
+
     /// Calculates if the given side can castle kingside.
     pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
         self.castling_rights.can_castle_kingside::<IS_WHITE>()
@@ -404,22 +421,6 @@ impl Board {
     /// Returns the current move number.
     pub const fn fullmoves(&self) -> u16 {
         self.fullmoves
-    }
-
-    /// Calculates the current material + piece-square table balance.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn psq(&self) -> Score {
-        self.psq_accumulator
-    }
-
-    /// Gets the phase of the game. 0 is midgame and 24 is endgame.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn phase(&self) -> u8 {
-        self.phase_accumulator
     }
 
     /// Tests if the king is in check.
@@ -460,6 +461,7 @@ impl Board {
         }
 
         self.clear_ep_square();
+        self.toggle_zobrist_ep_square(self.ep_square());
 
         self.move_piece(start, end, piece, piece_type, us);
 
@@ -467,6 +469,7 @@ impl Board {
             self.update_bb_piece(end_bb, captured_type, them);
             self.remove_psq_piece(end, captured);
             self.remove_phase_piece(captured);
+            self.toggle_zobrist_piece(end, piece);
 
             // check if we need to unset the castling rights if we're capturing
             // a rook
@@ -485,7 +488,8 @@ impl Board {
                     // this replies upon knowing the internal representation of
                     // CastlingRights - 0b01 is queenside, 0b10 is kingside
                     let flag = is_kingside + 1;
-                    self.unset_castling_right(them, CastlingRights(flag));
+                    self.remove_castling_right(them, CastlingRights(flag));
+                    self.toggle_zobrist_castling_rights(CastlingRights(flag));
                 }
             }
         }
@@ -516,9 +520,13 @@ impl Board {
                 us,
             );
 
-            self.unset_castling_rights(us);
+            self.remove_castling_rights(us);
+            // TODO: this is broken if one of our rights is missing
+            self.toggle_zobrist_castling_rights(CastlingRights(0b11 << (us.0 * 2)));
         } else if is_double_pawn_push(start, end, piece) {
-            self.set_ep_square(Square((start.0 + end.0) >> 1));
+            let ep_square = Square((start.0 + end.0) >> 1);
+            self.set_ep_square(ep_square);
+            self.toggle_zobrist_ep_square(ep_square);
         } else if is_en_passant {
             let dest = Square(if us == Side::WHITE {
                 end.0 - 8
@@ -527,6 +535,7 @@ impl Board {
             });
             let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
             self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
+            self.toggle_zobrist_piece(dest, captured_pawn);
         } else if is_promotion {
             let promotion_piece_type = mv.promotion_piece();
             let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
@@ -535,14 +544,16 @@ impl Board {
             self.set_mailbox_piece(end, promotion_piece);
 
             // remove the pawn
-            self.toggle_piece_bb(piece_type, end_bb);
+            self.toggle_piece_bb(PieceType::PAWN, end_bb);
             self.remove_psq_piece(end, piece);
             self.remove_phase_piece(piece);
+            self.toggle_zobrist_piece(end, piece);
 
             // add the promotion piece
             self.toggle_piece_bb(promotion_piece_type, end_bb);
             self.add_psq_piece(end, promotion_piece);
             self.add_phase_piece(promotion_piece);
+            self.toggle_zobrist_piece(end, promotion_piece);
         }
 
         if self.is_square_attacked(self.king_square()) {
@@ -557,11 +568,14 @@ impl Board {
             if !(start_bb & rook_squares).is_empty() {
                 let is_kingside = start.0 & 1;
                 let flag = is_kingside + 1;
-                self.unset_castling_right(us, CastlingRights(flag));
+                self.remove_castling_right(us, CastlingRights(flag));
+                self.toggle_zobrist_castling_rights(CastlingRights(flag));
             }
         }
         if piece_type == PieceType::KING {
-            self.unset_castling_rights(us);
+            self.remove_castling_rights(us);
+            // TODO: again, this is broken
+            self.toggle_zobrist_castling_rights(CastlingRights(0b11 << (us.0 * 2)));
         }
 
         self.flip_side();
@@ -626,6 +640,7 @@ impl Board {
         self.fullmoves = 1;
         self.psq_accumulator = Score(0, 0);
         self.phase_accumulator = 0;
+        self.zobrist = 0;
     }
 
     /// Finds the piece on the given rank and file and converts it to its
@@ -656,6 +671,7 @@ impl Board {
         self.move_mailbox_piece(start, end, piece);
         self.update_bb_piece(bb, piece_type, side);
         self.move_psq_piece(start, end, piece);
+        self.move_zobrist_piece(start, end, piece);
     }
 
     /// Returns the piece on `square`.
@@ -675,6 +691,7 @@ impl Board {
         self.toggle_side_bb(side, square_bb);
         self.add_psq_piece(square, piece);
         self.add_phase_piece(piece);
+        self.toggle_zobrist_piece(square, piece);
     }
 
     /// Removes `piece` from `square`.
@@ -689,6 +706,7 @@ impl Board {
         self.toggle_side_bb(side, bb);
         self.remove_psq_piece(square, piece);
         self.remove_phase_piece(piece);
+        self.toggle_zobrist_piece(square, piece);
     }
 
     /// Moves `piece` from `start` to `end` in the mailbox.
@@ -765,12 +783,12 @@ impl Board {
     }
 
     /// Unsets castling the given right for the given side.
-    fn unset_castling_right(&mut self, side: Side, right: CastlingRights) {
+    fn remove_castling_right(&mut self, side: Side, right: CastlingRights) {
         self.castling_rights.remove_right(side, right);
     }
 
     /// Clears the castling rights for the given side.
-    fn unset_castling_rights(&mut self, side: Side) {
+    fn remove_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
     }
 
@@ -803,63 +821,6 @@ impl Board {
     /// Sets fullmoves.
     fn set_fullmoves(&mut self, count: u16) {
         self.fullmoves = count;
-    }
-
-    /// Recalculates the accumulators from scratch. Prefer to use functions
-    /// that incrementally update both if possible.
-    fn refresh_accumulators(&mut self) {
-        let mut score = Score(0, 0);
-        let mut phase = 0;
-
-        for (square, piece) in self.mailbox.iter().enumerate() {
-            score += PIECE_SQUARE_TABLES[piece.to_index()][square];
-            phase += PHASE_WEIGHTS[piece.to_index()];
-        }
-
-        self.psq_accumulator = score;
-        self.phase_accumulator = phase;
-    }
-
-    /// Updates the piece-square table accumulator by adding the difference
-    /// between the psqt value of the start and end square (which can be
-    /// negative).
-    fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
-        self.remove_psq_piece(start, piece);
-        self.add_psq_piece(end, piece);
-    }
-
-    /// Adds the piece-square table value for `piece` at `square` to the psqt
-    /// accumulator.
-    fn add_psq_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
-        self.psq_accumulator += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
-    }
-
-    /// Removes the piece-square table value for `piece` at `square` from the
-    /// psqt accumulator.
-    fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
-        self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
-    }
-
-    /// Adds `piece` to `self.phase`.
-    fn add_phase_piece(&mut self, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
-        self.phase_accumulator += PHASE_WEIGHTS[piece.to_index()];
-    }
-
-    /// Removes `piece` from `self.phase`.
-    fn remove_phase_piece(&mut self, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
-        self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
     }
 
     /// Calculates the square the king is on.
