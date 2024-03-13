@@ -419,7 +419,7 @@ impl SearchInfo {
 pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
-    let mut best_move;
+    let mut best_move = Move::null();
     let time_allocated = search_info.calculate_time_window();
 
     'iter_deep: loop {
@@ -427,15 +427,18 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
         search_info.depth += 1;
         let depth = search_info.depth;
 
-        let eval = alpha_beta_search(&board.clone(), &mut search_info, -beta, -alpha, depth);
-        best_move = search_info.pv.get(0);
+        let eval = alpha_beta_search(&board.clone(), &mut search_info, alpha, beta, depth);
 
         if search_info.has_stopped() {
+            // technically `best_move` would be null if this is called before
+            // even depth 1 finishes, but there isn't much we can do about that
+            // currently
             break 'iter_deep;
         }
 
-        search_info.time = search_info.time_start.elapsed();
+        best_move = search_info.pv.get(0);
         search_info.score = eval;
+        search_info.time = search_info.time_start.elapsed();
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
         search_info.history = search_info.pv;
 
