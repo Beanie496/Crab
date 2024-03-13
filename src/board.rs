@@ -369,9 +369,17 @@ impl Board {
             let start = Square::from_str(&mv[0..=1]).unwrap();
             let end = Square::from_str(&mv[2..=3]).unwrap();
 
-            let mv = moves.move_with(start, end).unwrap();
+            // Each move should be exactly 4 characters; if it's a promotion,
+            // the last char will be the promotion char.
+            let mv = if mv.len() == 5 {
+                // SAFETY: It's not possible for it to be `None`.
+                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
+                moves.move_with_promo(start, end, PieceType::from(promotion_char))
+            } else {
+                moves.move_with(start, end)
+            };
 
-            assert!(copy.make_move(mv), "Illegal move");
+            assert!(copy.make_move(mv.unwrap()), "Illegal move");
         }
 
         *self = copy;

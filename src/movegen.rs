@@ -361,6 +361,14 @@ impl Move {
             .extra_bits(PIECE - 1)
     }
 
+    /// Creates a promotion [`Move`] to the given piece type from `start` to
+    /// `end`.
+    pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
+        Self::base(start, end)
+            .flag(Self::PROMOTION)
+            .extra_bits(promotion_piece.0 - 1)
+    }
+
     /// Creates a null [`Move`].
     pub const fn null() -> Self {
         Self::base(Square(0), Square(0))
@@ -453,6 +461,20 @@ impl Moves {
     /// returns `None` otherwise.
     pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
         self.find(|&mv| mv.is_moving_from_to(start, end))
+    }
+
+    /// Finds and returns, if it exists, the move that has start square
+    /// `start`, end square `end` and promotion piece `piece_type`.
+    ///
+    /// Returns `Some(mv)` if a `Move` does match the criteria; returns `None`
+    /// otherwise.
+    pub fn move_with_promo(
+        &mut self,
+        start: Square,
+        end: Square,
+        piece_type: PieceType,
+    ) -> Option<Move> {
+        self.find(|&mv| mv == Move::new_promo_any(start, end, piece_type))
     }
 
     /// Pushes `mv` onto itself. Assumes `self` is not full.
