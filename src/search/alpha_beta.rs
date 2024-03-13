@@ -84,8 +84,7 @@ pub fn alpha_beta_search(
             alpha = result;
             pv.clear();
             pv.enqueue(mv);
-            pv.append_pv(&search_info.pv);
-            search_info.pv.clear();
+            pv.append_pv(&mut search_info.pv);
         }
 
         total_moves += 1;
@@ -99,7 +98,7 @@ pub fn alpha_beta_search(
         };
     }
 
-    search_info.pv = pv;
+    search_info.pv.set_pv(&mut pv);
 
     alpha
 }
