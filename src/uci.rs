@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     defs::{PieceType, Side},
-    engine::Engine,
+    engine::{Engine, STARTPOS},
     movegen::magic::find_magics,
     search::Limits,
 };
@@ -17,9 +17,6 @@ use crate::{
 pub struct Uci {
     engine: Engine,
 }
-
-/// The starting position as a FEN string.
-const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 impl Uci {
     /// Creates a new instance of [`Uci`](Self).
@@ -111,7 +108,9 @@ impl Uci {
                     /* Print ID, all options and "uciok" */
                     println!("uciok");
                 }
-                "ucinewgame" => { /* What it sounds like. Set pos to start pos, etc. */ }
+                "ucinewgame" => {
+                    self.engine.reset();
+                }
                 "q" | "quit" => {
                     /* Quit as soon as possible */
                     self.engine.stop_search();

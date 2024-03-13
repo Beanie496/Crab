@@ -10,6 +10,9 @@ use crate::{
     search::{iterative_deepening, Depth, Limits, SearchInfo, Stop},
 };
 
+/// The starting position as a FEN string.
+pub const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 /// Master object that contains all the other major objects.
 pub struct Engine {
     /// The internal board.
@@ -87,6 +90,13 @@ impl Engine {
             #[allow(clippy::unwrap_used)]
             state.handle.join().unwrap();
         }
+    }
+
+    /// Sets `self` to its initial state. Should be called after the
+    /// `ucinewgame` command.
+    pub fn reset(&mut self) {
+        self.stop_search();
+        self.board.set_pos_to_fen(STARTPOS);
     }
 
     /// Calls [`pretty_print`](Board::pretty_print) on the internal board.
