@@ -85,6 +85,7 @@ pub fn alpha_beta_search(
             pv.clear();
             pv.enqueue(mv);
             pv.append_pv(&search_info.pv);
+            search_info.pv.clear();
         }
 
         total_moves += 1;
