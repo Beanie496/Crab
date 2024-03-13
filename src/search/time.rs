@@ -17,7 +17,7 @@ impl SearchInfo {
     ///
     /// Any kind of explanation here as to what I'm doing would immediately
     /// become outdated, so read the comments of the following code instead.
-    pub fn calculate_time_window(&self) -> Duration {
+    pub fn calculate_time_window(&self, move_overhead: Duration) -> Duration {
         if let Limits::Timed {
             time,
             inc,
@@ -29,7 +29,8 @@ impl SearchInfo {
             // to avoid allocating too little time
             let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
 
-            (time / u32::from(moves_to_go) + inc).saturating_sub(self.time_start.elapsed())
+            (time / u32::from(moves_to_go) + inc)
+                .saturating_sub(self.time_start.elapsed() + move_overhead)
         } else {
             Duration::MAX
         }

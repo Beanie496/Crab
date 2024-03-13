@@ -16,6 +16,29 @@ use crate::{
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct Uci {
     engine: Engine,
+    options: UciOptions,
+}
+
+/// The UCI options this engine supports.
+#[derive(Clone, Copy)]
+pub struct UciOptions {
+    /// The overhead of sending a move from the engine to the GUI.
+    pub move_overhead: Duration,
+}
+
+/// The name of this engine.
+const ID_NAME: &str = "Crab";
+/// The version of this engine.
+const ID_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The name of the author of this engine.
+const ID_AUTHOR: &str = "Beanie";
+
+impl Default for UciOptions {
+    fn default() -> Self {
+        Self {
+            move_overhead: Duration::from_millis(1),
+        }
+    }
 }
 
 impl Uci {
@@ -23,6 +46,7 @@ impl Uci {
     pub fn new() -> Self {
         Self {
             engine: Engine::new(),
+            options: UciOptions::default(),
         }
     }
 
@@ -95,10 +119,7 @@ impl Uci {
                     self.handle_position(&mut line);
                 }
                 "setoption" => {
-                    /* Next element of line_iter should be "name".  Element after
-                     * "name" should be one of the options specified from "uci"
-                     * command.
-                     */
+                    self.handle_option(&mut line);
                 }
                 "stop" => {
                     /* Stop calculating immediately. */
@@ -106,6 +127,7 @@ impl Uci {
                 }
                 "uci" => {
                     /* Print ID, all options and "uciok" */
+                    UciOptions::print();
                     println!("uciok");
                 }
                 "ucinewgame" => {
@@ -154,7 +176,11 @@ impl Uci {
             match token {
                 "wtime" => {
                     if self.engine.side_to_move() == Side::WHITE {
-                        limits.set_time(parse_next_num(line).map(Duration::from_millis));
+                        limits.set_time(
+                            parse_next_num(line)
+                                .and_then(|d| if d == 0 { None } else { Some(d) })
+                                .map(Duration::from_millis),
+                        );
                     }
                 }
                 "btime" => {
@@ -183,7 +209,7 @@ impl Uci {
             }
         }
 
-        self.engine.start_search(limits);
+        self.engine.start_search(limits, self.options);
     }
 
     /// Given an iterator over the remaining space-delimited tokens of a `position`
@@ -228,19 +254,59 @@ impl Uci {
 
         self.engine.set_position(&fen, &moves);
     }
+
+    /// Sets the UCI options given by the remaining space-delimited tokens of
+    /// the `setoption` command.
+    fn handle_option(&mut self, line: &mut Split<'_, char>) {
+        if line.next() != Some("name") {
+            return;
+        }
+
+        // more options added later, so be quiet, clippy
+        #[allow(clippy::single_match)]
+        match line.next() {
+            Some("Move") => {
+                if line.next() != Some("Overhead") {
+                    return;
+                }
+                if line.next() != Some("value") {
+                    return;
+                }
+                self.options.move_overhead = line
+                    .next()
+                    .and_then(|result| result.parse::<u64>().ok())
+                    .map_or(UciOptions::default_move_overhead(), Duration::from_millis);
+            }
+            _ => (),
+        }
+    }
+}
+
+impl UciOptions {
+    /// The default overhead of sending a move.
+    const fn default_move_overhead() -> Duration {
+        Duration::from_millis(1)
+    }
+
+    /// Prints the identification of this engine and all the UCI options it
+    /// supports.
+    fn print() {
+        println!("id name {ID_NAME}-{ID_VERSION}");
+        println!("id author {ID_AUTHOR}");
+        println!(
+            "option name Move Overhead type spin default {} min 0 max 1000",
+            Self::default_move_overhead().as_millis()
+        );
+    }
 }
 
 /// Parses the next unsigned integer.
 ///
-/// If the next token is a valid number, is not 0, and fits within `T`, it
+/// If the next token is a valid number, isn't 0, and fits within `T`, it
 /// returns `Some(T)`; otherwise, it returns `None`.
 fn parse_next_num<T: TryFrom<u128> + FromStr>(line: &mut Split<'_, char>) -> Option<T> {
-    if let Some(result) = line.next() {
-        if let Ok(result) = result.parse::<u128>() {
-            if result != 0 {
-                return result.try_into().ok();
-            }
-        }
-    }
-    None
+    line.next()
+        .and_then(|result| result.parse::<u128>().ok())
+        .and_then(|result| (result != 0).then_some(result))
+        .and_then(|result| result.try_into().ok())
 }

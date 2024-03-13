@@ -7,4 +7,3 @@
 - seldepth
 - Test `MaybeUninit` for `Moves` and `Pv`
 - Test `search_info.set_pv(pv)`, which copies each element, instead of copying the whole pv with `search_info.pv = pv`
-- move overhead

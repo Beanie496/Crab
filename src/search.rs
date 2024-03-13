@@ -8,6 +8,7 @@ use crate::{
     board::Board,
     evaluation::{Eval, INF_EVAL},
     movegen::Move,
+    uci::UciOptions,
 };
 use alpha_beta::alpha_beta_search;
 
@@ -416,11 +417,11 @@ impl SearchInfo {
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
+pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: UciOptions) {
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
-    let time_allocated = search_info.calculate_time_window();
+    let time_allocated = search_info.calculate_time_window(options.move_overhead);
 
     'iter_deep: loop {
         search_info.pv.clear();

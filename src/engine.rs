@@ -8,6 +8,7 @@ use crate::{
     defs::Side,
     perft::perft,
     search::{iterative_deepening, Depth, Limits, SearchInfo, Stop},
+    uci::UciOptions,
 };
 
 /// The starting position as a FEN string.
@@ -60,7 +61,7 @@ impl Engine {
 
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
-    pub fn start_search(&mut self, limits: Limits) {
+    pub fn start_search(&mut self, limits: Limits, options: UciOptions) {
         let board_clone = self.board.clone();
         let (control_tx, control_rx) = channel();
 
@@ -71,7 +72,7 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(&board_clone, search_info);
+                iterative_deepening(&board_clone, search_info, options);
             }),
         ));
     }
