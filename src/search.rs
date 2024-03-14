@@ -106,8 +106,8 @@ impl Default for Limits {
 impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
-        for mv in 0..self.len() {
-            ret_str.push_str(&self.get(mv).to_string());
+        for mv in self.moves() {
+            ret_str.push_str(&mv.to_string());
             ret_str.push(' ');
         }
         ret_str.pop();
@@ -131,7 +131,7 @@ impl Display for SearchInfo {
             self.depth,
             self.time.as_millis(),
             self.nodes,
-            self.pv,
+            self.history,
             self.score,
             self.nps,
         )
@@ -255,10 +255,9 @@ impl Pv {
     fn append_pv(&mut self, other_pv: &mut Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
-        for mv in other_pv.by_ref() {
+        for mv in other_pv {
             self.enqueue(mv);
         }
-        other_pv.clear();
     }
 
     /// Sets `self` to `other_pv`.
@@ -288,6 +287,11 @@ impl Pv {
     fn clear(&mut self) {
         self.first_item = 0;
         self.first_empty = 0;
+    }
+
+    /// Returns a slice to the moves of `self`.
+    fn moves(&self) -> &[Move] {
+        &self.moves[(self.first_item as usize)..(self.first_empty as usize)]
     }
 
     /// Gets the [`Move`] at the given index.
@@ -421,6 +425,7 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: 
         search_info.time = search_info.time_start.elapsed();
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
         search_info.history.set_pv(&mut search_info.pv);
+        search_info.pv.clear();
 
         println!("{search_info}");
 
