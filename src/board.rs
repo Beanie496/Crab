@@ -664,11 +664,10 @@ impl Board {
         char::from(piece)
     }
 
-    /// A wrapper over [`move_mailbox_piece`](Board::move_mailbox_piece),
-    /// [`update_bb_piece`](Board::update_bb_piece) and
-    /// [`move_psq_piece`](Board::move_psq_piece).
+    /// Moves `piece` from `start` to `end`, updating all relevant fields.
     ///
-    /// Use the three different functions separately if needed.
+    /// `piece == Piece::from_piecetype(piece_type, side)`. Having the two
+    /// redundant arguments is faster though.
     fn move_piece(
         &mut self,
         start: Square,
