@@ -1,13 +1,11 @@
 use std::{
     fmt::{self, Display, Formatter},
-    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, Shr},
 };
 
 use crate::defs::{File, Rank, Square};
 
-/// A wrapper for a `u64`, since a bitboard is 64 bits.
-// the idea for wrapping these types in structs and implementing a tonne of
-// methods/associated functions is taken from viridithas, so thanks cosmo
+/// A wrapper over a `u64`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Bitboard(pub u64);
 
@@ -106,6 +104,14 @@ impl Shl<u8> for Bitboard {
     }
 }
 
+impl Shr<u8> for Bitboard {
+    type Output = Self;
+
+    fn shr(self, rhs: u8) -> Self::Output {
+        Self(self.0 >> rhs)
+    }
+}
+
 impl Iterator for BitIter {
     type Item = Square;
 
@@ -120,7 +126,6 @@ impl Iterator for BitIter {
     }
 }
 
-/// Pre-constructed bitboards.
 impl Bitboard {
     /// The squares betwen the White king and kingside rook in the starting
     /// position.
@@ -227,7 +232,7 @@ impl Bitboard {
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
     /// `self` one square south.
-    pub const fn pawn_push<const IS_WHITE: bool>(self) -> Self {
+    pub fn pawn_push<const IS_WHITE: bool>(self) -> Self {
         if IS_WHITE {
             self.north()
         } else {
@@ -236,23 +241,23 @@ impl Bitboard {
     }
 
     /// Shifts `self` one square north without wrapping.
-    pub const fn north(self) -> Self {
-        Self(self.0 << 8)
+    pub fn north(self) -> Self {
+        self << 8
     }
 
     /// Shifts `self` one square east without wrapping.
-    pub const fn east(self) -> Self {
-        Self(self.0 << 1 & !Self::file_bb(File::FILE1).0)
+    pub fn east(self) -> Self {
+        (self << 1) & !Self::file_bb(File::FILE1)
     }
 
     /// Shifts `self` one square south without wrapping.
-    pub const fn south(self) -> Self {
-        Self(self.0 >> 8)
+    pub fn south(self) -> Self {
+        self >> 8
     }
 
     /// Shifts `self` one square west without wrapping.
-    pub const fn west(self) -> Self {
-        Self(self.0 >> 1 & !Self::file_bb(File::FILE8).0)
+    pub fn west(self) -> Self {
+        (self >> 1) & !Self::file_bb(File::FILE8)
     }
 
     /// Clears the least significant bit of `self` and returns it.
