@@ -1,4 +1,4 @@
-use super::{Pv, SearchInfo};
+use super::{Pv, SearchInfo, Depth};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -13,10 +13,10 @@ pub fn alpha_beta_search(
     search_info: &mut SearchInfo,
     mut alpha: Eval,
     mut beta: Eval,
-    depth: u8,
+    depth: Depth,
 ) -> Eval {
     if depth == 0 {
-        return quiescent_search(search_info, board, alpha, beta);
+        return quiescent_search(search_info, board, alpha, beta, depth);
     }
 
     // Stop if needed. The return value isn't important because it will be
@@ -111,6 +111,8 @@ fn quiescent_search(
     board: &Board,
     mut alpha: Eval,
     beta: Eval,
+    // this starts at 0 (called from the main search) and counts up
+    height: Depth,
 ) -> Eval {
     // Stop if needed. The return value isn't important because it will be
     // discarded anyway.
@@ -127,6 +129,8 @@ fn quiescent_search(
         alpha = stand_pat;
     }
 
+    search_info.seldepth = search_info.seldepth.max(search_info.depth + height);
+
     let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
 
     for mv in moves {
@@ -135,7 +139,7 @@ fn quiescent_search(
             continue;
         }
 
-        let result = -quiescent_search(search_info, &copy, -beta, -alpha);
+        let result = -quiescent_search(search_info, &copy, -beta, -alpha, height + 1);
         search_info.nodes += 1;
 
         if result >= beta {

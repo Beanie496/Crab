@@ -66,6 +66,8 @@ pub struct SearchInfo {
     time_start: Instant,
     /// The depth currently being searched.
     depth: Depth,
+    /// The maximum depth reached.
+    seldepth: Depth,
     /// How long the search has been going.
     time: Duration,
     /// How many positions have been searched.
@@ -127,8 +129,9 @@ impl Display for SearchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "info depth {} time {} nodes {} pv {} score cp {} nps {}",
+            "info depth {} seldepth {} time {} nodes {} pv {} score cp {} nps {}",
             self.depth,
+            self.seldepth,
             self.time.as_millis(),
             self.nodes,
             self.history,
@@ -312,6 +315,7 @@ impl SearchInfo {
         Self {
             time_start: Instant::now(),
             depth: 0,
+            seldepth: 0,
             time: Duration::ZERO,
             nodes: 0,
             pv: Pv::new(),
@@ -409,6 +413,7 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: 
 
     'iter_deep: loop {
         search_info.depth += 1;
+        search_info.seldepth = 0;
         let depth = search_info.depth;
 
         let eval = alpha_beta_search(&board.clone(), &mut search_info, alpha, beta, depth);
