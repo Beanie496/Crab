@@ -47,7 +47,6 @@ pub enum Limits {
 
 /// The principle variation: the current best sequence of moves for both sides.
 // 512 bytes
-#[derive(Clone, Copy)]
 struct Pv {
     /// A non-circular queue of moves.
     ///
@@ -59,12 +58,6 @@ struct Pv {
     first_item: u8,
     /// Index of the first empty space.
     first_empty: u8,
-}
-
-/// An iterator over a [`Pv`].
-#[allow(clippy::missing_docs_in_private_items)]
-struct PvIter {
-    pv: Pv,
 }
 
 /// Information about a search.
@@ -113,8 +106,8 @@ impl Default for Limits {
 impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
-        for mv in 0..self.len() {
-            ret_str.push_str(&self.get(mv).to_string());
+        for mv in self.moves() {
+            ret_str.push_str(&mv.to_string());
             ret_str.push(' ');
         }
         ret_str.pop();
@@ -122,20 +115,11 @@ impl Display for Pv {
     }
 }
 
-impl IntoIterator for Pv {
-    type Item = Move;
-    type IntoIter = PvIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        PvIter::new(self)
-    }
-}
-
-impl Iterator for PvIter {
+impl Iterator for Pv {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.pv.dequeue()
+        self.dequeue()
     }
 }
 
@@ -147,7 +131,7 @@ impl Display for SearchInfo {
             self.depth,
             self.time.as_millis(),
             self.nodes,
-            self.pv,
+            self.history,
             self.score,
             self.nps,
         )
@@ -257,15 +241,6 @@ impl Limits {
     }
 }
 
-impl PvIter {
-    /// Creates a new [`PvIter`].
-    // this function will be inlined anyway
-    #[allow(clippy::large_types_passed_by_value)]
-    const fn new(pv: Pv) -> Self {
-        Self { pv }
-    }
-}
-
 impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     const fn new() -> Self {
@@ -276,13 +251,19 @@ impl Pv {
         }
     }
 
-    /// Appends the [`Move`]s from `other_pv` to `self`.
-    fn append_pv(&mut self, other_pv: &Self) {
+    /// Appends `other_pv` to `self` and clears `other_pv`.
+    fn append_pv(&mut self, other_pv: &mut Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
-        for mv in other_pv.into_iter() {
+        for mv in other_pv {
             self.enqueue(mv);
         }
+    }
+
+    /// Sets `self` to `other_pv`.
+    fn set_pv(&mut self, other_pv: &mut Self) {
+        self.clear();
+        self.append_pv(other_pv);
     }
 
     /// Adds a [`Move`] to the back of `self`.
@@ -308,9 +289,12 @@ impl Pv {
         self.first_empty = 0;
     }
 
+    /// Returns a slice to the moves of `self`.
+    fn moves(&self) -> &[Move] {
+        &self.moves[(self.first_item as usize)..(self.first_empty as usize)]
+    }
+
     /// Gets the [`Move`] at the given index.
-    ///
-    /// Useful for read-only iteration.
     const fn get(&self, index: usize) -> Move {
         self.moves[index]
     }
@@ -424,7 +408,6 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: 
     let time_allocated = search_info.calculate_time_window(options.move_overhead);
 
     'iter_deep: loop {
-        search_info.pv.clear();
         search_info.depth += 1;
         let depth = search_info.depth;
 
@@ -441,7 +424,8 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: 
         search_info.score = eval;
         search_info.time = search_info.time_start.elapsed();
         search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
-        search_info.history = search_info.pv;
+        search_info.history.set_pv(&mut search_info.pv);
+        search_info.pv.clear();
 
         println!("{search_info}");
 
