@@ -6,20 +6,20 @@ use crate::{
 };
 
 impl Board {
-    /// Calculates the current material + piece-square table balance.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn psq(&self) -> Score {
-        self.psq_accumulator
-    }
-
     /// Gets the phase of the game. 0 is midgame and 24 is endgame.
     ///
     /// Since this value is incrementally upadated, this function is zero-cost
     /// to call.
     pub const fn phase(&self) -> u8 {
         self.phase_accumulator
+    }
+
+    /// Calculates the current material + piece-square table balance.
+    ///
+    /// Since this value is incrementally upadated, this function is zero-cost
+    /// to call.
+    pub const fn psq(&self) -> Score {
+        self.psq_accumulator
     }
 
     /// Recalculates the accumulators from scratch. Prefer to use functions
@@ -45,6 +45,20 @@ impl Board {
         self.add_psq_piece(end, piece);
     }
 
+    /// Adds `piece` to `self.phase`.
+    pub fn add_phase_piece(&mut self, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
+        self.phase_accumulator += PHASE_WEIGHTS[piece.to_index()];
+    }
+
+    /// Removes `piece` from `self.phase`.
+    pub fn remove_phase_piece(&mut self, piece: Piece) {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
+        self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
+    }
+
     /// Adds the piece-square table value for `piece` at `square` to the psqt
     /// accumulator.
     pub fn add_psq_piece(&mut self, square: Square, piece: Piece) {
@@ -65,17 +79,9 @@ impl Board {
         self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
-    /// Adds `piece` to `self.phase`.
-    pub fn add_phase_piece(&mut self, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
-        self.phase_accumulator += PHASE_WEIGHTS[piece.to_index()];
-    }
-
-    /// Removes `piece` from `self.phase`.
-    pub fn remove_phase_piece(&mut self, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PHASE_WEIGHTS.len()) };
-        self.phase_accumulator -= PHASE_WEIGHTS[piece.to_index()];
+    /// Clears the phase and psq accumulators.
+    pub fn clear_accumulators(&mut self) {
+        self.phase_accumulator = 0;
+        self.psq_accumulator = Score(0, 0);
     }
 }

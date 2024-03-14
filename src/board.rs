@@ -50,17 +50,17 @@ pub struct Board {
     /// Which move number the current move is. Starts at 1 and is incremented
     /// when Black moves.
     fullmoves: u16,
-    /// The current material balance weighted with piece-square tables, from
-    /// the perspective of White.
-    ///
-    /// It is incrementally updated.
-    psq_accumulator: Score,
     /// The current phase of the game, where 0 means the midgame and 24 means
     /// the endgame.
     ///
     /// `psq_val` uses this value to lerp between its midgame and
     /// endgame values. It is incrementally updated.
     phase_accumulator: u8,
+    /// The current material balance weighted with piece-square tables, from
+    /// the perspective of White.
+    ///
+    /// It is incrementally updated.
+    psq_accumulator: Score,
     /// The current zobrist key of the board.
     zobrist: Key,
 }
@@ -76,8 +76,8 @@ impl Default for Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            psq_accumulator: Score(0, 0),
             phase_accumulator: 0,
+            psq_accumulator: Score(0, 0),
             zobrist: 0,
         };
         board.refresh_accumulators();
@@ -219,11 +219,6 @@ impl Board {
             p, p, p, p, p, p, p, p,
             r, n, b, q, k, b, n, r,
         ]
-    }
-
-    /// Returns an mailbox.
-    const fn empty_mailbox() -> [Piece; Square::TOTAL] {
-        [Piece::NONE; Square::TOTAL]
     }
 
     /// Returns the piece [`Bitboard`]s of the starting position.
@@ -485,8 +480,8 @@ impl Board {
 
         if captured_type != PieceType::NONE {
             self.update_bb_piece(end_bb, captured_type, them);
-            self.remove_psq_piece(end, captured);
             self.remove_phase_piece(captured);
+            self.remove_psq_piece(end, captured);
             self.toggle_zobrist_piece(end, piece);
 
             // check if we need to unset the castling rights if we're capturing
@@ -559,14 +554,14 @@ impl Board {
 
             // remove the pawn
             self.toggle_piece_bb(PieceType::PAWN, end_bb);
-            self.remove_psq_piece(end, piece);
             self.remove_phase_piece(piece);
+            self.remove_psq_piece(end, piece);
             self.toggle_zobrist_piece(end, piece);
 
             // add the promotion piece
             self.toggle_piece_bb(promotion_piece_type, end_bb);
-            self.add_psq_piece(end, promotion_piece);
             self.add_phase_piece(promotion_piece);
+            self.add_psq_piece(end, promotion_piece);
             self.toggle_zobrist_piece(end, promotion_piece);
         }
 
@@ -648,17 +643,16 @@ impl Board {
 
     /// Clears `self`.
     fn clear_board(&mut self) {
-        self.mailbox = Self::empty_mailbox();
-        self.pieces = Self::no_pieces();
-        self.sides = Self::no_sides();
-        self.side_to_move = Side::NONE;
-        self.castling_rights = CastlingRights::none();
-        self.ep_square = Square::NONE;
-        self.halfmoves = 0;
-        self.fullmoves = 1;
-        self.psq_accumulator = Score(0, 0);
-        self.phase_accumulator = 0;
-        self.zobrist = 0;
+        self.clear_mailbox();
+        self.clear_pieces();
+        self.clear_sides();
+        self.reset_side();
+        self.clear_castling_rights();
+        self.clear_ep_square();
+        self.set_halfmoves(0);
+        self.set_fullmoves(1);
+        self.clear_accumulators();
+        self.clear_zobrist();
     }
 
     /// Finds the piece on the given rank and file and converts it to its
@@ -707,8 +701,8 @@ impl Board {
         self.set_mailbox_piece(square, piece);
         self.toggle_piece_bb(PieceType::from(piece), square_bb);
         self.toggle_side_bb(side, square_bb);
-        self.add_psq_piece(square, piece);
         self.add_phase_piece(piece);
+        self.add_psq_piece(square, piece);
         self.toggle_zobrist_piece(square, piece);
     }
 
@@ -722,8 +716,8 @@ impl Board {
         self.unset_mailbox_piece(square);
         self.toggle_piece_bb(piece_type, bb);
         self.toggle_side_bb(side, bb);
-        self.remove_psq_piece(square, piece);
         self.remove_phase_piece(piece);
+        self.remove_psq_piece(square, piece);
         self.toggle_zobrist_piece(square, piece);
     }
 
@@ -750,6 +744,13 @@ impl Board {
         self.mailbox[square.to_index()] = Piece::NONE;
     }
 
+    /// Clears the mailbox.
+    fn clear_mailbox(&mut self) {
+        for square in 0..(Square::TOTAL as u8) {
+            self.unset_mailbox_piece(Square(square));
+        }
+    }
+
     /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
     /// the side bitboard of `side`.
     fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
@@ -764,11 +765,21 @@ impl Board {
         self.pieces[piece.to_index()] ^= bb;
     }
 
+    /// Clears the piece bitboards.
+    fn clear_pieces(&mut self) {
+        self.pieces = Self::no_pieces();
+    }
+
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         // SAFETY: If it does get reached, it will panic in debug.
         unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
         self.sides[side.to_index()] ^= bb;
+    }
+
+    /// Clears the side bitboards.
+    fn clear_sides(&mut self) {
+        self.sides = Self::no_sides();
     }
 
     /// Sets side to move to `side`.
@@ -780,6 +791,11 @@ impl Board {
     fn flip_side(&mut self) {
         self.toggle_zobrist_side();
         self.side_to_move = self.side_to_move.flip();
+    }
+
+    /// Sets the side to [`Side::NONE`].
+    fn reset_side(&mut self) {
+        self.side_to_move = Side::NONE;
     }
 
     /// Returns the string representation of the current side to move: 'w' if
@@ -809,6 +825,11 @@ impl Board {
     /// Clears the castling rights for the given side.
     fn remove_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
+    }
+
+    /// Clears all castling rights.
+    fn clear_castling_rights(&mut self) {
+        self.castling_rights = CastlingRights::none();
     }
 
     /// Returns the string representation of the current en passant square: the

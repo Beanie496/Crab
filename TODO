@@ -6,3 +6,5 @@
 - Make most higher-level functions return a `Result`
 - seldepth
 - Test `MaybeUninit` for `Moves` and `Pv`
+- remove the mailbox
+- merge the updates of the psq and phase
