@@ -291,7 +291,7 @@ impl UciOptions {
     /// Prints the identification of this engine and all the UCI options it
     /// supports.
     fn print() {
-        println!("id name {ID_NAME}-{ID_VERSION}");
+        println!("id name {ID_NAME} {ID_VERSION}");
         println!("id author {ID_AUTHOR}");
         println!(
             "option name Move Overhead type spin default {} min 0 max 1000",
