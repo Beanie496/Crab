@@ -62,8 +62,8 @@ impl Engine {
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
     pub fn start_search(&mut self, limits: Limits, options: UciOptions) {
-        let board_clone = self.board.clone();
         let (control_tx, control_rx) = channel();
+        let board = self.board.clone();
 
         let search_info = SearchInfo::new(control_rx, limits);
 
@@ -72,7 +72,7 @@ impl Engine {
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(&board_clone, search_info, options);
+                iterative_deepening(board, search_info, options);
             }),
         ));
     }
@@ -107,8 +107,8 @@ impl Engine {
 
     /// Runs [`perft`] with the given parameters and the current
     /// board.
-    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&self, depth: Depth) -> u64 {
-        perft::<SHOULD_PRINT, IS_TIMED>(&self.board.clone(), depth)
+    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&mut self, depth: Depth) -> u64 {
+        perft::<SHOULD_PRINT, IS_TIMED>(&mut self.board, depth)
     }
 
     /// Returns the sode to move on the current board.

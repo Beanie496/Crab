@@ -1,11 +1,11 @@
 use std::time::Instant;
 
-use crate::{board::Board, defs::MoveType, movegen::generate_moves};
+use crate::{board::Board, defs::MoveType};
 
 /// Outputs and returns the number of leaf nodes `depth` moves in the future.
 ///
 /// If `IS_TIMED`, it will also output the time taken and the average NPS.
-pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, depth: u8) -> u64 {
+pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &mut Board, depth: u8) -> u64 {
     if IS_TIMED {
         let time = Instant::now();
         let result = perft::<SHOULD_PRINT, false>(board, depth);
@@ -30,21 +30,22 @@ pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, dept
         return 1;
     }
 
-    let moves = generate_moves::<{ MoveType::ALL }>(board);
+    let moves = board.generate_moves::<{ MoveType::ALL }>();
 
     let mut total = 0;
     for mv in moves {
-        let mut copy = board.clone();
-        if !copy.make_move(mv) {
+        if !board.make_move(mv) {
             continue;
         }
 
-        let moves = perft::<false, false>(&copy, depth - 1);
+        let moves = perft::<false, false>(board, depth - 1);
         total += moves;
 
         if SHOULD_PRINT {
             println!("{mv}: {moves}");
         }
+
+        board.unmake_move();
     }
     if SHOULD_PRINT {
         println!("Total: {total}");

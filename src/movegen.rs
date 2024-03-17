@@ -489,197 +489,193 @@ impl Moves {
     }
 }
 
-/// Generates all legal moves for the current position and puts them in
-/// `moves`.
-pub fn generate_moves<const MOVE_TYPE: u8>(board: &Board) -> Moves {
-    let mut moves = Moves::new();
-    if board.side_to_move() == Side::WHITE {
-        generate_pawn_moves::<true, MOVE_TYPE>(board, &mut moves);
-        generate_non_sliding_moves::<true, MOVE_TYPE>(board, &mut moves);
-        generate_sliding_moves::<true, MOVE_TYPE>(board, &mut moves);
-        if MOVE_TYPE == MoveType::ALL {
-            generate_castling::<true>(board, &mut moves);
-        }
-    } else {
-        generate_pawn_moves::<false, MOVE_TYPE>(board, &mut moves);
-        generate_non_sliding_moves::<false, MOVE_TYPE>(board, &mut moves);
-        generate_sliding_moves::<false, MOVE_TYPE>(board, &mut moves);
-        if MOVE_TYPE == MoveType::ALL {
-            generate_castling::<false>(board, &mut moves);
-        }
-    }
-    moves
-}
-
-/// Generates the castling moves for the given side.
-fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
-    let occupancies = board.occupancies();
-
-    if board.can_castle_kingside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
-    {
-        moves.push(Move::new_castle::<IS_WHITE, true>());
-    }
-    if board.can_castle_queenside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
-    {
-        moves.push(Move::new_castle::<IS_WHITE, false>());
-    }
-}
-
-/// Generates all legal knight and king moves (excluding castling) for `board`
-/// and puts them in `moves`.
-fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
-    board: &Board,
-    moves: &mut Moves,
-) {
-    let us_bb = board.side::<IS_WHITE>();
-    let target_squares = if MOVE_TYPE == MoveType::ALL {
-        // all squares that aren't us
-        !us_bb
-    } else if MOVE_TYPE == MoveType::CAPTURES {
-        // the opponent's piece
-        if IS_WHITE {
-            board.side::<false>()
+impl Board {
+    /// Generates all legal moves for the current position and puts them in
+    /// `moves`.
+    pub fn generate_moves<const MOVE_TYPE: u8>(&self) -> Moves {
+        let mut moves = Moves::new();
+        if self.side_to_move() == Side::WHITE {
+            self.generate_pawn_moves::<true, MOVE_TYPE>(&mut moves);
+            self.generate_non_sliding_moves::<true, MOVE_TYPE>(&mut moves);
+            self.generate_sliding_moves::<true, MOVE_TYPE>(&mut moves);
+            if MOVE_TYPE == MoveType::ALL {
+                self.generate_castling::<true>(&mut moves);
+            }
         } else {
-            board.side::<true>()
+            self.generate_pawn_moves::<false, MOVE_TYPE>(&mut moves);
+            self.generate_non_sliding_moves::<false, MOVE_TYPE>(&mut moves);
+            self.generate_sliding_moves::<false, MOVE_TYPE>(&mut moves);
+            if MOVE_TYPE == MoveType::ALL {
+                self.generate_castling::<false>(&mut moves);
+            }
         }
-    } else {
-        panic!("Unknown movetype");
-    };
+        moves
+    }
 
-    let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
-    for knight in knights {
-        // SAFETY: Instantiating `board` initialises `LOOKUP`.
-        let targets = unsafe { LOOKUPS.knight_attacks(knight) } & target_squares;
-        for target in targets {
-            moves.push(Move::new(knight, target));
+    /// Generates the castling moves for the given side.
+    fn generate_castling<const IS_WHITE: bool>(&self, moves: &mut Moves) {
+        let occupancies = self.occupancies();
+
+        if self.can_castle_kingside::<IS_WHITE>()
+            && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
+        {
+            moves.push(Move::new_castle::<IS_WHITE, true>());
+        }
+        if self.can_castle_queenside::<IS_WHITE>()
+            && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
+        {
+            moves.push(Move::new_castle::<IS_WHITE, false>());
         }
     }
 
-    let kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
-    for king in kings {
-        // SAFETY: Instantiating `board` initialises `LOOKUP`.
-        let targets = unsafe { LOOKUPS.king_attacks(king) } & target_squares;
-        for target in targets {
-            moves.push(Move::new(king, target));
-        }
-    }
-}
-
-/// Generates all legal pawn moves for `board` and puts them in `moves`.
-fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
-    board: &Board,
-    moves: &mut Moves,
-) {
-    let us_bb = board.side::<IS_WHITE>();
-    let occupancies = board.occupancies();
-    let them_bb = occupancies ^ us_bb;
-    let ep_square = board.ep_square();
-    let ep_square_bb = if ep_square == Square::NONE {
-        Bitboard::empty()
-    } else {
-        Bitboard::from(ep_square)
-    };
-    let empty = !occupancies;
-
-    let mut pawns = board.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
-    while !pawns.is_empty() {
-        let pawn = pawns.pop_lsb();
-        let pawn_sq = Square::from(pawn);
-
-        let potential_captures = if IS_WHITE {
-            // SAFETY: Instantiating `board` initialises `LOOKUP`.
-            unsafe { LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq) }
+    /// Generates all legal knight and king moves (excluding castling) for `board`
+    /// and puts them in `moves`.
+    fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
+        &self,
+        moves: &mut Moves,
+    ) {
+        let us_bb = self.side::<IS_WHITE>();
+        let target_squares = if MOVE_TYPE == MoveType::ALL {
+            // all squares that aren't us
+            !us_bb
+        } else if MOVE_TYPE == MoveType::CAPTURES {
+            // the opponent's piece
+            if IS_WHITE {
+                self.side::<false>()
+            } else {
+                self.side::<true>()
+            }
         } else {
-            // SAFETY: Same thing.
-            unsafe { LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq) }
+            panic!("Unknown movetype");
         };
-        let normal_captures = potential_captures & them_bb;
-        let ep_targets = potential_captures & ep_square_bb;
 
-        // if we're just looking at captures, loop through all captures
-        // early. Otherwise, wait a bit longer to loop through pushes and
-        // captures in the same loop.
-        if MOVE_TYPE == MoveType::CAPTURES {
-            for target in normal_captures {
+        let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
+        for knight in knights {
+            // SAFETY: Instantiating `board` initialises `LOOKUP`.
+            let targets = unsafe { LOOKUPS.knight_attacks(knight) } & target_squares;
+            for target in targets {
+                moves.push(Move::new(knight, target));
+            }
+        }
+
+        let kings = self.piece::<{ PieceType::KING.to_index() }>() & us_bb;
+        for king in kings {
+            // SAFETY: Instantiating `board` initialises `LOOKUP`.
+            let targets = unsafe { LOOKUPS.king_attacks(king) } & target_squares;
+            for target in targets {
+                moves.push(Move::new(king, target));
+            }
+        }
+    }
+
+    /// Generates all legal pawn moves for `board` and puts them in `moves`.
+    fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(&self, moves: &mut Moves) {
+        let us_bb = self.side::<IS_WHITE>();
+        let occupancies = self.occupancies();
+        let them_bb = occupancies ^ us_bb;
+        let ep_square = self.ep_square();
+        let ep_square_bb = if ep_square == Square::NONE {
+            Bitboard::empty()
+        } else {
+            Bitboard::from(ep_square)
+        };
+        let empty = !occupancies;
+
+        let mut pawns = self.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
+        while !pawns.is_empty() {
+            let pawn = pawns.pop_lsb();
+            let pawn_sq = Square::from(pawn);
+
+            let potential_captures = if IS_WHITE {
+                // SAFETY: Instantiating `board` initialises `LOOKUP`.
+                unsafe { LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq) }
+            } else {
+                // SAFETY: Same thing.
+                unsafe { LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq) }
+            };
+            let normal_captures = potential_captures & them_bb;
+            let ep_targets = potential_captures & ep_square_bb;
+
+            // if we're just looking at captures, loop through all captures
+            // early. Otherwise, wait a bit longer to loop through pushes and
+            // captures in the same loop.
+            if MOVE_TYPE == MoveType::CAPTURES {
+                for target in normal_captures {
+                    moves.push(Move::new(pawn_sq, target));
+                }
+                for target in ep_targets {
+                    moves.push(Move::new_en_passant(pawn_sq, target));
+                }
+                continue;
+            }
+
+            let single_push = pawn.pawn_push::<IS_WHITE>() & empty;
+
+            let double_push_rank = if IS_WHITE {
+                Bitboard::rank_bb(Rank::RANK4)
+            } else {
+                Bitboard::rank_bb(Rank::RANK5)
+            };
+            let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
+
+            let targets = single_push | normal_captures | double_push;
+            let promotion_targets =
+                targets & (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8));
+            let normal_targets = targets ^ promotion_targets;
+
+            for target in normal_targets {
                 moves.push(Move::new(pawn_sq, target));
             }
             for target in ep_targets {
                 moves.push(Move::new_en_passant(pawn_sq, target));
             }
-            continue;
+            for target in promotion_targets {
+                moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(pawn_sq, target));
+                moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(pawn_sq, target));
+            }
         }
+    }
 
-        let single_push = pawn.pawn_push::<IS_WHITE>() & empty;
-
-        let double_push_rank = if IS_WHITE {
-            Bitboard::rank_bb(Rank::RANK4)
+    /// Generates all legal bishop, rook and queen moves for `board` and puts them
+    /// in `moves`.
+    fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(&self, moves: &mut Moves) {
+        let us_bb = self.side::<IS_WHITE>();
+        let occupancies = self.occupancies();
+        let target_squares = if MOVE_TYPE == MoveType::ALL {
+            !us_bb
+        } else if MOVE_TYPE == MoveType::CAPTURES {
+            us_bb ^ occupancies
         } else {
-            Bitboard::rank_bb(Rank::RANK5)
+            panic!("Unknown movetype");
         };
-        let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
-        let targets = single_push | normal_captures | double_push;
-        let promotion_targets =
-            targets & (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8));
-        let normal_targets = targets ^ promotion_targets;
-
-        for target in normal_targets {
-            moves.push(Move::new(pawn_sq, target));
+        let bishops = self.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
+        for bishop in bishops {
+            // SAFETY: Instantiating `board` initialises `LOOKUP`.
+            let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & target_squares;
+            for target in targets {
+                moves.push(Move::new(bishop, target));
+            }
         }
-        for target in ep_targets {
-            moves.push(Move::new_en_passant(pawn_sq, target));
-        }
-        for target in promotion_targets {
-            moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(pawn_sq, target));
-        }
-    }
-}
 
-/// Generates all legal bishop, rook and queen moves for `board` and puts them
-/// in `moves`.
-fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
-    board: &Board,
-    moves: &mut Moves,
-) {
-    let us_bb = board.side::<IS_WHITE>();
-    let occupancies = board.occupancies();
-    let target_squares = if MOVE_TYPE == MoveType::ALL {
-        !us_bb
-    } else if MOVE_TYPE == MoveType::CAPTURES {
-        us_bb ^ occupancies
-    } else {
-        panic!("Unknown movetype");
-    };
-
-    let bishops = board.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
-    for bishop in bishops {
-        // SAFETY: Instantiating `board` initialises `LOOKUP`.
-        let targets = unsafe { LOOKUPS.bishop_attacks(bishop, occupancies) } & target_squares;
-        for target in targets {
-            moves.push(Move::new(bishop, target));
+        let rooks = self.piece::<{ PieceType::ROOK.to_index() }>() & us_bb;
+        for rook in rooks {
+            // SAFETY: Instantiating `board` initialises `LOOKUP`.
+            let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & target_squares;
+            for target in targets {
+                moves.push(Move::new(rook, target));
+            }
         }
-    }
 
-    let rooks = board.piece::<{ PieceType::ROOK.to_index() }>() & us_bb;
-    for rook in rooks {
-        // SAFETY: Instantiating `board` initialises `LOOKUP`.
-        let targets = unsafe { LOOKUPS.rook_attacks(rook, occupancies) } & target_squares;
-        for target in targets {
-            moves.push(Move::new(rook, target));
-        }
-    }
-
-    let queens = board.piece::<{ PieceType::QUEEN.to_index() }>() & us_bb;
-    for queen in queens {
-        // SAFETY: Instantiating `board` initialises `LOOKUP`.
-        let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & target_squares;
-        for target in targets {
-            moves.push(Move::new(queen, target));
+        let queens = self.piece::<{ PieceType::QUEEN.to_index() }>() & us_bb;
+        for queen in queens {
+            // SAFETY: Instantiating `board` initialises `LOOKUP`.
+            let targets = unsafe { LOOKUPS.queen_attacks(queen, occupancies) } & target_squares;
+            for target in targets {
+                moves.push(Move::new(queen, target));
+            }
         }
     }
 }

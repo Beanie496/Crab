@@ -1,6 +1,6 @@
 use std::{
     fmt::{self, Display, Formatter},
-    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, Not, Shl},
     str::FromStr,
 };
 
@@ -8,9 +8,9 @@ use crate::{
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::Score,
-    movegen::{generate_moves, Lookup, Move, LOOKUPS},
+    movegen::{Lookup, Move, LOOKUPS},
     out_of_bounds_is_unreachable,
-    util::is_double_pawn_push,
+    util::{is_double_pawn_push, Stack},
 };
 use zobrist::Key;
 
@@ -18,6 +18,9 @@ use zobrist::Key;
 mod accumulators;
 /// Functions for zobrist hashing.
 mod zobrist;
+
+/// A stack of [`MoveListEntry`]s.
+type Movelist = Stack<MoveListEntry, MAX_LEGAL_MOVES>;
 
 /// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
 /// E.g. `0b1101` would be castling rights `KQq`.
@@ -63,7 +66,23 @@ pub struct Board {
     psq_accumulator: Score,
     /// The current zobrist key of the board.
     zobrist: Key,
+    /// A list of all the moves since the initial FEN import.
+    movelist: Movelist,
 }
+
+/// All the information needed to undo a move.
+#[derive(Clone, Copy, PartialEq)]
+#[allow(clippy::missing_docs_in_private_items)]
+struct MoveListEntry {
+    mv: Move,
+    rights: CastlingRights,
+    captured: Piece,
+    ep_square: Square,
+    halfmoves: u8,
+}
+
+/// The maximum number of legal moves in a game before this program breaks.
+const MAX_LEGAL_MOVES: usize = 256;
 
 impl Default for Board {
     fn default() -> Self {
@@ -79,6 +98,7 @@ impl Default for Board {
             phase_accumulator: 0,
             psq_accumulator: Score(0, 0),
             zobrist: 0,
+            movelist: Movelist::new(),
         };
         board.refresh_accumulators();
         board.refresh_zobrist();
@@ -98,6 +118,22 @@ impl Display for Board {
             &self.halfmoves(),
             &self.fullmoves(),
         )
+    }
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.mailbox == other.mailbox
+            && self.pieces == other.pieces
+            && self.sides == other.sides
+            && self.side_to_move() == other.side_to_move()
+            && self.castling_rights() == other.castling_rights()
+            && self.ep_square() == other.ep_square()
+            && self.halfmoves() == other.halfmoves()
+            && self.fullmoves() == other.fullmoves()
+            && self.phase() == other.phase()
+            && self.psq() == other.psq()
+            && self.zobrist() == other.zobrist()
     }
 }
 
@@ -126,6 +162,14 @@ impl BitOr for CastlingRights {
 impl BitOrAssign for CastlingRights {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
+    }
+}
+
+impl BitXor for CastlingRights {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self(self.0 ^ rhs.0)
     }
 }
 
@@ -355,11 +399,9 @@ impl Board {
             return;
         }
 
-        let mut copy = self.clone();
-
         #[allow(clippy::string_slice)]
         for mv in moves_str.split(' ') {
-            let mut moves = generate_moves::<{ MoveType::ALL }>(&copy);
+            let mut moves = self.generate_moves::<{ MoveType::ALL }>();
 
             let start = Square::from_str(&mv[0..=1]).unwrap();
             let end = Square::from_str(&mv[2..=3]).unwrap();
@@ -374,10 +416,8 @@ impl Board {
                 moves.move_with(start, end)
             };
 
-            assert!(copy.make_move(mv.unwrap()), "Illegal move");
+            assert!(self.make_move(mv.unwrap()), "Illegal move");
         }
-
-        *self = copy;
     }
 
     /// Returns the piece bitboard given by `PIECE`.
@@ -456,18 +496,28 @@ impl Board {
         let us = Side::from(piece);
         let them = us.flip();
         let end_bb = Bitboard::from(end);
+        let mut is_legal = true;
 
-        self.halfmoves += 1;
-        if us == Side::BLACK {
-            self.fullmoves += 1;
-        }
+        self.movelist.push(MoveListEntry::new(
+            mv,
+            self.castling_rights(),
+            captured,
+            self.ep_square(),
+            self.halfmoves(),
+        ));
 
         if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
             self.halfmoves = 0;
         // 75-move rule: if 75 moves have been made by both players, the game
         // is adjucated as a draw. So the 151st move is illegal.
-        } else if self.halfmoves > 150 {
+        } else if self.halfmoves >= 150 {
+            self.movelist.pop();
             return false;
+        }
+
+        self.halfmoves += 1;
+        if us == Side::BLACK {
+            self.fullmoves += 1;
         }
 
         self.clear_ep_square();
@@ -506,26 +556,20 @@ impl Board {
         }
 
         if is_castling {
-            // if the king is castling out of check
-            if self.is_square_attacked(start) {
-                return false;
-            }
-            // if the king is castling into check
-            if self.is_square_attacked(end) {
-                return false;
-            }
-
             let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
             let rook_end = Square((start.0 + end.0) >> 1);
-            // if the king is castling through check
-            if self.is_square_attacked(rook_end) {
-                return false;
+
+            // if the king is castling into, through or out of check
+            if self.is_square_attacked(start)
+                || self.is_square_attacked(end)
+                || self.is_square_attacked(rook_end)
+            {
+                is_legal = false;
             }
 
             self.move_piece(
                 rook_start,
                 rook_end,
-                // `captured` is equivalent but slower
                 Piece::from_piecetype(PieceType::ROOK, us),
                 PieceType::ROOK,
                 us,
@@ -544,7 +588,6 @@ impl Board {
             });
             let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
             self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
-            self.toggle_zobrist_piece(dest, captured_pawn);
         } else if is_promotion {
             let promotion_piece_type = mv.promotion_piece();
             let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
@@ -563,10 +606,6 @@ impl Board {
             self.add_phase_piece(promotion_piece);
             self.add_psq_piece(end, promotion_piece);
             self.toggle_zobrist_piece(end, promotion_piece);
-        }
-
-        if self.is_square_attacked(self.king_square()) {
-            return false;
         }
 
         if piece_type == PieceType::ROOK {
@@ -591,9 +630,103 @@ impl Board {
         }
 
         self.toggle_zobrist_castling_rights(self.castling_rights());
+
+        if self.is_square_attacked(self.king_square()) || !is_legal {
+            self.flip_side();
+            self.unmake_move();
+            return false;
+        }
+
         self.flip_side();
 
         true
+    }
+
+    /// Unmakes the most recent move.
+    ///
+    /// Behaviour is undefined if this is called before `make_move`.
+    pub fn unmake_move(&mut self) {
+        self.flip_side();
+
+        debug_assert!(
+            self.movelist.len() > 0,
+            "There must be at least one move left in the movelist to unmake"
+        );
+        // SAFETY: we just asserted there's at least one element left
+        let entry = unsafe { self.movelist.pop().unwrap_unchecked() };
+
+        let mv = entry.mv();
+        let rights = entry.rights();
+        let captured = entry.captured();
+        let captured_type = PieceType::from(captured);
+        let ep_square = entry.ep_square();
+        self.set_halfmoves(entry.halfmoves());
+
+        let start = mv.start();
+        let end = mv.end();
+        let is_promotion = mv.is_promotion();
+        let is_castling = mv.is_castling();
+        let is_en_passant = mv.is_en_passant();
+
+        let piece = self.piece_on(end);
+        let piece_type = PieceType::from(piece);
+        let us = Side::from(piece);
+        let them = us.flip();
+        let start_bb = Bitboard::from(start);
+
+        if us == Side::BLACK {
+            self.fullmoves -= 1;
+        }
+
+        self.toggle_zobrist_ep_square(self.ep_square());
+        self.toggle_zobrist_ep_square(ep_square);
+        self.toggle_zobrist_castling_rights(self.castling_rights() ^ rights);
+        self.set_ep_square(ep_square);
+        self.set_castling_rights(rights);
+
+        self.move_piece(end, start, piece, piece_type, us);
+
+        if is_en_passant {
+            let dest = Square(if us == Side::WHITE {
+                end.0 - 8
+            } else {
+                end.0 + 8
+            });
+            self.add_piece(dest, Piece::from_piecetype(PieceType::PAWN, them));
+        } else if is_castling {
+            let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
+            let rook_end = Square((start.0 + end.0) >> 1);
+
+            self.move_piece(
+                rook_end,
+                rook_start,
+                Piece::from_piecetype(PieceType::ROOK, us),
+                PieceType::ROOK,
+                us,
+            );
+        } else {
+            if is_promotion {
+                let pawn = Piece::from_piecetype(PieceType::PAWN, us);
+
+                // overwrite the promotion piece on the mailbox
+                self.set_mailbox_piece(start, pawn);
+
+                // remove the promotion piece
+                self.toggle_piece_bb(piece_type, start_bb);
+                self.remove_phase_piece(piece);
+                self.remove_psq_piece(start, piece);
+                self.toggle_zobrist_piece(start, piece);
+
+                // add the pawn
+                self.toggle_piece_bb(PieceType::PAWN, start_bb);
+                self.add_phase_piece(pawn);
+                self.add_psq_piece(start, pawn);
+                self.toggle_zobrist_piece(end, pawn);
+            }
+            if captured_type != PieceType::NONE {
+                self.add_piece(end, captured);
+            }
+        }
     }
 
     /// Converts the current board to a string.
@@ -653,6 +786,7 @@ impl Board {
         self.set_fullmoves(1);
         self.clear_accumulators();
         self.clear_zobrist();
+        self.movelist.clear();
     }
 
     /// Finds the piece on the given rank and file and converts it to its
@@ -811,6 +945,11 @@ impl Board {
         self.castling_rights.to_string()
     }
 
+    /// Sets the castling rights to `rights`.
+    fn set_castling_rights(&mut self, rights: CastlingRights) {
+        self.castling_rights = rights;
+    }
+
     /// Adds the given right to the castling rights.
     fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
@@ -965,5 +1104,49 @@ impl CastlingRights {
         } else {
             *self &= Self::K | Self::Q;
         }
+    }
+}
+
+impl MoveListEntry {
+    /// Creates a new [`MovelistEntry`].
+    const fn new(
+        mv: Move,
+        rights: CastlingRights,
+        captured: Piece,
+        ep_square: Square,
+        halfmoves: u8,
+    ) -> Self {
+        Self {
+            mv,
+            rights,
+            captured,
+            ep_square,
+            halfmoves,
+        }
+    }
+
+    /// Returns the [`Move`].
+    const fn mv(self) -> Move {
+        self.mv
+    }
+
+    /// Returns the castling rights.
+    const fn rights(self) -> CastlingRights {
+        self.rights
+    }
+
+    /// Returns the captured piece.
+    const fn captured(self) -> Piece {
+        self.captured
+    }
+
+    /// Returns the en passant square.
+    const fn ep_square(self) -> Square {
+        self.ep_square
+    }
+
+    /// Returns the number of halfmoves.
+    const fn halfmoves(self) -> u8 {
+        self.halfmoves
     }
 }

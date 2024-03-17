@@ -1,22 +1,21 @@
-use super::{Pv, SearchInfo, Depth};
+use super::{Depth, Pv, SearchInfo};
 use crate::{
     board::Board,
     defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW},
-    movegen::generate_moves,
 };
 
 /// Performs a search on `board`. Returns the evaluation of after searching to
 /// the given depth.
 pub fn alpha_beta_search(
-    board: &Board,
+    board: &mut Board,
     search_info: &mut SearchInfo,
     mut alpha: Eval,
     mut beta: Eval,
     depth: Depth,
 ) -> Eval {
     if depth == 0 {
-        return quiescent_search(search_info, board, alpha, beta, depth);
+        return quiescent_search(board, search_info, alpha, beta, depth);
     }
 
     // Stop if needed. The return value isn't important because it will be
@@ -58,18 +57,20 @@ pub fn alpha_beta_search(
     }
 
     let mut pv = Pv::new();
-    let moves = generate_moves::<{ MoveType::ALL }>(board)
+    let moves = board
+        .generate_moves::<{ MoveType::ALL }>()
         .score(search_info, height)
         .sort();
 
     let mut total_moves = 0;
     for mv in moves {
-        let mut copy = board.clone();
-        if !copy.make_move(mv) {
+        if !board.make_move(mv) {
             continue;
         }
 
-        let result = -alpha_beta_search(&copy, search_info, -beta, -alpha, depth - 1);
+        let result = -alpha_beta_search(board, search_info, -beta, -alpha, depth - 1);
+        board.unmake_move();
+
         search_info.nodes += 1;
 
         // This position is too good - our opponent is guaranteed a worse
@@ -107,8 +108,8 @@ pub fn alpha_beta_search(
 /// Perform a quiescent search on the current position. This is similar to
 /// alpha-beta but it only examines captures.
 fn quiescent_search(
+    board: &mut Board,
     search_info: &mut SearchInfo,
-    board: &Board,
     mut alpha: Eval,
     beta: Eval,
     // this starts at 0 (called from the main search) and counts up
@@ -131,15 +132,16 @@ fn quiescent_search(
 
     search_info.seldepth = search_info.seldepth.max(search_info.depth + height);
 
-    let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
+    let moves = board.generate_moves::<{ MoveType::CAPTURES }>();
 
     for mv in moves {
-        let mut copy = board.clone();
-        if !copy.make_move(mv) {
+        if !board.make_move(mv) {
             continue;
         }
 
-        let result = -quiescent_search(search_info, &copy, -beta, -alpha, height + 1);
+        let result = -quiescent_search(board, search_info, -beta, -alpha, height + 1);
+        board.unmake_move();
+
         search_info.nodes += 1;
 
         if result >= beta {

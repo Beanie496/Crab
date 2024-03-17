@@ -405,7 +405,7 @@ impl SearchInfo {
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: UciOptions) {
+pub fn iterative_deepening(mut board: Board, mut search_info: SearchInfo, options: UciOptions) {
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
@@ -416,7 +416,7 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: 
         search_info.seldepth = 0;
         let depth = search_info.depth;
 
-        let eval = alpha_beta_search(&board.clone(), &mut search_info, alpha, beta, depth);
+        let eval = alpha_beta_search(&mut board, &mut search_info, alpha, beta, depth);
 
         if search_info.has_stopped() {
             // technically `best_move` would be null if this is called before

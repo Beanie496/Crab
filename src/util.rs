@@ -26,6 +26,7 @@ macro_rules! cfor {
 /// The point of this is to custom-make my own methods. Since this is a binary
 /// crate, I can do questionable things like `unreachable_unchecked` for some
 /// bounds checking without worrying about screwing over users.
+#[derive(Clone)]
 pub struct Stack<T: Copy, const SIZE: usize> {
     /// The internal array.
     stack: [MaybeUninit<T>; SIZE],
@@ -48,6 +49,11 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
             stack: [MaybeUninit::uninit(); SIZE],
             first_empty: 0,
         }
+    }
+
+    /// Returns the number of items in the stack.
+    pub const fn len(&self) -> usize {
+        self.first_empty
     }
 
     /// Pushes an item onto the stack.

@@ -40,7 +40,7 @@ pub const MATE: Eval = INF_EVAL - 300;
 pub const DRAW: Eval = 0;
 
 /// A blend between middlegame value and endgame value.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Score(pub Eval, pub Eval);
 
 impl Add for Score {
