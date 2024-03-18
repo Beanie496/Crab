@@ -36,7 +36,7 @@ pub struct ThreadState<Tx, Handle> {
 impl Clone for Engine {
     fn clone(&self) -> Self {
         Self {
-            board: self.board.clone(),
+            board: self.board,
             search_thread_state: None,
         }
     }
@@ -62,7 +62,7 @@ impl Engine {
     /// Start the search. Runs to infinity if `depth == None`, otherwise runs
     /// to depth `Some(depth)`.
     pub fn start_search(&mut self, limits: Limits, options: UciOptions) {
-        let board_clone = self.board.clone();
+        let board_clone = self.board;
         let (control_tx, control_rx) = channel();
 
         let search_info = SearchInfo::new(control_rx, limits);

@@ -34,7 +34,7 @@ pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, dept
 
     let mut total = 0;
     for mv in moves {
-        let mut copy = board.clone();
+        let mut copy = *board;
         if !copy.make_move(mv) {
             continue;
         }

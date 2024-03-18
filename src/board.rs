@@ -26,7 +26,7 @@ pub struct CastlingRights(u8);
 
 /// The board. It contains information about the current board state and can
 /// generate pseudo-legal moves. It is small (134 bytes) so it uses copy-make.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Board {
     /// An array of piece values, used for quick lookup of which piece is on a
     /// given square.
@@ -355,7 +355,7 @@ impl Board {
             return;
         }
 
-        let mut copy = self.clone();
+        let mut copy = *self;
 
         #[allow(clippy::string_slice)]
         for mv in moves_str.split(' ') {

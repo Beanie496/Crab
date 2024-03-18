@@ -1,4 +1,4 @@
-use super::{Pv, SearchInfo, Depth};
+use super::{Depth, Pv, SearchInfo};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -64,7 +64,7 @@ pub fn alpha_beta_search(
 
     let mut total_moves = 0;
     for mv in moves {
-        let mut copy = board.clone();
+        let mut copy = *board;
         if !copy.make_move(mv) {
             continue;
         }
@@ -134,7 +134,7 @@ fn quiescent_search(
     let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
 
     for mv in moves {
-        let mut copy = board.clone();
+        let mut copy = *board;
         if !copy.make_move(mv) {
             continue;
         }
