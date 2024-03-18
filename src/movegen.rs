@@ -60,10 +60,7 @@ pub struct Move {
 }
 
 /// An stack of [`Move`]s.
-pub struct Moves {
-    /// The internal array.
-    moves: Stack<Move, MAX_LEGAL_MOVES>,
-}
+pub type Moves = Stack<Move, MAX_LEGAL_MOVES>;
 
 /// The number of bitboards required to store all bishop attacks, where each
 /// element corresponds to one permutation of blockers. (This means some
@@ -97,14 +94,6 @@ impl Display for Move {
         } else {
             write!(f, "{start}{end}")
         }
-    }
-}
-
-impl Iterator for Moves {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.pop()
     }
 }
 
@@ -447,13 +436,6 @@ impl Move {
 }
 
 impl Moves {
-    /// Creates an empty [`Moves`] object.
-    pub const fn new() -> Self {
-        Self {
-            moves: Stack::new(),
-        }
-    }
-
     /// Finds and returns, if it exists, the move that has start square `start`
     /// and end square `end`.
     ///
@@ -475,17 +457,6 @@ impl Moves {
         piece_type: PieceType,
     ) -> Option<Move> {
         self.find(|&mv| mv == Move::new_promo_any(start, end, piece_type))
-    }
-
-    /// Pushes `mv` onto itself. Assumes `self` is not full.
-    pub fn push(&mut self, mv: Move) {
-        self.moves.push(mv);
-    }
-
-    /// Pops a `Move` from the array. Returns `Some(move)` if there are `> 0`
-    /// moves, otherwise returns `None`.
-    pub fn pop(&mut self) -> Option<Move> {
-        self.moves.pop()
     }
 }
 
