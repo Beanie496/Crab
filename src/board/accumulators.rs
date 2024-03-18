@@ -1,9 +1,8 @@
 use super::Board;
 use crate::{
-    index_unchecked,
-    out_of_bounds_is_unreachable,
     defs::{Piece, Square},
     evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
+    index_unchecked, out_of_bounds_is_unreachable,
 };
 
 impl Board {

@@ -1,12 +1,11 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::{
-    index_unchecked,
-    out_of_bounds_is_unreachable,
     bitboard::Bitboard,
     board::Board,
     defs::{File, MoveType, PieceType, Rank, Side, Square},
-    util::{Stack},
+    index_unchecked, out_of_bounds_is_unreachable,
+    util::Stack,
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, sliding_attacks};

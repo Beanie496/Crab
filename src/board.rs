@@ -5,12 +5,12 @@ use std::{
 };
 
 use crate::{
-    index_into_unchecked, index_unchecked,
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::Score,
+    index_into_unchecked, index_unchecked,
     movegen::{generate_moves, Lookup, Move, LOOKUPS},
-    util::{is_double_pawn_push},
+    util::is_double_pawn_push,
 };
 use zobrist::Key;
 

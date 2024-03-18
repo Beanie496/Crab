@@ -29,7 +29,7 @@ macro_rules! index_unchecked {
         debug_assert!($index < $array.len(), "Attempted to index out of bounds");
         // SAFETY: we just checked `index` is valid
         unsafe { *$array.get_unchecked($index) }
-    }}
+    }};
 }
 
 /// Inserts `item` at `index` into `array` without bounds checking.
@@ -41,7 +41,7 @@ macro_rules! index_into_unchecked {
         debug_assert!($index < $array.len(), "Attempted to index out of bounds");
         // SAFETY: we just checked `index` is valid
         unsafe { *$array.get_unchecked_mut($index) = $item }
-    }}
+    }};
 }
 
 /// Tells the compiler that `index` cannot match or exceed `bound`.
@@ -102,9 +102,10 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     pub fn pop(&mut self) -> Option<T> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
+            let item = index_unchecked!(self.stack, self.first_empty);
             // SAFETY: It is not possible for `first_empty` to index into
             // uninitialised memory
-            unsafe { index_unchecked!(self.stack, self.first_empty).assume_init_read() }
+            unsafe { item.assume_init_read() }
         })
     }
 

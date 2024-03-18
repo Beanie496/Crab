@@ -5,6 +5,5 @@
     - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
 - Make most higher-level functions return a `Result`
 - merge the updates of the psq and phase
-- use `get_unchecked` instead of the ugly assertions to the compiler
 - replace `Moves` with a typedef
 - `impl Parse for Board`, but the lookup tables will need to be static
