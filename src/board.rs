@@ -5,12 +5,12 @@ use std::{
 };
 
 use crate::{
+    index_into_unchecked, index_unchecked,
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::Score,
     movegen::{generate_moves, Lookup, Move, LOOKUPS},
-    out_of_bounds_is_unreachable,
-    util::is_double_pawn_push,
+    util::{is_double_pawn_push},
 };
 use zobrist::Key;
 
@@ -394,6 +394,11 @@ impl Board {
         }
     }
 
+    /// Returns the board of the side according to `IS_WHITE`.
+    pub fn side_any(&self, side: Side) -> Bitboard {
+        index_unchecked!(self.sides, side.to_index())
+    }
+
     /// Returns all the occupied squares on the board.
     pub fn occupancies(&self) -> Bitboard {
         self.side::<true>() | self.side::<false>()
@@ -687,9 +692,7 @@ impl Board {
 
     /// Returns the piece on `square`.
     fn piece_on(&self, square: Square) -> Piece {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()]
+        index_unchecked!(self.mailbox, square.to_index())
     }
 
     /// Adds a piece to square `square` for side `side`. Assumes there is no
@@ -731,16 +734,12 @@ impl Board {
 
     /// Sets the piece on `square` in the mailbox to `piece`.
     fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()] = piece;
+        index_into_unchecked!(self.mailbox, square.to_index(), piece);
     }
 
     /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
     fn unset_mailbox_piece(&mut self, square: Square) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.mailbox.len()) };
-        self.mailbox[square.to_index()] = Piece::NONE;
+        index_into_unchecked!(self.mailbox, square.to_index(), Piece::NONE);
     }
 
     /// Clears the mailbox.
@@ -759,9 +758,8 @@ impl Board {
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
     fn toggle_piece_bb(&mut self, piece: PieceType, bb: Bitboard) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.pieces.len()) };
-        self.pieces[piece.to_index()] ^= bb;
+        let old_bb = index_unchecked!(self.pieces, piece.to_index());
+        index_into_unchecked!(self.pieces, piece.to_index(), old_bb ^ bb);
     }
 
     /// Clears the piece bitboards.
@@ -771,9 +769,8 @@ impl Board {
 
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.sides.len()) };
-        self.sides[side.to_index()] ^= bb;
+        let old_bb = index_unchecked!(self.sides, side.to_index());
+        index_into_unchecked!(self.sides, side.to_index(), old_bb ^ bb);
     }
 
     /// Clears the side bitboards.
@@ -864,11 +861,8 @@ impl Board {
 
     /// Calculates the square the king is on.
     fn king_square(&self) -> Square {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(self.side_to_move().to_index(), self.sides.len()) };
         Square::from(
-            self.piece::<{ PieceType::KING.to_index() }>()
-                & self.sides[self.side_to_move().to_index()],
+            self.piece::<{ PieceType::KING.to_index() }>() & self.side_any(self.side_to_move()),
         )
     }
 
@@ -877,9 +871,7 @@ impl Board {
         let occupancies = self.occupancies();
         let us = self.side_to_move();
         let them = us.flip();
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(them.to_index(), self.sides.len()) };
-        let them_bb = self.sides[them.to_index()];
+        let them_bb = self.side_any(them);
 
         // SAFETY: Instantiating `self` initialises `LOOKUP`.
         let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };

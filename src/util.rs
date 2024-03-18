@@ -5,7 +5,6 @@ use std::{cmp::Ordering, mem::MaybeUninit};
 use crate::{
     bitboard::Bitboard,
     defs::{Piece, PieceType, Rank, Square},
-    out_of_bounds_is_unreachable,
 };
 
 /// A C-style `for` loop to allow easier looping in `const` functions.
@@ -18,6 +17,30 @@ macro_rules! cfor {
             $body;
             $expr;
         }
+    }}
+}
+
+/// Gets the item at `index` in `array` without bounds checking.
+///
+/// In debug mode, it will assert that `index` is within `array`.
+#[macro_export]
+macro_rules! index_unchecked {
+    ($array:expr, $index:expr) => {{
+        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
+        // SAFETY: we just checked `index` is valid
+        unsafe { *$array.get_unchecked($index) }
+    }}
+}
+
+/// Inserts `item` at `index` into `array` without bounds checking.
+///
+/// In debug mode, it will assert that `index` is within `array`.
+#[macro_export]
+macro_rules! index_into_unchecked {
+    ($array:expr, $index:expr, $item:expr) => {{
+        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
+        // SAFETY: we just checked `index` is valid
+        unsafe { *$array.get_unchecked_mut($index) = $item }
     }}
 }
 
@@ -52,9 +75,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
 
     /// Pushes an item onto the stack.
     pub fn push(&mut self, item: T) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.stack.len()) };
-        self.stack[self.first_empty] = MaybeUninit::new(item);
+        index_into_unchecked!(self.stack, self.first_empty, MaybeUninit::new(item));
         self.first_empty += 1;
     }
 
@@ -63,11 +84,9 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     pub fn pop(&mut self) -> Option<T> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
-            // SAFETY: If it does get reached, it will panic in debug.
-            unsafe { out_of_bounds_is_unreachable!(self.first_empty, self.stack.len()) };
             // SAFETY: It is not possible for `first_empty` to index into
             // uninitialised memory
-            unsafe { self.stack[self.first_empty].assume_init_read() }
+            unsafe { index_unchecked!(self.stack, self.first_empty).assume_init_read() }
         })
     }
 

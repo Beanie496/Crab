@@ -1,11 +1,11 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::{
+    index_unchecked,
     bitboard::Bitboard,
     board::Board,
     defs::{File, MoveType, PieceType, Rank, Side, Square},
-    out_of_bounds_is_unreachable,
-    util::Stack,
+    util::{Stack},
 };
 use magic::{Magic, BISHOP_MAGICS, MAX_BLOCKERS, ROOK_MAGICS};
 use util::{gen_all_sliding_attacks, sliding_attacks};
@@ -255,45 +255,33 @@ impl Lookup {
 
     /// Finds the pawn attacks from `square`.
     pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
-        self.pawn_attacks[side.to_index()][square.to_index()]
+        index_unchecked!(
+            index_unchecked!(self.pawn_attacks, side.to_index()),
+            square.to_index()
+        )
     }
 
     /// Finds the knight attacks from `square`.
     pub fn knight_attacks(&self, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.knight_attacks.len()) };
-        self.knight_attacks[square.to_index()]
+        index_unchecked!(self.knight_attacks, square.to_index())
     }
 
     /// Finds the king attacks from `square`.
     pub fn king_attacks(&self, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.king_attacks.len()) };
-        self.king_attacks[square.to_index()]
+        index_unchecked!(self.king_attacks, square.to_index())
     }
 
     /// Finds the bishop attacks from `square` with the given blockers.
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.bishop_magics.len()) };
-        let index = self.bishop_magics[square.to_index()].get_table_index(blockers);
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.magic_table.len()) };
-        self.magic_table[index]
+        let index =
+            index_unchecked!(self.bishop_magics, square.to_index()).get_table_index(blockers);
+        index_unchecked!(self.magic_table, index)
     }
 
     /// Finds the rook attacks from `square` with the given blockers.
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.rook_magics.len()) };
-        let index = self.rook_magics[square.to_index()].get_table_index(blockers);
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(index, self.magic_table.len()) };
-        self.magic_table[index]
+        let index = index_unchecked!(self.rook_magics, square.to_index()).get_table_index(blockers);
+        index_unchecked!(self.magic_table, index)
     }
 
     /// Finds the queen attacks from `square` with the given blockers.
