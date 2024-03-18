@@ -7,3 +7,4 @@
 - merge the updates of the psq and phase
 - use `get_unchecked` instead of the ugly assertions to the compiler
 - replace `Moves` with a typedef
+- `impl Parse for Board`, but the lookup tables will need to be static
