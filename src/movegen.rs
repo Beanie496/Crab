@@ -2,6 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::{
     index_unchecked,
+    out_of_bounds_is_unreachable,
     bitboard::Bitboard,
     board::Board,
     defs::{File, MoveType, PieceType, Rank, Side, Square},
@@ -255,10 +256,11 @@ impl Lookup {
 
     /// Finds the pawn attacks from `square`.
     pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        index_unchecked!(
-            index_unchecked!(self.pawn_attacks, side.to_index()),
-            square.to_index()
-        )
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
+        self.pawn_attacks[side.to_index()][square.to_index()]
     }
 
     /// Finds the knight attacks from `square`.

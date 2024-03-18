@@ -44,6 +44,24 @@ macro_rules! index_into_unchecked {
     }}
 }
 
+/// Tells the compiler that `index` cannot match or exceed `bound`.
+///
+/// In debug mode, it will assert that `index` is within `bound`.
+#[macro_export]
+macro_rules! out_of_bounds_is_unreachable {
+    ($index: expr, $bound: expr) => {{
+        if $index >= $bound {
+            #[cfg(debug_assertions)]
+            panic!(
+                "Unreachable code reached: index {} out of bound {}",
+                $index, $bound
+            );
+            #[allow(unreachable_code)]
+            std::hint::unreachable_unchecked()
+        }
+    }};
+}
+
 /// A generic stack.
 ///
 /// The point of this is to custom-make my own methods. Since this is a binary

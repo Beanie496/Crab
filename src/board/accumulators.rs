@@ -1,6 +1,7 @@
 use super::Board;
 use crate::{
     index_unchecked,
+    out_of_bounds_is_unreachable,
     defs::{Piece, Square},
     evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
 };
@@ -55,19 +56,21 @@ impl Board {
     /// Adds the piece-square table value for `piece` at `square` to the psqt
     /// accumulator.
     pub fn add_psq_piece(&mut self, square: Square, piece: Piece) {
-        self.psq_accumulator += index_unchecked!(
-            index_unchecked!(PIECE_SQUARE_TABLES, piece.to_index()),
-            square.to_index()
-        );
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        self.psq_accumulator += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
     /// Removes the piece-square table value for `piece` at `square` from the
     /// psqt accumulator.
     pub fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
-        self.psq_accumulator -= index_unchecked!(
-            index_unchecked!(PIECE_SQUARE_TABLES, piece.to_index()),
-            square.to_index()
-        );
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        self.psq_accumulator -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
     /// Clears the phase and psq accumulators.
