@@ -1,6 +1,6 @@
 use crate::{
     bitboard::Bitboard,
-    defs::{Direction, File, PieceType, Rank, Square},
+    defs::{File, PieceType, Square},
     movegen::magic::MAX_BLOCKERS,
 };
 
@@ -12,11 +12,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     square: Square,
     attacks: &mut [Bitboard; MAX_BLOCKERS],
 ) {
-    let excluded_ranks_bb = (Bitboard::file_bb(File::FILE1) | Bitboard::file_bb(File::FILE8))
-        & !Bitboard::file_bb(File::from(square));
-    let excluded_files_bb = (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8))
-        & !Bitboard::rank_bb(Rank::from(square));
-    let edges = excluded_ranks_bb | excluded_files_bb;
+    let edges = Bitboard::edges_without(square);
     let mask = sliding_attacks::<PIECE>(square, Bitboard::empty()) & !edges;
 
     let mut blockers = mask;
@@ -29,49 +25,137 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::empty());
 }
 
-/// Checks if `square` can go in the given direction.
-pub fn is_valid<const DIRECTION: i8>(square: Square) -> bool {
-    // I want to lose the sign and intentially overflow `square`, since that
-    // would have the same effect as just adding the i8 to the u8
-    let dest = Square(square.0.wrapping_add(DIRECTION as u8));
-    // credit to Stockfish, as I didn't come up with this code.
-    // It checks if `square` is still within the board, and if it is, it checks
-    // if it hasn't wrapped (because if it has wrapped, the distance will be
-    // larger than 2).
-    dest.is_valid() && square.horizontal_distance(dest) <= 1
-}
+/// Generates the attack set for `PIECE` on `square` up to and including the
+/// given blockers and/or the edge.
+///
+/// Will panic if `PIECE` is not the piece type of a bishop or rook.
+#[allow(clippy::similar_names)]
+pub const fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
+    let not_a_file = 0xfefe_fefe_fefe_fefe;
+    let not_h_file = 0x7f7f_7f7f_7f7f_7f7f;
+    let square = square.0;
+    let square_bb = bitboard_from_square(square);
+    let blockers = blockers.0;
 
-/// Generates an attack from `square` in the given direction up to and
-/// including the first encountered bit set in `blockers`. `blockers` is
-/// assumed not to include `square` itself.
-pub fn ray_attack<const DIRECTION: i8>(mut square: Square, blockers: Bitboard) -> Bitboard {
-    let mut attacks = Bitboard::empty();
-    // checks if the next square is valid and if the piece can move from the
-    // square
-    while is_valid::<DIRECTION>(square) && (Bitboard::from(square) & blockers).is_empty() {
-        // I want to lose the sign and intentially overflow `square`, since
-        // that would have the same effect as just adding the i8 to the u8
-        square = Square(square.0.wrapping_add(DIRECTION as u8));
-        attacks |= Bitboard::from(square);
-    }
-    attacks
-}
+    let mut attacks = 0x0;
+    let mut ray = square_bb;
+    let mut free = !blockers;
 
-/// Generates the attack set for `piece` on `square` up to and including the
-/// given blockers. Includes the edge.
-pub fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard) -> Bitboard {
-    let piece = PieceType(PIECE);
-    let mut ray = Bitboard::empty();
-    if piece == PieceType::BISHOP {
-        ray |= ray_attack::<{ Direction::NE.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::SE.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::SW.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::NW.0 }>(square, blockers);
+    // Kogge-stone algorithm. This code is only ever ran once at compilation
+    // time, so I'm optimising here for an interpreter of MIR. This results in
+    // ugly code just to get half-decent compilation times.
+    if PIECE == PieceType::BISHOP.0 {
+        // north-east
+        free &= not_a_file;
+        ray |= free & (ray << 9);
+        free &= free << 9;
+        ray |= free & (ray << 18);
+        free &= free << 18;
+        ray |= free & (ray << 36);
+        ray <<= 9;
+        attacks |= ray & not_a_file;
+
+        // south-east
+        ray = square_bb;
+        free = !blockers & not_a_file;
+        ray |= free & (ray >> 7);
+        free &= free >> 7;
+        ray |= free & (ray >> 14);
+        free &= free >> 14;
+        ray |= free & (ray >> 28);
+        ray >>= 7;
+        attacks |= ray & not_a_file;
+
+        // south-west
+        ray = square_bb;
+        free = !blockers & not_h_file;
+        ray |= free & (ray >> 9);
+        free &= free >> 9;
+        ray |= free & (ray >> 18);
+        free &= free >> 18;
+        ray |= free & (ray >> 36);
+        ray >>= 9;
+        attacks |= ray & not_h_file;
+
+        // north-west
+        ray = square_bb;
+        free = !blockers & not_h_file;
+        ray |= free & (ray << 7);
+        free &= free << 7;
+        ray |= free & (ray << 14);
+        free &= free << 14;
+        ray |= free & (ray << 28);
+        ray <<= 7;
+    } else if PIECE == PieceType::ROOK.0 {
+        // north
+        ray |= free & (ray << 8);
+        free &= free << 8;
+        ray |= free & (ray << 16);
+        free &= free << 16;
+        ray |= free & (ray << 32);
+        ray <<= 8;
+        attacks |= ray;
+
+        // east
+        ray = square_bb;
+        free = !blockers & not_a_file;
+        ray |= free & (ray << 1);
+        free &= free << 1;
+        ray |= free & (ray << 2);
+        free &= free << 2;
+        ray |= free & (ray << 4);
+        ray <<= 1;
+        attacks |= ray & not_a_file;
+
+        // south
+        ray = square_bb;
+        free = !blockers;
+        ray |= free & (ray >> 8);
+        free &= free >> 8;
+        ray |= free & (ray >> 16);
+        free &= free >> 16;
+        ray |= free & (ray >> 32);
+        ray >>= 8;
+        attacks |= ray;
+
+        // west
+        ray = square_bb;
+        free = !blockers & not_h_file;
+        ray |= free & (ray >> 1);
+        free &= free >> 1;
+        ray |= free & (ray >> 2);
+        free &= free >> 2;
+        ray |= free & (ray >> 4);
+        ray >>= 1;
     } else {
-        ray |= ray_attack::<{ Direction::N.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::E.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::S.0 }>(square, blockers);
-        ray |= ray_attack::<{ Direction::W.0 }>(square, blockers);
+        panic!("Sliding piece type not a bishop or rook");
     };
-    ray
+    attacks |= ray & not_h_file;
+
+    Bitboard(attacks)
+}
+
+/// Shifts a bitboard one square north without wrapping.
+pub const fn north(num: u64) -> u64 {
+    num << 8
+}
+
+/// Shifts a bitboard one square east without wrapping.
+pub const fn east(num: u64) -> u64 {
+    (num << 1) & !Bitboard::file_bb(File::FILE1).0
+}
+
+/// Shifts a bitboard one square south without wrapping.
+pub const fn south(num: u64) -> u64 {
+    num >> 8
+}
+
+/// Shifts a bitboard one square west without wrapping.
+pub const fn west(num: u64) -> u64 {
+    (num >> 1) & !Bitboard::file_bb(File::FILE8).0
+}
+
+/// Converts a square to a bitboard with the relevant bit set.
+pub const fn bitboard_from_square(square: u8) -> u64 {
+    1 << square
 }

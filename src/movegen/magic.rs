@@ -187,11 +187,13 @@ impl Magic {
         }
     }
 
-    /// Calculates the index into the table it is for. See
-    /// <https://www.chessprogramming.org/Magic_Bitboards> for an explanation.
-    pub fn get_table_index(&self, mut occupancies: Bitboard) -> usize {
-        occupancies &= self.mask;
+    /// Calculates the index into the table it is for.
+    ///
+    /// See <https://www.chessprogramming.org/Magic_Bitboards> for an
+    /// explanation.
+    pub const fn get_table_index(&self, occupancies: Bitboard) -> usize {
         let mut occupancies = occupancies.0;
+        occupancies &= self.mask.0;
         occupancies = occupancies.wrapping_mul(self.magic);
         occupancies >>= self.shift;
         occupancies as usize + self.offset as usize
@@ -199,8 +201,6 @@ impl Magic {
 }
 
 /// Finds magic numbers for all 64 squares for both the rook and bishop.
-///
-/// # Panics
 ///
 /// Panics if the value given for the generic parameter does not match the
 /// inner value of a [`PieceType::BISHOP`] or a [`PieceType::ROOK`].

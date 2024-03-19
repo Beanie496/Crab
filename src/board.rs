@@ -9,7 +9,7 @@ use crate::{
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
     evaluation::Score,
     index_into_unchecked, index_unchecked,
-    movegen::{generate_moves, Lookup, Move, LOOKUPS},
+    movegen::{generate_moves, Move, LOOKUPS},
     util::is_double_pawn_push,
 };
 use zobrist::Key;
@@ -188,7 +188,6 @@ impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
     pub fn new() -> Self {
-        Lookup::init();
         Self::default()
     }
 
@@ -873,16 +872,11 @@ impl Board {
         let them = us.flip();
         let them_bb = self.side_any(them);
 
-        // SAFETY: Instantiating `self` initialises `LOOKUP`.
-        let pawn_attacks = unsafe { LOOKUPS.pawn_attacks(us, square) };
-        // SAFETY: Ditto.
-        let knight_attacks = unsafe { LOOKUPS.knight_attacks(square) };
-        // SAFETY: Ditto.
-        let diagonal_attacks = unsafe { LOOKUPS.bishop_attacks(square, occupancies) };
-        // SAFETY: Ditto.
-        let orthogonal_attacks = unsafe { LOOKUPS.rook_attacks(square, occupancies) };
-        // SAFETY: Ditto.
-        let king_attacks = unsafe { LOOKUPS.king_attacks(square) };
+        let pawn_attacks = LOOKUPS.pawn_attacks(us, square);
+        let knight_attacks = LOOKUPS.knight_attacks(square);
+        let diagonal_attacks = LOOKUPS.bishop_attacks(square, occupancies);
+        let orthogonal_attacks = LOOKUPS.rook_attacks(square, occupancies);
+        let king_attacks = LOOKUPS.king_attacks(square);
 
         let pawns = self.piece::<{ PieceType::PAWN.to_index() }>();
         let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>();

@@ -193,12 +193,19 @@ impl Bitboard {
     /// 0 0 0 0 0 0 0 1
     /// X 0 0 0 0 0 0 1
     /// ```
-    pub fn edges_without(square: Square) -> Self {
-        let excluded_ranks_bb = (Self::file_bb(File::FILE1) | Self::file_bb(File::FILE8))
-            & !Self::file_bb(File::from(square));
-        let excluded_files_bb = (Self::rank_bb(Rank::RANK1) | Self::rank_bb(Rank::RANK8))
-            & !Self::rank_bb(Rank::from(square));
-        excluded_ranks_bb | excluded_files_bb
+    pub const fn edges_without(square: Square) -> Self {
+        let rank_1 = 0x0000_0000_0000_00ff;
+        let rank_1_and_8 = 0xff00_0000_0000_00ff;
+        let file_a = 0x0101_0101_0101_0101;
+        let file_a_and_h = 0x8181_8181_8181_8181;
+
+        // the square on the first file of its rank
+        let square_file_a = square.0 & 56;
+        let square_file = square.0 & 7;
+        let excluded_ranks_bb = rank_1_and_8 & !(rank_1 << square_file_a);
+        let excluded_files_bb = file_a_and_h & !(file_a << square_file);
+
+        Self(excluded_ranks_bb | excluded_files_bb)
     }
 
     /// Returns the bits between the starting position of the king and the
@@ -226,8 +233,8 @@ impl Bitboard {
     }
 
     /// Tests if no bits in `self` are set.
-    pub const fn is_empty(self) -> bool {
-        self.0 == Self::empty().0
+    pub fn is_empty(self) -> bool {
+        self == Self::empty()
     }
 
     /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
@@ -245,19 +252,9 @@ impl Bitboard {
         self << 8
     }
 
-    /// Shifts `self` one square east without wrapping.
-    pub fn east(self) -> Self {
-        (self << 1) & !Self::file_bb(File::FILE1)
-    }
-
     /// Shifts `self` one square south without wrapping.
     pub fn south(self) -> Self {
         self >> 8
-    }
-
-    /// Shifts `self` one square west without wrapping.
-    pub fn west(self) -> Self {
-        (self >> 1) & !Self::file_bb(File::FILE8)
     }
 
     /// Clears the least significant bit of `self` and returns it.

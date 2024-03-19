@@ -5,9 +5,6 @@ use std::{
 
 use crate::bitboard::Bitboard;
 
-/// A wrapper for an `i8`, since a direction can go from -9 to 9.
-pub struct Direction(pub i8);
-
 /// A wrapper for a `u8`, since a file can go from 0 to 7.
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
@@ -177,27 +174,6 @@ impl FromStr for Square {
 
         Ok(Self(square))
     }
-}
-
-/// The square difference in each of the 8 directions.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl Direction {
-    /// North.
-    pub const N: Self = Self(8);
-    /// North-east.
-    pub const NE: Self = Self(9);
-    /// East.
-    pub const E: Self = Self(1);
-    /// South-east.
-    pub const SE: Self = Self(-7);
-    /// South.
-    pub const S: Self = Self(-8);
-    /// South-west.
-    pub const SW: Self = Self(-9);
-    /// West.
-    pub const W: Self = Self(-1);
-    /// North-west.
-    pub const NW: Self = Self(7);
 }
 
 /// Enumerates files.
@@ -401,17 +377,6 @@ impl Square {
     /// Converts `rank` and `file` into a [`Square`].
     pub const fn from_pos(rank: Rank, file: File) -> Self {
         Self(rank.0 * 8 + file.0)
-    }
-
-    /// Finds the horizontal distance between `self` and `other_square`
-    pub fn horizontal_distance(self, other_square: Self) -> u8 {
-        File::from(self).0.abs_diff(File::from(other_square).0)
-    }
-
-    /// Checks if `self` is within the board.
-    pub fn is_valid(self) -> bool {
-        // `sq` is unsigned so it can't be less than 0.
-        self <= Self::H8
     }
 
     /// Returns the contents of `self` as a `usize`.
