@@ -1,8 +1,8 @@
 use super::{Board, CastlingRights};
 use crate::{
-    index_unchecked, out_of_bounds_is_unreachable,
     cfor,
     defs::{Piece, Side, Square},
+    index_unchecked, out_of_bounds_is_unreachable,
 };
 
 #[allow(clippy::doc_markdown)]

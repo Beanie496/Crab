@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    index_unchecked, index_into_unchecked,
     board::Board,
     evaluation::{Eval, INF_EVAL},
     movegen::Move,
@@ -272,14 +273,14 @@ impl Pv {
 
     /// Adds a [`Move`] to the back of `self`.
     fn enqueue(&mut self, mv: Move) {
-        self.moves[self.first_empty as usize] = mv;
+        index_into_unchecked!(self.moves, self.first_empty as usize, mv);
         self.first_empty += 1;
     }
 
     /// Removes a [`Move`] from the front of `self`.
     fn dequeue(&mut self) -> Option<Move> {
         (self.first_item < self.first_empty).then(|| {
-            let mv = self.moves[self.first_item as usize];
+            let mv = index_unchecked!(self.moves, self.first_item as usize);
             self.first_item += 1;
             mv
         })
@@ -299,8 +300,8 @@ impl Pv {
     }
 
     /// Gets the [`Move`] at the given index.
-    const fn get(&self, index: usize) -> Move {
-        self.moves[index]
+    fn get(&self, index: usize) -> Move {
+        index_unchecked!(self.moves, index)
     }
 
     /// Calculates the length of `self`.
