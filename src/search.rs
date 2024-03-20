@@ -5,9 +5,9 @@ use std::{
 };
 
 use crate::{
-    index_unchecked, index_into_unchecked,
     board::Board,
     evaluation::{Eval, INF_EVAL},
+    index_into_unchecked, index_unchecked,
     movegen::Move,
 };
 use alpha_beta::alpha_beta_search;

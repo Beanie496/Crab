@@ -514,7 +514,7 @@ impl Board {
             self.update_bb_piece(end_bb, captured_type, them);
             self.remove_phase_piece(captured);
             self.remove_psq_piece(end, captured);
-            self.toggle_zobrist_piece(end, piece);
+            self.toggle_zobrist_piece(end, captured);
 
             // check if we need to unset the castling rights if we're capturing
             // a rook
