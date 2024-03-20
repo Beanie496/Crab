@@ -93,9 +93,9 @@ impl Display for Board {
             f,
             "{} {} {} {} {} {}",
             &self.stringify_board(),
-            &self.side_to_move_as_char(),
-            &self.stringify_castling_rights(),
-            &self.stringify_ep_square(),
+            &char::from(self.side_to_move()),
+            &self.castling_rights().to_string(),
+            &self.ep_square(),
             &self.halfmoves(),
             &self.fullmoves(),
         )
@@ -215,6 +215,10 @@ impl BitOrAssign for CastlingRights {
     }
 }
 
+/// Converts the current castling rights into their string representation.
+///
+/// E.g. `KQq` if the White king can castle both ways and the Black king
+/// can only castle queenside.
 impl Display for CastlingRights {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::new();
@@ -781,20 +785,6 @@ impl Board {
         self.side_to_move = self.side_to_move.flip();
     }
 
-    /// Returns the string representation of the current side to move: 'w' if
-    /// White and 'b' if Black.
-    const fn side_to_move_as_char(&self) -> char {
-        (b'b' + self.side_to_move().0 * 21) as char
-    }
-
-    /// Converts the current castling rights into their string representation.
-    ///
-    /// E.g. `KQq` if the White king can castle both ways and the Black king
-    /// can only castle queenside.
-    fn stringify_castling_rights(&self) -> String {
-        self.castling_rights.to_string()
-    }
-
     /// Adds the given right to the castling rights.
     fn add_castling_right(&mut self, right: CastlingRights) {
         self.castling_rights.add_right(right);
@@ -808,17 +798,6 @@ impl Board {
     /// Clears the castling rights for the given side.
     fn remove_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
-    }
-
-    /// Returns the string representation of the current en passant square: the
-    /// square if there is one (e.g. "b3") or "-" if there is none.
-    fn stringify_ep_square(&self) -> String {
-        let ep_square = self.ep_square();
-        if ep_square == Square::NONE {
-            "-".to_string()
-        } else {
-            ep_square.to_string()
-        }
     }
 
     /// Sets the en passant square to `square`.

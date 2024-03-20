@@ -52,17 +52,42 @@ const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
     'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
 ];
 
+impl From<File> for char {
+    /// Converts a rank into a character: 'a' to 'f'.
+    fn from(file: File) -> Self {
+        (b'a' + file.0) as Self
+    }
+}
+
 impl From<Piece> for char {
+    /// Converts a piece into a character: 'P' for White pawn, 'k' for Black
+    /// king, etc.
     fn from(piece: Piece) -> Self {
         PIECE_CHARS[piece.to_index()]
     }
 }
 
 impl From<PieceType> for char {
+    /// Converts a piece type into a character: 'p' for pawn to 'k' for king.
     fn from(piece_type: PieceType) -> Self {
-        // default to lowercase, or Black
         let piece = Piece::from_piecetype(piece_type, Side::BLACK);
         Self::from(piece)
+    }
+}
+
+impl From<Rank> for char {
+    /// Converts a rank into a character: '1' to '8'.
+    fn from(rank: Rank) -> Self {
+        (b'1' + rank.0) as Self
+    }
+}
+
+impl From<Side> for char {
+    /// Converts a side into a char.
+    ///
+    /// 'w' if White and 'b' if Black; undefined otherwise.
+    fn from(side: Side) -> Self {
+        (b'b' + side.0 * 21) as Self
     }
 }
 
@@ -127,13 +152,17 @@ impl From<Piece> for Side {
 }
 
 impl Display for Square {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}{}",
-            ((b'a' + File::from(*self).0) as char),
-            ((b'1' + Rank::from(*self).0) as char),
-        )
+    /// Returns the string representation of a square: the square if there is
+    /// one (e.g. "b3") or "-" if there is none.
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        let mut ret_str = String::new();
+        if *self == Self::NONE {
+            fmt.write_str("-")
+        } else {
+            ret_str.push(char::from(File::from(*self)));
+            ret_str.push(char::from(Rank::from(*self)));
+            fmt.write_str(&ret_str)
+        }
     }
 }
 
