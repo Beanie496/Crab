@@ -4,7 +4,7 @@ use std::{cmp::Ordering, mem::MaybeUninit};
 
 use crate::{
     bitboard::Bitboard,
-    defs::{Piece, PieceType, Rank, Square},
+    defs::{PieceType, Rank, Square},
 };
 
 /// A C-style `for` loop to allow easier looping in `const` functions.

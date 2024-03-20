@@ -8,7 +8,6 @@ use crate::{
     board::Board,
     evaluation::{Eval, INF_EVAL},
     movegen::Move,
-    uci::UciOptions,
 };
 use alpha_beta::alpha_beta_search;
 
@@ -70,6 +69,8 @@ pub struct SearchInfo {
     seldepth: Depth,
     /// How long the search has been going.
     time: Duration,
+    /// The overhead of sending a move.
+    move_overhead: Duration,
     /// How many positions have been searched.
     nodes: u64,
     /// The principle variation: the optimal sequence of moves for both sides.
@@ -311,12 +312,13 @@ impl Pv {
 impl SearchInfo {
     /// Creates a new [`SearchInfo`] with the initial information that searches
     /// start with.
-    pub fn new(control_rx: Receiver<Stop>, limits: Limits) -> Self {
+    pub fn new(control_rx: Receiver<Stop>, limits: Limits, move_overhead: Duration) -> Self {
         Self {
             time_start: Instant::now(),
             depth: 0,
             seldepth: 0,
             time: Duration::ZERO,
+            move_overhead,
             nodes: 0,
             pv: Pv::new(),
             score: 0,
@@ -362,9 +364,11 @@ impl SearchInfo {
                 }
             }
             Limits::Timed { time, .. } => {
-                // if we're approaching our total time (assuming a min overhead
-                // of 100 us), stop the search
-                if self.time_start.elapsed() + Duration::from_micros(100) > time {
+                // if we're about to pass our total time (not just our time
+                // window), stop the search
+                if self.time_start.elapsed() + self.move_overhead + Duration::from_micros(100)
+                    > time
+                {
                     self.has_stopped = true;
                 }
             }
@@ -405,11 +409,11 @@ impl SearchInfo {
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo, options: UciOptions) {
+pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
-    let time_allocated = search_info.calculate_time_window(options.move_overhead);
+    let time_allocated = search_info.calculate_time_window();
 
     'iter_deep: loop {
         search_info.depth += 1;

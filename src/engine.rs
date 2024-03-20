@@ -65,14 +65,14 @@ impl Engine {
         let board_clone = self.board;
         let (control_tx, control_rx) = channel();
 
-        let search_info = SearchInfo::new(control_rx, limits);
+        let search_info = SearchInfo::new(control_rx, limits, options.move_overhead);
 
         self.stop_search();
 
         self.search_thread_state = Some(ThreadState::new(
             control_tx,
             spawn(move || {
-                iterative_deepening(&board_clone, search_info, options);
+                iterative_deepening(&board_clone, search_info);
             }),
         ));
     }
