@@ -90,10 +90,39 @@ impl Default for Board {
 
 impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut board = String::new();
+        let mut empty_squares = 0;
+        // I can't just iterate over the piece board normally: the board goes
+        // from a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
+        // rank-file
+        for rank in (0..Rank::TOTAL).rev() {
+            for file in 0..File::TOTAL {
+                let square = Square::from_pos(Rank(rank as u8), File(file as u8));
+                let piece = self.piece_on(square);
+
+                if piece == Piece::NONE {
+                    empty_squares += 1;
+                } else {
+                    if empty_squares != 0 {
+                        board.push(char::from_digit(empty_squares, 10).ok_or(fmt::Error)?);
+                        empty_squares = 0;
+                    }
+                    board.push(char::from(piece));
+                }
+            }
+            if empty_squares != 0 {
+                board.push(char::from_digit(empty_squares, 10).ok_or(fmt::Error)?);
+                empty_squares = 0;
+            }
+            board.push('/');
+        }
+        // remove the trailing slash
+        board.pop();
+
         write!(
             f,
             "{} {} {} {} {} {}",
-            &self.stringify_board(),
+            &board,
             &char::from(self.side_to_move()),
             &self.castling_rights().to_string(),
             &self.ep_square(),
@@ -620,51 +649,6 @@ impl Board {
         self.flip_side();
 
         true
-    }
-
-    /// Converts the current board to a string.
-    ///
-    /// e.g. the starting position would be
-    /// "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".
-    // the unwraps are called on values that logically can not be `None`, so
-    // this can not panic
-    #[allow(clippy::missing_panics_doc)]
-    fn stringify_board(&self) -> String {
-        let mut ret_str = String::new();
-        let mut empty_squares = 0;
-        // I can't just iterate over the piece board normally: the board goes
-        // from a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
-        // rank-file
-        for rank in (0..Rank::TOTAL).rev() {
-            for file in 0..File::TOTAL {
-                let square = Square::from_pos(Rank(rank as u8), File(file as u8));
-                let piece = self.piece_on(square);
-
-                if piece == Piece::NONE {
-                    empty_squares += 1;
-                } else {
-                    if empty_squares != 0 {
-                        // `empty_squares` logically can not be greater than 8,
-                        // so it's impossible for this to panic
-                        #[allow(clippy::unwrap_used)]
-                        ret_str.push(char::from_digit(empty_squares, 10).unwrap());
-                        empty_squares = 0;
-                    }
-                    ret_str.push(char::from(piece));
-                }
-            }
-            if empty_squares != 0 {
-                // same reason as before - this can not panic
-                #[allow(clippy::unwrap_used)]
-                ret_str.push(char::from_digit(empty_squares, 10).unwrap());
-                empty_squares = 0;
-            }
-            ret_str.push('/');
-        }
-        // remove the trailing slash
-        ret_str.pop();
-
-        ret_str
     }
 
     /// Finds the piece on the given rank and file and converts it to its

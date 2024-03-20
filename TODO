@@ -5,4 +5,3 @@
     - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
 - Make most higher-level functions return a `Result`
 - add repetition detection
-- inline `stringify_board`
