@@ -13,12 +13,12 @@ use crate::{
     movegen::{generate_moves, Move, LOOKUPS},
     util::is_double_pawn_push,
 };
-use zobrist::Key;
 
-/// Evaluation accumulators.
+/// Accumulated, incrementally-updated fields.
 mod accumulators;
-/// Functions for zobrist hashing.
-mod zobrist;
+
+/// The size of a zobrist key.
+pub type Key = u64;
 
 /// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
 /// E.g. `0b1101` would be castling rights `KQq`.
@@ -56,13 +56,15 @@ pub struct Board {
     ///
     /// `psq_val` uses this value to lerp between its midgame and
     /// endgame values. It is incrementally updated.
-    phase_accumulator: u8,
+    phase: u8,
     /// The current material balance weighted with piece-square tables, from
     /// the perspective of White.
     ///
     /// It is incrementally updated.
-    psq_accumulator: Score,
+    psq: Score,
     /// The current zobrist key of the board.
+    ///
+    /// It is incrementally updated.
     zobrist: Key,
 }
 
@@ -77,12 +79,11 @@ impl Default for Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            phase_accumulator: 0,
-            psq_accumulator: Score(0, 0),
+            phase: 0,
+            psq: Score(0, 0),
             zobrist: Self::new_zobrist(),
         };
         board.refresh_accumulators();
-        board.refresh_zobrist();
         board
     }
 }
@@ -153,6 +154,7 @@ impl FromStr for Board {
                 board.set_side_to_move(Side::WHITE);
             } else {
                 board.set_side_to_move(Side::BLACK);
+                board.toggle_zobrist_side();
             }
         }
 
@@ -167,11 +169,13 @@ impl FromStr for Board {
                     _ => (),
                 }
             }
+            board.toggle_zobrist_castling_rights(board.castling_rights());
         }
 
         // 4. en passant
         let ep_square = ep_square.map_or(Square::NONE, |ep| ep.parse::<Square>().unwrap());
         board.set_ep_square(ep_square);
+        board.toggle_zobrist_ep_square(ep_square);
 
         // 5. halfmoves
         let halfmoves = halfmoves.map_or(0, |hm| hm.parse::<u8>().unwrap());
@@ -180,8 +184,6 @@ impl FromStr for Board {
         // 6. fullmoves
         let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
         board.set_fullmoves(fullmoves);
-
-        board.refresh_zobrist();
 
         Ok(board)
     }
@@ -287,8 +289,8 @@ impl Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            phase_accumulator: 0,
-            psq_accumulator: Score(0, 0),
+            phase: 0,
+            psq: Score(0, 0),
             zobrist: Self::new_zobrist(),
         }
     }
@@ -512,9 +514,7 @@ impl Board {
 
         if captured_type != PieceType::NONE {
             self.update_bb_piece(end_bb, captured_type, them);
-            self.remove_phase_piece(captured);
-            self.remove_psq_piece(end, captured);
-            self.toggle_zobrist_piece(end, captured);
+            self.remove_accumulated_piece(end, captured);
 
             // check if we need to unset the castling rights if we're capturing
             // a rook
@@ -584,15 +584,11 @@ impl Board {
 
             // remove the pawn
             self.toggle_piece_bb(PieceType::PAWN, end_bb);
-            self.remove_phase_piece(piece);
-            self.remove_psq_piece(end, piece);
-            self.toggle_zobrist_piece(end, piece);
+            self.remove_accumulated_piece(end, piece);
 
             // add the promotion piece
             self.toggle_piece_bb(promotion_piece_type, end_bb);
-            self.add_phase_piece(promotion_piece);
-            self.add_psq_piece(end, promotion_piece);
-            self.toggle_zobrist_piece(end, promotion_piece);
+            self.add_accumulated_piece(end, promotion_piece);
         }
 
         if self.is_square_attacked(self.king_square()) {
@@ -697,8 +693,7 @@ impl Board {
         let bb = Bitboard::from(start) | Bitboard::from(end);
         self.move_mailbox_piece(start, end, piece);
         self.update_bb_piece(bb, piece_type, side);
-        self.move_psq_piece(start, end, piece);
-        self.move_zobrist_piece(start, end, piece);
+        self.move_accumulated_piece(start, end, piece);
     }
 
     /// Returns the piece on `square`.
@@ -714,9 +709,7 @@ impl Board {
         self.set_mailbox_piece(square, piece);
         self.toggle_piece_bb(PieceType::from(piece), square_bb);
         self.toggle_side_bb(side, square_bb);
-        self.add_phase_piece(piece);
-        self.add_psq_piece(square, piece);
-        self.toggle_zobrist_piece(square, piece);
+        self.add_accumulated_piece(square, piece);
     }
 
     /// Removes `piece` from `square`.
@@ -729,9 +722,7 @@ impl Board {
         self.unset_mailbox_piece(square);
         self.toggle_piece_bb(piece_type, bb);
         self.toggle_side_bb(side, bb);
-        self.remove_phase_piece(piece);
-        self.remove_psq_piece(square, piece);
-        self.toggle_zobrist_piece(square, piece);
+        self.remove_accumulated_piece(square, piece);
     }
 
     /// Moves `piece` from `start` to `end` in the mailbox.
