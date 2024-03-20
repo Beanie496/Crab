@@ -126,13 +126,6 @@ impl From<Piece> for Side {
     }
 }
 
-impl From<Bitboard> for Square {
-    /// Converts the position of the LSB of `bb` to a [`Square`].
-    fn from(bb: Bitboard) -> Self {
-        Self(bb.0.trailing_zeros() as u8)
-    }
-}
-
 impl Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
@@ -141,6 +134,13 @@ impl Display for Square {
             ((b'a' + File::from(*self).0) as char),
             ((b'1' + Rank::from(*self).0) as char),
         )
+    }
+}
+
+impl From<Bitboard> for Square {
+    /// Converts the position of the LSB of `bb` to a [`Square`].
+    fn from(bb: Bitboard) -> Self {
+        Self(bb.0.trailing_zeros() as u8)
     }
 }
 
