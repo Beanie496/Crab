@@ -536,7 +536,7 @@ impl Board {
             );
 
             self.remove_castling_rights(us);
-        } else if is_double_pawn_push(start, end, piece) {
+        } else if is_double_pawn_push(start, end, piece_type) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
             self.toggle_zobrist_ep_square(ep_square);

@@ -129,8 +129,8 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
 }
 
 /// Checks if the move is a double pawn push.
-pub fn is_double_pawn_push(start: Square, end: Square, piece: Piece) -> bool {
-    if PieceType::from(piece) != PieceType::PAWN {
+pub fn is_double_pawn_push(start: Square, end: Square, piece_type: PieceType) -> bool {
+    if piece_type != PieceType::PAWN {
         return false;
     }
     let start_bb = Bitboard::from(start);
