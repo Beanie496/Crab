@@ -502,11 +502,11 @@ impl Board {
             return false;
         }
 
-        self.clear_ep_square();
         self.toggle_zobrist_ep_square(self.ep_square());
         // it's easiest just to unset them now and then re-set them later
         // rather than doing additional checks
         self.toggle_zobrist_castling_rights(self.castling_rights());
+        self.clear_ep_square();
 
         self.move_piece(start, end, piece, piece_type, us);
 
@@ -557,7 +557,6 @@ impl Board {
             self.move_piece(
                 rook_start,
                 rook_end,
-                // `captured` is equivalent but slower
                 Piece::from_piecetype(PieceType::ROOK, us),
                 PieceType::ROOK,
                 us,
@@ -576,7 +575,6 @@ impl Board {
             });
             let captured_pawn = Piece::from_piecetype(PieceType::PAWN, them);
             self.remove_piece(dest, captured_pawn, PieceType::PAWN, them);
-            self.toggle_zobrist_piece(dest, captured_pawn);
         } else if is_promotion {
             let promotion_piece_type = mv.promotion_piece();
             let promotion_piece = Piece::from_piecetype(promotion_piece_type, us);
