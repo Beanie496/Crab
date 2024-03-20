@@ -26,7 +26,8 @@ impl TestPosition {
 }
 
 impl TestPosition {
-    fn run_test(&self, engine: &mut Engine) {
+    fn run_test(&self) {
+        let mut engine = Engine::new();
         engine.set_position(&self.position, "");
         println!("Position: {}", self.position);
         assert_eq!(
@@ -38,7 +39,6 @@ impl TestPosition {
 
 #[test]
 fn test_positions() {
-    let engine = Engine::new();
     let (tx, rx) = mpsc::channel();
     let rx = Arc::new(Mutex::new(rx));
     let mut handles = Vec::new();
@@ -69,17 +69,13 @@ fn test_positions() {
     // create as many threads as is optimal. If no threads available, the test
     // positions won't be able to be run, so panic.
     for _ in 0..available_parallelism().unwrap().get() {
-        // I'm manually doing `.clone()` because deriving `Copy` for `Engine`
-        // (and by extension `Board`) results in a noticeable slowdown in
-        // `perft`, for some goddamn reason.
-        let mut engine = engine.clone();
         let rx = Arc::clone(&rx);
         // Spawn a thread that dequeues and runs the test positions from the
         // receiver until there are no positions left
         handles.push(spawn(move || loop {
             let test_pos = rx.lock().unwrap().try_recv();
             if let Ok(test_pos) = test_pos {
-                test_pos.run_test(&mut engine)
+                test_pos.run_test()
             } else {
                 return;
             }
