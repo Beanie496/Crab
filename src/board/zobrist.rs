@@ -1,5 +1,6 @@
 use super::{Board, CastlingRights};
 use crate::{
+    index_unchecked, out_of_bounds_is_unreachable,
     cfor,
     defs::{Piece, Side, Square},
 };
@@ -131,7 +132,11 @@ impl ZobristKeys {
     }
 
     /// Calculates the key of the given piece on the given square.
-    const fn piece_key(&self, square: Square, piece: Piece) -> Key {
+    fn piece_key(&self, square: Square, piece: Piece) -> Key {
+        // SAFETY: If it does get reached, it will panic in debug.
+        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side.len()) };
+        // SAFETY: Ditto.
+        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side[0].len()) };
         self.piece_and_side[square.to_index()][piece.to_index()]
     }
 
@@ -141,12 +146,12 @@ impl ZobristKeys {
     }
 
     /// Calculates the key of the given castling rights.
-    const fn castling_rights_key(&self, rights: CastlingRights) -> Key {
-        self.castling_rights[rights.0 as usize]
+    fn castling_rights_key(&self, rights: CastlingRights) -> Key {
+        index_unchecked!(self.castling_rights, rights.0 as usize)
     }
 
     /// Calculates the key of the given square.
-    const fn ep_square_key(&self, square: Square) -> Key {
-        self.ep[square.to_index()]
+    fn ep_square_key(&self, square: Square) -> Key {
+        index_unchecked!(self.ep, square.to_index())
     }
 }
