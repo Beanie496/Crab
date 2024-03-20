@@ -29,10 +29,11 @@ impl TestPosition {
     fn run_test(&self) {
         let mut engine = Engine::new();
         engine.set_position(&self.position, "");
-        println!("Position: {}", self.position);
         assert_eq!(
             engine.perft::<false, false>(self.perft_depth),
-            self.perft_result
+            self.perft_result,
+            "incorrect result for position {}",
+            self.position,
         );
     }
 }
