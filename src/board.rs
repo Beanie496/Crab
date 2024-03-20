@@ -1,4 +1,5 @@
 use std::{
+    convert::Infallible,
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
     str::FromStr,
@@ -78,7 +79,7 @@ impl Default for Board {
             fullmoves: 1,
             phase_accumulator: 0,
             psq_accumulator: Score(0, 0),
-            zobrist: 0,
+            zobrist: Self::new_zobrist(),
         };
         board.refresh_accumulators();
         board.refresh_zobrist();
@@ -98,6 +99,91 @@ impl Display for Board {
             &self.halfmoves(),
             &self.fullmoves(),
         )
+    }
+}
+
+impl FromStr for Board {
+    type Err = Infallible;
+
+    /// Sets `self.board` to the given FEN.
+    ///
+    /// This function does practically no error checking because that's up to
+    /// the GUI. If it does catch an error, it will panic.
+    #[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        let mut board = Self::new();
+
+        if string.is_empty() {
+            return Ok(board);
+        }
+
+        let mut iter = string.split(' ');
+        let board_str = iter.next().unwrap();
+        let side_to_move = iter.next();
+        let castling_rights = iter.next();
+        let ep_square = iter.next();
+        let halfmoves = iter.next();
+        let fullmoves = iter.next();
+
+        // 1. the board itself
+        let mut square = 56;
+        let ranks = board_str.split('/');
+        for rank in ranks {
+            for piece in rank.chars() {
+                // if it's a number, skip over that many files
+                if ('0'..='8').contains(&piece) {
+                    // `piece` is from 0 to 8 inclusive so the unwrap cannot
+                    // panic
+                    let empty_squares = piece.to_digit(10).unwrap() as u8;
+                    square += empty_squares;
+                } else {
+                    let piece = Piece::from(piece);
+
+                    board.add_piece(Square(square), piece);
+
+                    square += 1;
+                }
+            }
+            square = square.wrapping_sub(16);
+        }
+
+        // 2. side to move
+        if let Some(stm) = side_to_move {
+            if stm == "w" {
+                board.set_side_to_move(Side::WHITE);
+            } else {
+                board.set_side_to_move(Side::BLACK);
+            }
+        }
+
+        // 3. castling rights
+        if let Some(cr) = castling_rights {
+            for right in cr.chars() {
+                match right {
+                    'K' => board.add_castling_right(CastlingRights::K),
+                    'Q' => board.add_castling_right(CastlingRights::Q),
+                    'k' => board.add_castling_right(CastlingRights::k),
+                    'q' => board.add_castling_right(CastlingRights::q),
+                    _ => (),
+                }
+            }
+        }
+
+        // 4. en passant
+        let ep_square = ep_square.map_or(Square::NONE, |ep| ep.parse::<Square>().unwrap());
+        board.set_ep_square(ep_square);
+
+        // 5. halfmoves
+        let halfmoves = halfmoves.map_or(0, |hm| hm.parse::<u8>().unwrap());
+        board.set_halfmoves(halfmoves);
+
+        // 6. fullmoves
+        let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
+        board.set_fullmoves(fullmoves);
+
+        board.refresh_zobrist();
+
+        Ok(board)
     }
 }
 
@@ -171,24 +257,36 @@ impl Shl<u8> for CastlingRights {
 /// Flags. It's fine to use `&`, `^` and `|` on these.
 impl CastlingRights {
     /// The flag `K`.
-    pub const K: Self = Self(0b1000);
+    const K: Self = Self(0b1000);
     /// The flag `Q`.
-    pub const Q: Self = Self(0b0100);
+    const Q: Self = Self(0b0100);
     /// The flag `k`.
-    pub const k: Self = Self(0b0010);
+    const k: Self = Self(0b0010);
     /// The flag `q`.
-    pub const q: Self = Self(0b0001);
+    const q: Self = Self(0b0001);
     /// The flags `KQkq`, i.e. all flags.
-    pub const KQkq: Self = Self(0b1111);
+    const KQkq: Self = Self(0b1111);
     /// No flags.
-    pub const NONE: Self = Self(0b0000);
+    const NONE: Self = Self(0b0000);
 }
 
 impl Board {
     /// Creates a new [`Board`] initialised with the state of the starting
     /// position and initialises the static lookup tables.
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            mailbox: Self::no_mailbox(),
+            pieces: Self::no_pieces(),
+            sides: Self::no_sides(),
+            side_to_move: Side::NONE,
+            castling_rights: CastlingRights::none(),
+            ep_square: Square::NONE,
+            halfmoves: 0,
+            fullmoves: 1,
+            phase_accumulator: 0,
+            psq_accumulator: Score(0, 0),
+            zobrist: Self::new_zobrist(),
+        }
     }
 
     /// Returns the mailbox of the starting position.
@@ -218,6 +316,11 @@ impl Board {
             p, p, p, p, p, p, p, p,
             r, n, b, q, k, b, n, r,
         ]
+    }
+
+    /// Returns the mailbox of the starting position.
+    const fn no_mailbox() -> [Piece; Square::TOTAL] {
+        [Piece::NONE; Square::TOTAL]
     }
 
     /// Returns the piece [`Bitboard`]s of the starting position.
@@ -264,85 +367,6 @@ impl Board {
         println!();
         println!("FEN: {self}");
         println!("Zobrist key: {}", self.zobrist());
-    }
-
-    /// Sets `self.board` to the given FEN.
-    ///
-    /// This function does practically no error checking because that's up to
-    /// the GUI. If it does catch an error, it will panic.
-    #[allow(clippy::unwrap_used)]
-    pub fn set_pos_to_fen(&mut self, position: &str) {
-        if position.is_empty() {
-            return;
-        }
-
-        self.clear_board();
-
-        let mut iter = position.split(' ');
-        let board = iter.next().unwrap();
-        let side_to_move = iter.next();
-        let castling_rights = iter.next();
-        let ep_square = iter.next();
-        let halfmoves = iter.next();
-        let fullmoves = iter.next();
-
-        // 1. the board itself
-        let mut square = 56;
-        let ranks = board.split('/');
-        for rank in ranks {
-            for piece in rank.chars() {
-                // if it's a number, skip over that many files
-                if ('0'..='8').contains(&piece) {
-                    // `piece` is from 0 to 8 inclusive so the unwrap cannot
-                    // panic
-                    let empty_squares = piece.to_digit(10).unwrap() as u8;
-                    square += empty_squares;
-                } else {
-                    let piece = Piece::from(piece);
-
-                    self.add_piece(Square(square), piece);
-
-                    square += 1;
-                }
-            }
-            square = square.wrapping_sub(16);
-        }
-
-        // 2. side to move
-        if let Some(stm) = side_to_move {
-            if stm == "w" {
-                self.set_side_to_move(Side::WHITE);
-            } else {
-                self.set_side_to_move(Side::BLACK);
-            }
-        }
-
-        // 3. castling rights
-        if let Some(cr) = castling_rights {
-            for right in cr.chars() {
-                match right {
-                    'K' => self.add_castling_right(CastlingRights::K),
-                    'Q' => self.add_castling_right(CastlingRights::Q),
-                    'k' => self.add_castling_right(CastlingRights::k),
-                    'q' => self.add_castling_right(CastlingRights::q),
-                    _ => (),
-                }
-            }
-        }
-
-        // 4. en passant
-        let ep_square = ep_square.map_or(Square::NONE, |ep| ep.parse::<Square>().unwrap());
-        self.set_ep_square(ep_square);
-
-        // 5. halfmoves
-        let halfmoves = halfmoves.map_or(0, |hm| hm.parse::<u8>().unwrap());
-        self.set_halfmoves(halfmoves);
-
-        // 6. fullmoves
-        let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
-        self.set_fullmoves(fullmoves);
-
-        self.refresh_zobrist();
     }
 
     /// Takes a sequence of moves in long algebraic notation and feeds them to
@@ -645,20 +669,6 @@ impl Board {
         ret_str
     }
 
-    /// Clears `self`.
-    fn clear_board(&mut self) {
-        self.clear_mailbox();
-        self.clear_pieces();
-        self.clear_sides();
-        self.reset_side();
-        self.clear_castling_rights();
-        self.clear_ep_square();
-        self.set_halfmoves(0);
-        self.set_fullmoves(1);
-        self.clear_accumulators();
-        self.clear_zobrist();
-    }
-
     /// Finds the piece on the given rank and file and converts it to its
     /// character representation. If no piece is on the square, returns '0'
     /// instead.
@@ -741,13 +751,6 @@ impl Board {
         index_into_unchecked!(self.mailbox, square.to_index(), Piece::NONE);
     }
 
-    /// Clears the mailbox.
-    fn clear_mailbox(&mut self) {
-        for square in 0..(Square::TOTAL as u8) {
-            self.unset_mailbox_piece(Square(square));
-        }
-    }
-
     /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
     /// the side bitboard of `side`.
     fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
@@ -761,20 +764,10 @@ impl Board {
         index_into_unchecked!(self.pieces, piece.to_index(), old_bb ^ bb);
     }
 
-    /// Clears the piece bitboards.
-    fn clear_pieces(&mut self) {
-        self.pieces = Self::no_pieces();
-    }
-
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
         let old_bb = index_unchecked!(self.sides, side.to_index());
         index_into_unchecked!(self.sides, side.to_index(), old_bb ^ bb);
-    }
-
-    /// Clears the side bitboards.
-    fn clear_sides(&mut self) {
-        self.sides = Self::no_sides();
     }
 
     /// Sets side to move to `side`.
@@ -786,11 +779,6 @@ impl Board {
     fn flip_side(&mut self) {
         self.toggle_zobrist_side();
         self.side_to_move = self.side_to_move.flip();
-    }
-
-    /// Sets the side to [`Side::NONE`].
-    fn reset_side(&mut self) {
-        self.side_to_move = Side::NONE;
     }
 
     /// Returns the string representation of the current side to move: 'w' if
@@ -820,11 +808,6 @@ impl Board {
     /// Clears the castling rights for the given side.
     fn remove_castling_rights(&mut self, side: Side) {
         self.castling_rights.clear_side(side);
-    }
-
-    /// Clears all castling rights.
-    fn clear_castling_rights(&mut self) {
-        self.castling_rights = CastlingRights::none();
     }
 
     /// Returns the string representation of the current en passant square: the

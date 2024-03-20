@@ -38,6 +38,11 @@ struct ZobristKeys {
 const ZOBRIST_KEYS: ZobristKeys = ZobristKeys::new();
 
 impl Board {
+    /// Makes a new, empty zobrist key.
+    pub const fn new_zobrist() -> Key {
+        0
+    }
+
     /// Recalculates the zobrist key of the current board.
     pub fn refresh_zobrist(&mut self) {
         self.clear_zobrist();

@@ -5,4 +5,4 @@
     - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
 - Make most higher-level functions return a `Result`
 - merge the updates of the psq and phase
-- `impl Parse for Board`
+- add repetition detection

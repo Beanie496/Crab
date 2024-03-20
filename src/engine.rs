@@ -45,7 +45,7 @@ impl Clone for Engine {
 impl Engine {
     /// Creates a new [`Engine`] with each member struct initialised to their
     /// default values.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             board: Board::new(),
             search_thread_state: None,
@@ -55,7 +55,7 @@ impl Engine {
     /// Sets `self.board` to the given FEN and moves, as given by the
     /// `position` UCI command. Unexpected/incorrect tokens will be ignored.
     pub fn set_position(&mut self, position: &str, moves: &str) {
-        self.board.set_pos_to_fen(position);
+        self.board = position.parse().expect("This function cannot fail");
         self.board.play_moves(moves);
     }
 
@@ -97,7 +97,7 @@ impl Engine {
     /// `ucinewgame` command.
     pub fn reset(&mut self) {
         self.stop_search();
-        self.board.set_pos_to_fen(STARTPOS);
+        self.board = STARTPOS.parse().expect("This function cannot fail");
     }
 
     /// Calls [`pretty_print`](Board::pretty_print) on the internal board.
