@@ -77,6 +77,18 @@ pub struct Stack<T: Copy, const SIZE: usize> {
     first_empty: usize,
 }
 
+impl<T: Copy, const SIZE: usize> FromIterator<T> for Stack<T, SIZE> {
+    fn from_iter<U: IntoIterator<Item = T>>(other_stack: U) -> Self {
+        let mut stack = Self::new();
+
+        for item in other_stack {
+            stack.push(item);
+        }
+
+        stack
+    }
+}
+
 impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
     type Item = T;
 
