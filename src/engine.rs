@@ -111,7 +111,7 @@ impl Engine {
         *self.search_thread_state_mut() = Some((
             control_tx,
             spawn(move || {
-                iterative_deepening(&board, search_info);
+                iterative_deepening(search_info, board);
             }),
         ));
     }

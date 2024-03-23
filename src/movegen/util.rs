@@ -5,9 +5,11 @@ use crate::{
 };
 
 /// Generates all combinations of attacks from `square` and puts them in
-/// `attacks`. It starts with a full blocker board that goes from the
-/// square to the edge exclusive and uses the Carry-Rippler trick to
-/// generate each subsequent attack.
+/// `attacks`.
+///
+/// It starts with a full blocker board that goes from the square to the edge
+/// exclusive and uses the Carry-Rippler trick to generate each subsequent
+/// attack.
 pub fn gen_all_sliding_attacks<const PIECE: u8>(
     square: Square,
     attacks: &mut [Bitboard; MAX_BLOCKERS],

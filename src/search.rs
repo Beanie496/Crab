@@ -76,16 +76,16 @@ pub struct SearchInfo {
     nodes: u64,
     /// The principle variation: the optimal sequence of moves for both sides.
     pv: Pv,
-    // ignore this for now
+    // idk yet
     //_multipv: [[Move]],
     /// The score of the position from the perspective of the side to move.
     score: Eval,
-    /// Which move is currently being searched at root.
-    _currmove: Move,
-    /// Which move number is currently being searched at root.
-    _currmovenumber: u8,
-    /// How full the transposition table is (in permill).
-    _hashfull: u16,
+    // Which move is currently being searched at root.
+    //_currmove: Move,
+    // Which move number is currently being searched at root.
+    //_currmovenumber: u8,
+    // How full the transposition table is (in permill).
+    //_hashfull: u16,
     /// How many positions have been reached on average per second.
     nps: u64,
     /// A channel to receive the 'stop' command from.
@@ -321,9 +321,6 @@ impl SearchInfo {
             nodes: 0,
             pv: Pv::new(),
             score: 0,
-            _currmove: Move::null(),
-            _currmovenumber: 1,
-            _hashfull: 0,
             nps: 0,
             control_rx,
             has_stopped: false,
@@ -408,7 +405,7 @@ impl SearchInfo {
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
+pub fn iterative_deepening(mut search_info: SearchInfo, board: Board) {
     let alpha = -INF_EVAL;
     let beta = INF_EVAL;
     let mut best_move = Move::null();
@@ -419,7 +416,7 @@ pub fn iterative_deepening(board: &Board, mut search_info: SearchInfo) {
         search_info.seldepth = 0;
         let depth = search_info.depth;
 
-        let eval = alpha_beta_search(&board.clone(), &mut search_info, alpha, beta, depth);
+        let eval = alpha_beta_search(&mut search_info, &board, alpha, beta, depth);
 
         if search_info.has_stopped() {
             // technically `best_move` would be null if this is called before

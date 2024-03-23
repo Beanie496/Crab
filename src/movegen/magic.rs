@@ -24,7 +24,7 @@ pub struct Magic {
     offset: u32,
 }
 
-/// The hardcoded magic numbers for the bishop. Generated using [`find_magics`].
+/// The hardcoded magic numbers for the bishop. Generated using [`find_magics()`].
 #[allow(clippy::unreadable_literal)]
 pub const BISHOP_MAGICS: [u64; Square::TOTAL] = [
     18017181921083777,
@@ -92,12 +92,10 @@ pub const BISHOP_MAGICS: [u64; Square::TOTAL] = [
     4620763597834879264,
     72638153366733312,
 ];
-
 /// The maximum number of blocker permutations from a single square: a rook
 /// attacking from one of the corners.
 pub const MAX_BLOCKERS: usize = 4096;
-
-/// The hardcoded magic numbers for the rook. Generated using [`find_magics`].
+/// The hardcoded magic numbers for the rook. Generated using [`find_magics()`].
 #[allow(clippy::unreadable_literal)]
 pub const ROOK_MAGICS: [u64; Square::TOTAL] = [
     36033333578174594,

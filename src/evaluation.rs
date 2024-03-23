@@ -82,8 +82,8 @@ impl SubAssign for Score {
 }
 
 impl Score {
-    /// Lerp the current score to an eval given a game phase, where `0` means
-    /// use the middlegame score and `>= 24` means use the endgame score.
+    /// Lerps the score to an eval given a game phase, where `0` means use the
+    /// middlegame score and `>= 24` means use the endgame score.
     fn lerp_to_eval(self, phase: u8) -> Eval {
         // `>= 24` can happen because of early promotion
         let phase: Eval = min(24, Eval::from(phase));
@@ -92,8 +92,8 @@ impl Score {
     }
 }
 
-/// Calculates a static evaluation of the current board depending on
-/// various heuristics.
+/// Calculates a static evaluation of the current board depending on various
+/// heuristics.
 ///
 /// Currently just calculates material balance with piece-square tables.
 pub fn evaluate(board: &Board) -> Eval {
