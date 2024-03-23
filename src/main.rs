@@ -1,6 +1,22 @@
 //! Crab, a UCI-compatible chess engine written in Rust.
+//!
+//! Accepted commands:
+//! - `f`: find magics for the bishop and rook
+//! - `go` with the options `wtime`, `btime`, `winc`, `binc`, `movestogo`,
+//!   `depth`, `nodes`, `movetime` and `infinite`
+//! - `isready`
+//! - `p`: pretty-print the current board
+//! - `perft <depth>`: run perft to `<depth>`
+//! - `position`
+//! - `setoption`: see output of `uci` command for more detail
+//! - `stop`
+//! - `uci`
+//! - `ucinewgame`
+//! - `quit`
 
-use uci::Uci;
+use std::io;
+
+use engine::Engine;
 
 /// For unit testing.
 mod bench;
@@ -10,8 +26,10 @@ mod bitboard;
 mod board;
 /// Definitions and enumerations.
 mod defs;
-/// Items associated with [`Engine`](engine::Engine).
+/// Items associated with [`Engine`].
 mod engine;
+/// Error handling.
+mod error;
 /// Items related to evaluation.
 mod evaluation;
 /// Items related to move generation.
@@ -25,6 +43,7 @@ mod uci;
 /// Utility.
 mod util;
 
-fn main() {
-    Uci::new().main_loop();
+fn main() -> Result<(), io::Error> {
+    Engine::new().main_loop()?;
+    Ok(())
 }

@@ -13,7 +13,7 @@ use util::{bitboard_from_square, east, north, sliding_attacks, south, west};
 
 /// Items related to magic bitboards.
 pub mod magic;
-/// Useful functions for move generation specifically.
+/// Useful functions for move generation.
 mod util;
 
 /// Contains lookup tables for each piece.
@@ -82,16 +82,20 @@ const ROOK_SIZE: usize = 102_400;
 /// Example: `R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1`
 pub const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables.
-#[allow(long_running_const_eval)]
 pub static LOOKUPS: Lookup = Lookup::new();
 
 impl Display for Move {
+    /// Displays a move in long algebraic notation.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let start = self.start();
         let end = self.end();
         if self.is_promotion() {
             // we want the lowercase letter here
             write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
+        } else if *self == Self::null() {
+            // UCI specifies a null move should look like this. A null move
+            // should never be sent, but just in case.
+            write!(f, "0000")
         } else {
             write!(f, "{start}{end}")
         }
@@ -118,7 +122,9 @@ impl Move {
 }
 
 impl Lookup {
-    /// Initialises the tables of [`LOOKUPS`].
+    /// Creates new lookup tables.
+    ///
+    /// This is meant to be called once at compile time.
     #[allow(clippy::large_stack_frames)]
     const fn new() -> Self {
         let pawn_attacks = Self::init_pawn_attacks();
@@ -252,10 +258,8 @@ impl Lookup {
 
     /// Finds the pawn attacks from `square`.
     pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len()) };
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len()) };
+        out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len());
+        out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len());
         self.pawn_attacks[side.to_index()][square.to_index()]
     }
 
@@ -349,12 +353,12 @@ impl Move {
         Self::base(Square(0), Square(0))
     }
 
-    /// Calculates the start square of `self`.
+    /// Calculates the start square of the move.
     pub const fn start(self) -> Square {
         Square(self.upper & Self::SQUARE_MASK)
     }
 
-    /// Calculates the end square of `self`.
+    /// Calculates the end square of the move.
     pub const fn end(self) -> Square {
         Square(self.lower & Self::SQUARE_MASK)
     }
@@ -389,8 +393,8 @@ impl Move {
         PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
     }
 
-    /// Checks if the given start and end square match the start and end square
-    /// contained within `self`.
+    /// Checks if the move is moving from the given start square to the given
+    /// end square.
     pub const fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
         // if the start and end square are the same, xoring them together
@@ -408,13 +412,13 @@ impl Move {
         }
     }
 
-    /// Adds the given flag to `self`.
+    /// Adds the given flag to the move.
     const fn flag(mut self, flag: u8) -> Self {
         self.upper |= flag;
         self
     }
 
-    /// Adds the given extra bits to `self`.
+    /// Adds the given extra bits to the move.
     const fn extra_bits(mut self, extra_bits: u8) -> Self {
         self.lower |= extra_bits << Self::EXTRA_BITS_SHIFT;
         self
@@ -422,19 +426,19 @@ impl Move {
 }
 
 impl Moves {
-    /// Finds and returns, if it exists, the move that has start square `start`
-    /// and end square `end`.
+    /// Finds and returns, if it exists, the [`Move`] that has start square
+    /// `start` and end square `end`.
     ///
-    /// Returns `Some(mv)` if a `Move` does match the start and end square;
+    /// Returns `Some(mv)` if a [`Move`] does match the start and end square;
     /// returns `None` otherwise.
     pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
         self.find(|&mv| mv.is_moving_from_to(start, end))
     }
 
-    /// Finds and returns, if it exists, the move that has start square
+    /// Finds and returns, if it exists, the [`Move`] that has start square
     /// `start`, end square `end` and promotion piece `piece_type`.
     ///
-    /// Returns `Some(mv)` if a `Move` does match the criteria; returns `None`
+    /// Returns `Some(mv)` if a [`Move`] does match the criteria; returns `None`
     /// otherwise.
     pub fn move_with_promo(
         &mut self,
@@ -446,8 +450,7 @@ impl Moves {
     }
 }
 
-/// Generates all legal moves for the current position and puts them in
-/// `moves`.
+/// Calculates all legal moves for the current position of the given board.
 pub fn generate_moves<const MOVE_TYPE: u8>(board: &Board) -> Moves {
     let mut moves = Moves::new();
     if board.side_to_move() == Side::WHITE {
@@ -468,23 +471,23 @@ pub fn generate_moves<const MOVE_TYPE: u8>(board: &Board) -> Moves {
     moves
 }
 
-/// Generates the castling moves for the given side.
+/// Generates the castling moves for the given side and puts them in `moves`.
 fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
     let occupancies = board.occupancies();
 
-    if board.can_castle_kingside::<IS_WHITE>()
+    if board.castling_rights().can_castle_kingside::<IS_WHITE>()
         && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
     {
         moves.push(Move::new_castle::<IS_WHITE, true>());
     }
-    if board.can_castle_queenside::<IS_WHITE>()
+    if board.castling_rights().can_castle_queenside::<IS_WHITE>()
         && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
     {
         moves.push(Move::new_castle::<IS_WHITE, false>());
     }
 }
 
-/// Generates all legal knight and king moves (excluding castling) for `board`
+/// Calculates all legal knight and king moves (excluding castling) for `board`
 /// and puts them in `moves`.
 fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     board: &Board,
@@ -522,7 +525,7 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     }
 }
 
-/// Generates all legal pawn moves for `board` and puts them in `moves`.
+/// Calculates all legal pawn moves for `board` and puts them in `moves`.
 fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     board: &Board,
     moves: &mut Moves,

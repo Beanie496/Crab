@@ -3,5 +3,4 @@
   - byte lookup massively reduces the table size (all tables fit into my l1 cache!!) at the cost of an additional lookup
   - sharing attacks halves the table size at the cost of one additional instruction
     - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
-- Make most higher-level functions return a `Result`
 - add repetition detection

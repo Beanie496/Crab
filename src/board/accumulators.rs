@@ -139,20 +139,16 @@ impl Board {
     /// Adds the piece-square table value for `piece` at `square` to the psqt
     /// accumulator.
     fn add_psq_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
+        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
         self.psq += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
     /// Removes the piece-square table value for `piece` at `square` from the
     /// psqt accumulator.
     fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len()) };
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len()) };
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
+        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
         self.psq -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
@@ -225,10 +221,8 @@ impl ZobristKeys {
 
     /// Calculates the key of the given piece on the given square.
     fn piece_key(&self, square: Square, piece: Piece) -> Key {
-        // SAFETY: If it does get reached, it will panic in debug.
-        unsafe { out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side.len()) };
-        // SAFETY: Ditto.
-        unsafe { out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side[0].len()) };
+        out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side.len());
+        out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side[0].len());
         self.piece_and_side[square.to_index()][piece.to_index()]
     }
 

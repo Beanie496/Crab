@@ -5,7 +5,7 @@ use std::{
     thread::{available_parallelism, spawn},
 };
 
-use crate::engine::Engine;
+use crate::perft::perft;
 
 struct TestPosition {
     position: String,
@@ -27,10 +27,9 @@ impl TestPosition {
 
 impl TestPosition {
     fn run_test(&self) {
-        let mut engine = Engine::new();
-        engine.set_position(&self.position, "");
+        let board = self.position.parse().unwrap();
         assert_eq!(
-            engine.perft::<false, false>(self.perft_depth),
+            perft::<false, false>(&board, self.perft_depth),
             self.perft_result,
             "incorrect result for position {}",
             self.position,
@@ -46,14 +45,17 @@ fn test_positions() {
 
     // add all test positions to the queue
     for position in TEST_POSITIONS.lines() {
-        let mut tokens = position.split(' ');
+        let mut tokens = position.split_whitespace();
+        let mut fen = String::new();
 
+        // have to do this before `take()` because `take()` takes ownership of
+        // `tokens`
         let result = tokens
             .next_back()
             .and_then(|result| result.parse::<u64>().ok())
             .unwrap();
 
-        let mut fen = String::new();
+        fen.push_str("position fen ");
         for token in tokens.take(6) {
             fen.push_str(&token);
             fen.push(' ');
@@ -67,9 +69,7 @@ fn test_positions() {
         tx.send(test_pos).unwrap();
     }
 
-    // create as many threads as is optimal. If no threads available, the test
-    // positions won't be able to be run, so panic.
-    for _ in 0..available_parallelism().unwrap().get() {
+    for _ in 0..available_parallelism().map_or(1, |p| p.get()) {
         let rx = Arc::clone(&rx);
         // Spawn a thread that dequeues and runs the test positions from the
         // receiver until there are no positions left

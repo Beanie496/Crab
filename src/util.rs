@@ -57,7 +57,10 @@ macro_rules! out_of_bounds_is_unreachable {
                 $index, $bound
             );
             #[allow(unreachable_code)]
-            std::hint::unreachable_unchecked()
+            // SAFETY: If it does get reached, it will panic in debug.
+            unsafe {
+                std::hint::unreachable_unchecked()
+            }
         }
     }};
 }
@@ -109,7 +112,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         })
     }
 
-    /// Clears `self`.
+    /// Clears the stack.
     pub fn clear(&mut self) {
         self.first_empty = 0;
     }
@@ -128,7 +131,8 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     }
 }
 
-/// Checks if the move is a double pawn push.
+/// Checks if the given piece type moving from the given start square to the
+/// given end square is a double pawn push.
 pub fn is_double_pawn_push(start: Square, end: Square, piece_type: PieceType) -> bool {
     if piece_type != PieceType::PAWN {
         return false;

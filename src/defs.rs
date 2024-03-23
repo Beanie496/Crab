@@ -3,19 +3,15 @@ use std::{
     str::FromStr,
 };
 
-use crate::bitboard::Bitboard;
+use crate::{bitboard::Bitboard, error::ParseError};
 
-/// A wrapper for a `u8`, since a file can go from 0 to 7.
+/// A file: file A = 0 to file F = 7.
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
 
 /// A wrapper for certain types of move. See associated constants for the
 /// current types.
 pub struct MoveType;
-
-/// The error that happens if a parsed string is invalid.
-#[derive(Debug)]
-pub struct ParseError;
 
 /// A piece, containing the type of piece and side.
 ///
@@ -31,15 +27,15 @@ pub struct Piece(pub u8);
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PieceType(pub u8);
 
-/// A wrapper for a `u8`, since a rank can go from 0 to 7.
+/// A rank: rank 1 = 0 to rank 8 = 7.
 #[derive(Clone, Copy)]
 pub struct Rank(pub u8);
 
-/// A wrapper for a `u8`, since a side is just 0, 1 or 2.
+/// A side: 0, 1 for a regular side or 2 for no side.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Side(pub u8);
 
-/// A wrapper for a `u8`, since a square can go from 0 to 64.
+/// A square: with little-endian rank-file mapping: a1 = 0, b1 = 1, etc.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub struct Square(pub u8);
 
@@ -53,7 +49,7 @@ const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
 ];
 
 impl From<File> for char {
-    /// Converts a rank into a character: 'a' to 'f'.
+    /// Converts a rank into a character: 'a' to 'h'.
     fn from(file: File) -> Self {
         (b'a' + file.0) as Self
     }
@@ -83,7 +79,7 @@ impl From<Rank> for char {
 }
 
 impl From<Side> for char {
-    /// Converts a side into a char.
+    /// Converts a side into a char, assuming the side is White or Black.
     ///
     /// 'w' if White and 'b' if Black; undefined otherwise.
     fn from(side: Side) -> Self {
@@ -92,14 +88,18 @@ impl From<Side> for char {
 }
 
 impl From<Square> for File {
+    /// Calculates the file of a square.
     fn from(square: Square) -> Self {
         Self(square.0 & 7)
     }
 }
 
-impl From<char> for Piece {
-    fn from(piece: char) -> Self {
-        match piece {
+impl TryFrom<char> for Piece {
+    type Error = ParseError;
+
+    /// Converts a piece character specified by FEN into an actual piece.
+    fn try_from(piece: char) -> Result<Self, Self::Error> {
+        Ok(match piece {
             'P' => Self::WPAWN,
             'N' => Self::WKNIGHT,
             'B' => Self::WBISHOP,
@@ -112,48 +112,54 @@ impl From<char> for Piece {
             'r' => Self::BROOK,
             'q' => Self::BQUEEN,
             'k' => Self::BKING,
-            _ => Self::NONE,
-        }
+            _ => return Err(ParseError::InvalidToken),
+        })
     }
 }
 
-impl From<char> for PieceType {
-    fn from(piece: char) -> Self {
+impl TryFrom<char> for PieceType {
+    type Error = ParseError;
+
+    /// Converts a piece character specified by FEN into an actual type of
+    /// piece.
+    fn try_from(piece: char) -> Result<Self, Self::Error> {
         let piece = piece.to_ascii_lowercase();
-        match piece {
+        Ok(match piece {
             'p' => Self::PAWN,
             'n' => Self::KNIGHT,
             'b' => Self::BISHOP,
             'r' => Self::ROOK,
             'q' => Self::QUEEN,
             'k' => Self::KING,
-            _ => Self::NONE,
-        }
+            _ => return Err(ParseError::InvalidToken),
+        })
     }
 }
 
 impl From<Piece> for PieceType {
+    /// Calculates the type of a piece.
     fn from(piece: Piece) -> Self {
         Self(piece.0 >> 1)
     }
 }
 
 impl From<Square> for Rank {
+    /// Calculates the rank of a square.
     fn from(square: Square) -> Self {
         Self(square.0 >> 3)
     }
 }
 
 impl From<Piece> for Side {
-    /// Returns the side of `self`.
+    /// Calculates the side of a piece.
     fn from(piece: Piece) -> Self {
         Self(piece.0 & 1)
     }
 }
 
 impl Display for Square {
-    /// Returns the string representation of a square: the square if there is
-    /// one (e.g. "b3") or "-" if there is none.
+    /// Converts a square into its string representation: the square if `self`
+    /// isn't [`NONE`](Self::NONE) (e.g. "b3") or "-" otherwise.
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::new();
         if *self == Self::NONE {
@@ -187,18 +193,18 @@ impl FromStr for Square {
         let mut square = 0;
         let mut iter = string.as_bytes().iter();
 
-        let file = iter.next().ok_or(ParseError)?;
+        let file = iter.next().ok_or(ParseError::ExpectedToken)?;
         if (b'a'..=b'h').contains(file) {
             square += file - b'a';
         } else {
-            return Err(ParseError);
+            return Err(ParseError::ErroneousToken);
         }
 
-        let rank = iter.next().ok_or(ParseError)?;
+        let rank = iter.next().ok_or(ParseError::ExpectedToken)?;
         if (b'1'..=b'8').contains(rank) {
             square += (rank - b'1') * 8;
         } else {
-            return Err(ParseError);
+            return Err(ParseError::ErroneousToken);
         }
 
         Ok(Self(square))
@@ -206,8 +212,6 @@ impl FromStr for Square {
 }
 
 /// Enumerates files.
-///
-/// To avoid casting everywhere, this isn't an enum.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl File {
     pub const FILE1: Self = Self(0);
@@ -262,8 +266,6 @@ impl PieceType {
 }
 
 /// Enumerates ranks.
-///
-/// To avoid casting everywhere, this isn't an enum.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Rank {
     pub const RANK1: Self = Self(0);
@@ -278,8 +280,6 @@ impl Rank {
 }
 
 /// Enumerates sides.
-///
-/// To avoid casting everywhere, this isn't an enum.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Side {
     pub const BLACK: Self = Self(0);
@@ -288,9 +288,7 @@ impl Side {
     pub const NONE: Self = Self(2);
 }
 
-/// Enumerates squares. This engine uses little-endian rank-file mapping.
-///
-/// To avoid casting everywhere, this isn't an enum.
+/// Enumerates squares.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Square {
     pub const A1: Self = Self(0);
@@ -367,36 +365,31 @@ impl Piece {
         Self((piece.0 << 1) + side.0)
     }
 
-    /// Returns the contents of `self` as a `usize`.
+    /// Converts the piece to a usize.
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
 }
 
 impl PieceType {
-    /// Returns the contents of `self` as a `usize`.
+    /// Converts the piece type to a usize.
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
 }
 
 impl Side {
-    /// Flips the contents of `self`.
+    /// Flips the side.
     ///
     /// e.g. `Side::WHITE.flip() == Side::BLACK`.
     ///
-    /// The result is undefined if `self` isn't `Side::WHITE` or `Side::BLACK`.
+    /// The result is undefined if the square isn't [`Side::WHITE`] or
+    /// [`Side::BLACK`].
     pub const fn flip(self) -> Self {
         Self(self.0 ^ 1)
     }
 
-    /// Returns the contents of `self` as a bool: White is `true`, Black is
-    /// `false`.
-    pub const fn to_bool(self) -> bool {
-        self.0 != 0
-    }
-
-    /// Returns the contents of `self` as a `usize`.
+    /// Converts the side to a usize.
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }
@@ -408,7 +401,7 @@ impl Square {
         Self(rank.0 * 8 + file.0)
     }
 
-    /// Returns the contents of `self` as a `usize`.
+    /// Converts the square to a usize.
     pub const fn to_index(self) -> usize {
         self.0 as usize
     }

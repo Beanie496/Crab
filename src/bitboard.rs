@@ -232,13 +232,13 @@ impl Bitboard {
         Self(0)
     }
 
-    /// Tests if no bits in `self` are set.
+    /// Tests if the bitboard is empty.
     pub fn is_empty(self) -> bool {
         self == Self::empty()
     }
 
-    /// Shifts `self` one square north if `IS_WHITE` is true, otherwise shifts
-    /// `self` one square south.
+    /// Shifts the bitboard one square north if `IS_WHITE` is true, otherwise
+    /// shifts it one square south.
     pub fn pawn_push<const IS_WHITE: bool>(self) -> Self {
         if IS_WHITE {
             self.north()
@@ -247,17 +247,17 @@ impl Bitboard {
         }
     }
 
-    /// Shifts `self` one square north without wrapping.
+    /// Shifts the bitboard one square north without wrapping.
     pub fn north(self) -> Self {
         self << 8
     }
 
-    /// Shifts `self` one square south without wrapping.
+    /// Shifts the bitboard one square south without wrapping.
     pub fn south(self) -> Self {
         self >> 8
     }
 
-    /// Clears the least significant bit of `self` and returns it.
+    /// Clears the least significant bit of the bitboard and returns it.
     pub fn pop_lsb(&mut self) -> Self {
         let popped_bit = self.0 & self.0.wrapping_neg();
         self.0 ^= popped_bit;
@@ -266,8 +266,8 @@ impl Bitboard {
 }
 
 impl BitIter {
-    /// Clears the least significant bit of `self` and converts the position of
-    /// that bit to a [`Square`].
+    /// Clears the least significant bit of the bitboard and converts the
+    /// position of that bit to a [`Square`].
     pub fn pop_next_square(&mut self) -> Square {
         let shift = self.0.trailing_zeros();
         self.0 ^= 1 << shift;

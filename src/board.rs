@@ -1,6 +1,6 @@
 use std::{
-    convert::Infallible,
     fmt::{self, Display, Formatter},
+    num::ParseIntError,
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
     str::FromStr,
 };
@@ -8,6 +8,7 @@ use std::{
 use crate::{
     bitboard::Bitboard,
     defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
+    error::ParseError,
     evaluation::Score,
     index_into_unchecked, index_unchecked,
     movegen::{generate_moves, Move, LOOKUPS},
@@ -17,24 +18,30 @@ use crate::{
 /// Accumulated, incrementally-updated fields.
 mod accumulators;
 
-/// The size of a zobrist key.
+/// The type of a zobrist key.
 pub type Key = u64;
 
-/// Stores castling rights. Encoded as `KQkq`, with one bit for each right.
-/// E.g. `0b1101` would be castling rights `KQq`.
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub struct CastlingRights(u8);
+/// All the errors that can occur while parsing a `position` command into a
+/// [`Board`].
+#[derive(Debug)]
+pub enum BoardParseError {
+    /// A generic parsing error occured.
+    ParseError(ParseError),
+    /// A move was invalid.
+    InvalidMove,
+    /// An integer couldn't be parsed.
+    ParseIntError(ParseIntError),
+}
 
 /// The board. It contains information about the current board state and can
-/// generate pseudo-legal moves. It is small (134 bytes) so it uses copy-make.
+/// generate pseudo-legal moves. It uses copy-make.
 #[derive(Clone, Copy)]
 pub struct Board {
     /// An array of piece values, used for quick lookup of which piece is on a
     /// given square.
     mailbox: [Piece; Square::TOTAL],
     /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
-    /// is the knights, and so on, as according to the order set by
-    /// [`Piece`].
+    /// is the knights, and so on, as according to the order set by [`Piece`].
     pieces: [Bitboard; PieceType::TOTAL],
     /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
     /// is is the intersection of all Black piece bitboards.
@@ -54,8 +61,8 @@ pub struct Board {
     /// The current phase of the game, where 0 means the midgame and 24 means
     /// the endgame.
     ///
-    /// `psq_val` uses this value to lerp between its midgame and
-    /// endgame values. It is incrementally updated.
+    /// `psq` uses this value to lerp between its midgame and endgame values.
+    /// It is incrementally updated.
     phase: u8,
     /// The current material balance weighted with piece-square tables, from
     /// the perspective of White.
@@ -68,7 +75,15 @@ pub struct Board {
     zobrist: Key,
 }
 
+/// Stores castling rights.
+///
+/// Encoded as `KQkq`, with one bit for each right.  E.g. `0b1101` would be
+/// castling rights `KQq`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct CastlingRights(u8);
+
 impl Default for Board {
+    /// Returns a [`Board`] with the starting position.
     fn default() -> Self {
         let mut board = Self {
             mailbox: Self::default_mailbox(),
@@ -89,11 +104,12 @@ impl Default for Board {
 }
 
 impl Display for Board {
+    /// Converts the board into a FEN string.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut board = String::new();
         let mut empty_squares = 0;
-        // I can't just iterate over the piece board normally: the board goes
-        // from a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
+        // I can't just iterate over the mailbox normally: the board goes from
+        // a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
         // rank-file
         for rank in (0..Rank::TOTAL).rev() {
             for file in 0..File::TOTAL {
@@ -104,14 +120,16 @@ impl Display for Board {
                     empty_squares += 1;
                 } else {
                     if empty_squares != 0 {
-                        board.push(char::from_digit(empty_squares, 10).ok_or(fmt::Error)?);
+                        // `from_digit`, unwrapping then mapping is a lot more
+                        // verbose and does pointless error checking
+                        board.push(char::from(b'0' + empty_squares));
                         empty_squares = 0;
                     }
                     board.push(char::from(piece));
                 }
             }
             if empty_squares != 0 {
-                board.push(char::from_digit(empty_squares, 10).ok_or(fmt::Error)?);
+                board.push(char::from(b'0' + empty_squares));
                 empty_squares = 0;
             }
             board.push('/');
@@ -119,102 +137,145 @@ impl Display for Board {
         // remove the trailing slash
         board.pop();
 
+        let side_to_move = self.side_to_move();
+        let rights = self.castling_rights();
+        let ep_square = self.ep_square();
+        let halfmoves = self.halfmoves();
+        let fullmoves = self.fullmoves();
+
         write!(
             f,
-            "{} {} {} {} {} {}",
+            "{} {} {rights} {ep_square} {halfmoves} {fullmoves}",
             &board,
-            &char::from(self.side_to_move()),
-            &self.castling_rights().to_string(),
-            &self.ep_square(),
-            &self.halfmoves(),
-            &self.fullmoves(),
+            char::from(side_to_move),
         )
     }
 }
 
 impl FromStr for Board {
-    type Err = Infallible;
+    type Err = BoardParseError;
 
-    /// Sets `self.board` to the given FEN.
+    /// Parses a full `position` command.
     ///
-    /// This function does practically no error checking because that's up to
-    /// the GUI. If it does catch an error, it will panic.
-    #[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
+    /// It will return with an [`Err`] if the FEN string cannot be parsed (e.g.
+    /// if it's too short) but does not check if the FEN string actually makes
+    /// sense (e.g. if it contains a row with 14 pieces).
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let mut board = Self::new();
+        let mut tokens = string.split_whitespace();
 
-        if string.is_empty() {
+        if "position" != tokens.next().ok_or(ParseError::ExpectedToken)? {
+            return Err(BoardParseError::from(ParseError::InvalidToken));
+        }
+
+        match tokens.next() {
+            Some("startpos") => board.set_startpos(),
+            Some("fen") => {
+                let board_str = tokens.next().ok_or(ParseError::ExpectedToken)?;
+                let side_to_move = tokens.next().ok_or(ParseError::ExpectedToken)?;
+                let castling_rights = tokens.next().ok_or(ParseError::ExpectedToken)?;
+                let ep_square = tokens.next().ok_or(ParseError::ExpectedToken)?;
+                let halfmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
+                let fullmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
+
+                // 1. the board itself
+                let mut square = 56;
+                let ranks = board_str.split('/');
+                for rank in ranks {
+                    for piece in rank.chars() {
+                        // if it's a number, skip over that many files
+                        if ('0'..='8').contains(&piece) {
+                            let empty_squares = piece as u8 - b'0';
+                            square += empty_squares;
+                        } else {
+                            board.add_piece(Square(square), Piece::try_from(piece)?);
+                            square += 1;
+                        }
+                    }
+                    square = square.wrapping_sub(16);
+                }
+
+                // 2. side to move
+                if side_to_move == "w" {
+                    board.set_side_to_move(Side::WHITE);
+                } else {
+                    board.set_side_to_move(Side::BLACK);
+                    board.toggle_zobrist_side();
+                }
+
+                // 3. castling rights
+                for right in castling_rights.chars() {
+                    match right {
+                        'K' => board.castling_rights_mut().add_right(CastlingRights::K),
+                        'Q' => board.castling_rights_mut().add_right(CastlingRights::Q),
+                        'k' => board.castling_rights_mut().add_right(CastlingRights::k),
+                        'q' => board.castling_rights_mut().add_right(CastlingRights::q),
+                        _ => (),
+                    }
+                }
+                board.toggle_zobrist_castling_rights(board.castling_rights());
+
+                // 4. en passant
+                let ep_square = ep_square.parse::<Square>()?;
+                board.set_ep_square(ep_square);
+                board.toggle_zobrist_ep_square(ep_square);
+
+                // 5. halfmoves
+                let halfmoves = halfmoves.parse::<u8>()?;
+                board.set_halfmoves(halfmoves);
+
+                // 6. fullmoves
+                let fullmoves = fullmoves.parse::<u16>()?;
+                board.set_fullmoves(fullmoves);
+            }
+            _ => return Err(BoardParseError::from(ParseError::ExpectedToken)),
+        };
+
+        // check if we have any moves to parse
+        if let Some(token) = tokens.next() {
+            if token != "moves" {
+                return Err(BoardParseError::from(ParseError::InvalidToken));
+            }
+        } else {
             return Ok(board);
         }
 
-        let mut iter = string.split(' ');
-        let board_str = iter.next().unwrap();
-        let side_to_move = iter.next();
-        let castling_rights = iter.next();
-        let ep_square = iter.next();
-        let halfmoves = iter.next();
-        let fullmoves = iter.next();
+        #[allow(clippy::string_slice)]
+        for mv in tokens {
+            let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
 
-        // 1. the board itself
-        let mut square = 56;
-        let ranks = board_str.split('/');
-        for rank in ranks {
-            for piece in rank.chars() {
-                // if it's a number, skip over that many files
-                if ('0'..='8').contains(&piece) {
-                    // `piece` is from 0 to 8 inclusive so the unwrap cannot
-                    // panic
-                    let empty_squares = piece.to_digit(10).unwrap() as u8;
-                    square += empty_squares;
-                } else {
-                    let piece = Piece::from(piece);
+            let start = Square::from_str(&mv[0..=1])?;
+            let end = Square::from_str(&mv[2..=3])?;
 
-                    board.add_piece(Square(square), piece);
-
-                    square += 1;
-                }
-            }
-            square = square.wrapping_sub(16);
-        }
-
-        // 2. side to move
-        if let Some(stm) = side_to_move {
-            if stm == "w" {
-                board.set_side_to_move(Side::WHITE);
+            // Each move should be exactly 4 characters; if it's a promotion,
+            // the last char will be the promotion char.
+            let mv = if mv.len() == 5 {
+                // SAFETY: It's not possible for it to be `None`.
+                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
+                moves.move_with_promo(start, end, PieceType::try_from(promotion_char)?)
             } else {
-                board.set_side_to_move(Side::BLACK);
-                board.toggle_zobrist_side();
+                moves.move_with(start, end)
+            }
+            .ok_or(BoardParseError::InvalidMove)?;
+
+            if !board.make_move(mv) {
+                return Err(BoardParseError::InvalidMove);
             }
         }
-
-        // 3. castling rights
-        if let Some(cr) = castling_rights {
-            for right in cr.chars() {
-                match right {
-                    'K' => board.add_castling_right(CastlingRights::K),
-                    'Q' => board.add_castling_right(CastlingRights::Q),
-                    'k' => board.add_castling_right(CastlingRights::k),
-                    'q' => board.add_castling_right(CastlingRights::q),
-                    _ => (),
-                }
-            }
-            board.toggle_zobrist_castling_rights(board.castling_rights());
-        }
-
-        // 4. en passant
-        let ep_square = ep_square.map_or(Square::NONE, |ep| ep.parse::<Square>().unwrap());
-        board.set_ep_square(ep_square);
-        board.toggle_zobrist_ep_square(ep_square);
-
-        // 5. halfmoves
-        let halfmoves = halfmoves.map_or(0, |hm| hm.parse::<u8>().unwrap());
-        board.set_halfmoves(halfmoves);
-
-        // 6. fullmoves
-        let fullmoves = fullmoves.map_or(1, |fm| fm.parse::<u16>().unwrap());
-        board.set_fullmoves(fullmoves);
 
         Ok(board)
+    }
+}
+
+impl From<ParseError> for BoardParseError {
+    fn from(parse_error: ParseError) -> Self {
+        Self::ParseError(parse_error)
+    }
+}
+
+impl From<ParseIntError> for BoardParseError {
+    fn from(parse_int_error: ParseIntError) -> Self {
+        Self::ParseIntError(parse_int_error)
     }
 }
 
@@ -289,7 +350,6 @@ impl Shl<u8> for CastlingRights {
 }
 
 #[allow(non_upper_case_globals)]
-/// Flags. It's fine to use `&`, `^` and `|` on these.
 impl CastlingRights {
     /// The flag `K`.
     const K: Self = Self(0b1000);
@@ -306,8 +366,7 @@ impl CastlingRights {
 }
 
 impl Board {
-    /// Creates a new [`Board`] initialised with the state of the starting
-    /// position and initialises the static lookup tables.
+    /// Creates a new, empty [`Board`].
     pub const fn new() -> Self {
         Self {
             mailbox: Self::no_mailbox(),
@@ -353,7 +412,7 @@ impl Board {
         ]
     }
 
-    /// Returns the mailbox of the starting position.
+    /// Returns an empty mailbox.
     const fn no_mailbox() -> [Piece; Square::TOTAL] {
         [Piece::NONE; Square::TOTAL]
     }
@@ -404,46 +463,12 @@ impl Board {
         println!("Zobrist key: {}", self.zobrist());
     }
 
-    /// Takes a sequence of moves in long algebraic notation and feeds them to
-    /// the board. If a move is invalid or illegal, it panics.
-    #[allow(clippy::unwrap_used)]
-    pub fn play_moves(&mut self, moves_str: &str) {
-        // UCI says it's ok to have no moves
-        if moves_str.is_empty() {
-            return;
-        }
-
-        let mut copy = *self;
-
-        #[allow(clippy::string_slice)]
-        for mv in moves_str.split(' ') {
-            let mut moves = generate_moves::<{ MoveType::ALL }>(&copy);
-
-            let start = Square::from_str(&mv[0..=1]).unwrap();
-            let end = Square::from_str(&mv[2..=3]).unwrap();
-
-            // Each move should be exactly 4 characters; if it's a promotion,
-            // the last char will be the promotion char.
-            let mv = if mv.len() == 5 {
-                // SAFETY: It's not possible for it to be `None`.
-                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
-                moves.move_with_promo(start, end, PieceType::from(promotion_char))
-            } else {
-                moves.move_with(start, end)
-            };
-
-            assert!(copy.make_move(mv.unwrap()), "Illegal move");
-        }
-
-        *self = copy;
-    }
-
     /// Returns the piece bitboard given by `PIECE`.
     pub const fn piece<const PIECE: usize>(&self) -> Bitboard {
         self.pieces[PIECE]
     }
 
-    /// Returns the board of the side according to `IS_WHITE`.
+    /// Returns the side bitboard according to `IS_WHITE`.
     pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
             self.sides[Side::WHITE.to_index()]
@@ -452,12 +477,12 @@ impl Board {
         }
     }
 
-    /// Returns the board of the side according to `IS_WHITE`.
+    /// Returns the side bitboard of the given side.
     pub fn side_any(&self, side: Side) -> Bitboard {
         index_unchecked!(self.sides, side.to_index())
     }
 
-    /// Returns all the occupied squares on the board.
+    /// Calculates the bitboard with all occupancies set.
     pub fn occupancies(&self) -> Bitboard {
         self.side::<true>() | self.side::<false>()
     }
@@ -468,18 +493,13 @@ impl Board {
     }
 
     /// Returns the castling rights.
-    const fn castling_rights(&self) -> CastlingRights {
+    pub const fn castling_rights(&self) -> CastlingRights {
         self.castling_rights
     }
 
-    /// Calculates if the given side can castle kingside.
-    pub fn can_castle_kingside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_kingside::<IS_WHITE>()
-    }
-
-    /// Calculates if the given side can castle queenside.
-    pub fn can_castle_queenside<const IS_WHITE: bool>(&self) -> bool {
-        self.castling_rights.can_castle_queenside::<IS_WHITE>()
+    /// Returns a mutable reference to the castling rights.
+    pub fn castling_rights_mut(&mut self) -> &mut CastlingRights {
+        &mut self.castling_rights
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
@@ -502,8 +522,13 @@ impl Board {
         self.is_square_attacked(self.king_square())
     }
 
+    /// Sets the board to the starting position.
+    pub fn set_startpos(&mut self) {
+        *self = Self::default();
+    }
+
     /// Makes the given move on the internal board. `mv` is assumed to be a
-    /// valid move. Returns `true` if the given move is legal, `false`
+    /// valid move. Returns `true` if the given move is legal and `false`
     /// otherwise.
     pub fn make_move(&mut self, mv: Move) -> bool {
         let start = mv.start();
@@ -550,16 +575,16 @@ impl Board {
             if captured_type == PieceType::ROOK {
                 match end {
                     Square::A1 => {
-                        self.remove_castling_right(CastlingRights::Q);
+                        self.castling_rights_mut().remove_right(CastlingRights::Q);
                     }
                     Square::H1 => {
-                        self.remove_castling_right(CastlingRights::K);
+                        self.castling_rights_mut().remove_right(CastlingRights::K);
                     }
                     Square::A8 => {
-                        self.remove_castling_right(CastlingRights::q);
+                        self.castling_rights_mut().remove_right(CastlingRights::q);
                     }
                     Square::H8 => {
-                        self.remove_castling_right(CastlingRights::k);
+                        self.castling_rights_mut().remove_right(CastlingRights::k);
                     }
                     _ => (),
                 }
@@ -591,7 +616,7 @@ impl Board {
                 us,
             );
 
-            self.remove_castling_rights(us);
+            self.castling_rights_mut().clear_side(us);
         } else if is_double_pawn_push(start, end, piece_type) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
@@ -627,22 +652,22 @@ impl Board {
         if piece_type == PieceType::ROOK {
             match start {
                 Square::A1 => {
-                    self.remove_castling_right(CastlingRights::Q);
+                    self.castling_rights_mut().remove_right(CastlingRights::Q);
                 }
                 Square::H1 => {
-                    self.remove_castling_right(CastlingRights::K);
+                    self.castling_rights_mut().remove_right(CastlingRights::K);
                 }
                 Square::A8 => {
-                    self.remove_castling_right(CastlingRights::q);
+                    self.castling_rights_mut().remove_right(CastlingRights::q);
                 }
                 Square::H8 => {
-                    self.remove_castling_right(CastlingRights::k);
+                    self.castling_rights_mut().remove_right(CastlingRights::k);
                 }
                 _ => (),
             }
         }
         if piece_type == PieceType::KING {
-            self.remove_castling_rights(us);
+            self.castling_rights_mut().clear_side(us);
         }
 
         self.toggle_zobrist_castling_rights(self.castling_rights());
@@ -652,8 +677,9 @@ impl Board {
     }
 
     /// Finds the piece on the given rank and file and converts it to its
-    /// character representation. If no piece is on the square, returns '0'
-    /// instead.
+    /// character representation.
+    ///
+    /// If no piece is on the square, returns '0' instead.
     fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
         let square = Square::from_pos(rank, file);
         let piece = self.piece_on(square);
@@ -685,8 +711,9 @@ impl Board {
         index_unchecked!(self.mailbox, square.to_index())
     }
 
-    /// Adds a piece to square `square` for side `side`. Assumes there is no
-    /// piece on the square to be written to.
+    /// Adds a piece to square `square` for side `side`.
+    ///
+    /// Assumes there is no piece on the square to be written to.
     fn add_piece(&mut self, square: Square, piece: Piece) {
         let square_bb = Bitboard::from(square);
         let side = Side::from(piece);
@@ -756,21 +783,6 @@ impl Board {
     fn flip_side(&mut self) {
         self.toggle_zobrist_side();
         self.side_to_move = self.side_to_move.flip();
-    }
-
-    /// Adds the given right to the castling rights.
-    fn add_castling_right(&mut self, right: CastlingRights) {
-        self.castling_rights.add_right(right);
-    }
-
-    /// Unsets castling the given right for the given side.
-    fn remove_castling_right(&mut self, right: CastlingRights) {
-        self.castling_rights.remove_right(right);
-    }
-
-    /// Clears the castling rights for the given side.
-    fn remove_castling_rights(&mut self, side: Side) {
-        self.castling_rights.clear_side(side);
     }
 
     /// Sets the en passant square to `square`.
@@ -848,7 +860,7 @@ impl CastlingRights {
     }
 
     /// Calculates if the given side can castle kingside.
-    fn can_castle_kingside<const IS_WHITE: bool>(self) -> bool {
+    pub fn can_castle_kingside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
             self & Self::K == Self::K
         } else {
@@ -857,7 +869,7 @@ impl CastlingRights {
     }
 
     /// Calculates if the given side can castle queenside.
-    fn can_castle_queenside<const IS_WHITE: bool>(self) -> bool {
+    pub fn can_castle_queenside<const IS_WHITE: bool>(self) -> bool {
         if IS_WHITE {
             self & Self::Q == Self::Q
         } else {
@@ -865,12 +877,12 @@ impl CastlingRights {
         }
     }
 
-    /// Adds the given right to `self`.
+    /// Adds the given right to the castling rights.
     fn add_right(&mut self, right: Self) {
         *self |= right;
     }
 
-    /// Removes the given right from `self`.
+    /// Removes the given right from the castling rights.
     fn remove_right(&mut self, right: Self) {
         debug_assert!(
             right.0.count_ones() == 1,
@@ -879,7 +891,7 @@ impl CastlingRights {
         *self &= !right;
     }
 
-    /// Clears the rights for `side`.
+    /// Clears the rights of the given side.
     fn clear_side(&mut self, side: Side) {
         if side == Side::WHITE {
             *self &= Self::k | Self::q;

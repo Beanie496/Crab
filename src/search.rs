@@ -256,7 +256,7 @@ impl Pv {
         }
     }
 
-    /// Appends `other_pv` to `self` and clears `other_pv`.
+    /// Appends another [`Pv`].
     fn append_pv(&mut self, other_pv: &mut Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
@@ -265,19 +265,19 @@ impl Pv {
         }
     }
 
-    /// Sets `self` to `other_pv`.
+    /// Sets the PV to the other PV.
     fn set_pv(&mut self, other_pv: &mut Self) {
         self.clear();
         self.append_pv(other_pv);
     }
 
-    /// Adds a [`Move`] to the back of `self`.
+    /// Adds a [`Move`] to the back of the queue.
     fn enqueue(&mut self, mv: Move) {
         index_into_unchecked!(self.moves, self.first_empty as usize, mv);
         self.first_empty += 1;
     }
 
-    /// Removes a [`Move`] from the front of `self`.
+    /// Removes a [`Move`] from the front of the queue.
     fn dequeue(&mut self) -> Option<Move> {
         (self.first_item < self.first_empty).then(|| {
             let mv = index_unchecked!(self.moves, self.first_item as usize);
@@ -286,15 +286,13 @@ impl Pv {
         })
     }
 
-    /// Clears all moves from `self`.
-    ///
-    /// This only sets a couple of variables, so it's basically free.
+    /// Clears all moves from the queue.
     fn clear(&mut self) {
         self.first_item = 0;
         self.first_empty = 0;
     }
 
-    /// Returns a slice to the moves of `self`.
+    /// Returns a slice to the moves of the queue.
     fn moves(&self) -> &[Move] {
         &self.moves[(self.first_item as usize)..(self.first_empty as usize)]
     }
@@ -304,7 +302,7 @@ impl Pv {
         index_unchecked!(self.moves, index)
     }
 
-    /// Calculates the length of `self`.
+    /// Calculates the length of the queue.
     fn len(&self) -> usize {
         usize::from(self.first_empty - self.first_item)
     }
