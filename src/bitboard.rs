@@ -12,6 +12,21 @@ pub struct Bitboard(pub u64);
 /// An iterator over the bits of a [`Bitboard`].
 pub struct BitIter(u64);
 
+impl Bitboard {
+    /// The squares betwen the White king and kingside rook in the starting
+    /// position.
+    const CASTLING_SPACE_WK: Self = Self(0x0000_0000_0000_0060);
+    /// The squares betwen the White king and queenside rook in the starting
+    /// position.
+    const CASTLING_SPACE_WQ: Self = Self(0x0000_0000_0000_000e);
+    /// The squares betwen the Black king and kingside rook in the starting
+    /// position.
+    const CASTLING_SPACE_BK: Self = Self(0x6000_0000_0000_0000);
+    /// The squares betwen the Black king and queenside rook in the starting
+    /// position.
+    const CASTLING_SPACE_BQ: Self = Self(0x0e00_0000_0000_0000);
+}
+
 impl BitAnd for Bitboard {
     type Output = Self;
 
@@ -124,21 +139,6 @@ impl Iterator for BitIter {
             Some(self.pop_next_square())
         }
     }
-}
-
-impl Bitboard {
-    /// The squares betwen the White king and kingside rook in the starting
-    /// position.
-    const CASTLING_SPACE_WK: Self = Self(0x0000_0000_0000_0060);
-    /// The squares betwen the White king and queenside rook in the starting
-    /// position.
-    const CASTLING_SPACE_WQ: Self = Self(0x0000_0000_0000_000e);
-    /// The squares betwen the Black king and kingside rook in the starting
-    /// position.
-    const CASTLING_SPACE_BK: Self = Self(0x6000_0000_0000_0000);
-    /// The squares betwen the Black king and queenside rook in the starting
-    /// position.
-    const CASTLING_SPACE_BQ: Self = Self(0x0e00_0000_0000_0000);
 }
 
 impl Bitboard {

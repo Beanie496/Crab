@@ -21,18 +21,18 @@ const ID_NAME: &str = "Crab";
 /// The version of this engine.
 const ID_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[allow(clippy::missing_docs_in_private_items)]
+impl UciOptions {
+    /// The range that the move overhead can take, in milliseconds.
+    pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1000);
+}
+
 impl Default for UciOptions {
     fn default() -> Self {
         Self {
             move_overhead: Duration::from_millis(1),
         }
     }
-}
-
-#[allow(clippy::missing_docs_in_private_items)]
-impl UciOptions {
-    /// The range that the move overhead can take, in milliseconds.
-    pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1000);
 }
 
 impl UciOptions {

@@ -23,9 +23,7 @@ impl TestPosition {
             perft_result,
         }
     }
-}
 
-impl TestPosition {
     fn run_test(&self) {
         let board = self.position.parse().unwrap();
         assert_eq!(

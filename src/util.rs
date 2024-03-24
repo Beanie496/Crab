@@ -20,18 +20,6 @@ macro_rules! cfor {
     }}
 }
 
-/// Gets the item at `index` in `array` without bounds checking.
-///
-/// In debug mode, it will assert that `index` is within `array`.
-#[macro_export]
-macro_rules! index_unchecked {
-    ($array:expr, $index:expr) => {{
-        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
-        // SAFETY: we just checked `index` is valid
-        unsafe { *$array.get_unchecked($index) }
-    }};
-}
-
 /// Inserts `item` at `index` into `array` without bounds checking.
 ///
 /// In debug mode, it will assert that `index` is within `array`.
@@ -41,6 +29,18 @@ macro_rules! index_into_unchecked {
         debug_assert!($index < $array.len(), "Attempted to index out of bounds");
         // SAFETY: we just checked `index` is valid
         unsafe { *$array.get_unchecked_mut($index) = $item }
+    }};
+}
+
+/// Gets the item at `index` in `array` without bounds checking.
+///
+/// In debug mode, it will assert that `index` is within `array`.
+#[macro_export]
+macro_rules! index_unchecked {
+    ($array:expr, $index:expr) => {{
+        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
+        // SAFETY: we just checked `index` is valid
+        unsafe { *$array.get_unchecked($index) }
     }};
 }
 

@@ -14,9 +14,8 @@ The order for each file should be as shown:
 - Types
 - Enums/unions/structs in that order, unless needed otherwise
 - Consts/statics
-- Traits
 - Impls
-- Functions definitions, in descending order of abstraction (so main() first)
+- Functions definitions
 
 Don't use the old file path style. This means you should never make a file called `mod.rs`.
 Unit tests should usually be inline modules. All other modules should be in external files.
@@ -24,30 +23,13 @@ Unit tests should usually be inline modules. All other modules should be in exte
 ### 2. Imports
 
 Only import what is used.
-```
-// ok
-use a::{
-    b::{
-        c::{
-            d::e,
-            f::g,
-        },
-    },
-    h::i,
-};
-```
-```
-// not ok
-use a::{b::{c, d}, f};
-```
-
 When two items in different crates have the same name, bring the parent modules into scope instead. Don't use `as` to rename an item.
 ```
 // ok
 use x::y;
 use a::b;
 
-...
+// ...
 
 y::z
 b::z
@@ -60,42 +42,24 @@ use a::b::z as a_z;
 
 ### 3. Indentation and line width
 
-Avoid excessive indentation.
-Keep both comments and doc comments to 80 lines.
+Keep both comments and doc comments to a width of 79.
 
 ### 4. Newlines
 
-At the highest scope, everything should be separated with a blank line, unless they take only one line. This includes everything defined in the 'order' section.
-Function definitions & declarations should be separated with a blank line at any scope.
+Separate everything at indentation 0 with a blank line. Group `use`s, `mod`s, `type`s, `const`s and `static`s though.
 Never use two blank lines.
-```
-fn fun() {
-    u32 x = 3;
-    u32 y = 4;
 
-    if x > y {
-        do_something();
-    }
-}
-```
+### 5. Names
 
-### 5. Spaces
+Use descriptive names. This is Rust, not C.
 
-Operators should generally be preceded and followed by a space.
-However, unary operators (`&`, `*`, `-`, `!`) should be attached to whatever they affect.
-
-### 6. Names
-
-The length of variable names should be proportional to their scope. A for loop counter might be called `i`; calling a global variable `i` is criminal.
-Names should *always* be descriptive, whatever it's naming. If a variable name requires a comment, you are naming it wrong.
-
-### 7. Functions and methods
+### 6. Functions and methods
 
 Functions shouldn't be as small as possible for the sake of being small.
-If a function is doing several separate things, fence the separate things into their own braced blocks. If a block needs to be called elsewhere, turn it into a function.
+
 The `impl` blocks should be in this order for each struct:
-- Trait impls
 - Constants
+- Trait impls
 - Methods/associated functions
 
 If two struct share the same type of `impl`, they should be grouped, in alphabetical order.
@@ -121,10 +85,10 @@ impl B {
 ```
 Functions and methods should be ordered in whatever order seems logical.
 
-### 8. Comments
+### 7. Comments
 
-Comments are an unfortunate necessity. Write your code such that the code itself explains what it's doing. Sometimes comments are needed, but they shouldn't be needed often.
+Don't overuse them, but ensure they're there when needed.
 
-### 9. Assembly
+### 8. Assembly
 
 Don't use it.

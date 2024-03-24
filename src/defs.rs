@@ -48,6 +48,154 @@ const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
     'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
 ];
 
+/// Enumerates files.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl File {
+    pub const FILE1: Self = Self(0);
+    pub const FILE2: Self = Self(1);
+    pub const FILE3: Self = Self(2);
+    pub const FILE4: Self = Self(3);
+    pub const FILE5: Self = Self(4);
+    pub const FILE6: Self = Self(5);
+    pub const FILE7: Self = Self(6);
+    pub const FILE8: Self = Self(7);
+    pub const TOTAL: usize = 8;
+}
+
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl MoveType {
+    /// All moves.
+    pub const ALL: u8 = 0;
+    /// Captures only.
+    pub const CAPTURES: u8 = 1;
+}
+
+/// Enumerates pieces for White and Black.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl Piece {
+    pub const WPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::WHITE);
+    pub const WKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::WHITE);
+    pub const WBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::WHITE);
+    pub const WROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::WHITE);
+    pub const WQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::WHITE);
+    pub const WKING: Self = Self::from_piecetype(PieceType::KING, Side::WHITE);
+    pub const BPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::BLACK);
+    pub const BKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::BLACK);
+    pub const BBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::BLACK);
+    pub const BROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::BLACK);
+    pub const BQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::BLACK);
+    pub const BKING: Self = Self::from_piecetype(PieceType::KING, Side::BLACK);
+    pub const TOTAL: usize = 12;
+    pub const NONE: Self = Self(12);
+}
+
+/// Enumerates pieces.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl PieceType {
+    pub const PAWN: Self = Self(0);
+    pub const KNIGHT: Self = Self(1);
+    pub const BISHOP: Self = Self(2);
+    pub const ROOK: Self = Self(3);
+    pub const QUEEN: Self = Self(4);
+    pub const KING: Self = Self(5);
+    pub const TOTAL: usize = 6;
+    pub const NONE: Self = Self(6);
+}
+
+/// Enumerates ranks.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl Rank {
+    pub const RANK1: Self = Self(0);
+    pub const RANK2: Self = Self(1);
+    pub const RANK3: Self = Self(2);
+    pub const RANK4: Self = Self(3);
+    pub const RANK5: Self = Self(4);
+    pub const RANK6: Self = Self(5);
+    pub const RANK7: Self = Self(6);
+    pub const RANK8: Self = Self(7);
+    pub const TOTAL: usize = 8;
+}
+
+/// Enumerates sides.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl Side {
+    pub const BLACK: Self = Self(0);
+    pub const WHITE: Self = Self(1);
+    pub const TOTAL: usize = 2;
+    pub const NONE: Self = Self(2);
+}
+
+/// Enumerates squares.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl Square {
+    pub const A1: Self = Self(0);
+    pub const B1: Self = Self(1);
+    pub const C1: Self = Self(2);
+    pub const D1: Self = Self(3);
+    pub const E1: Self = Self(4);
+    pub const F1: Self = Self(5);
+    pub const G1: Self = Self(6);
+    pub const H1: Self = Self(7);
+    pub const A2: Self = Self(8);
+    pub const B2: Self = Self(9);
+    pub const C2: Self = Self(10);
+    pub const D2: Self = Self(11);
+    pub const E2: Self = Self(12);
+    pub const F2: Self = Self(13);
+    pub const G2: Self = Self(14);
+    pub const H2: Self = Self(15);
+    pub const A3: Self = Self(16);
+    pub const B3: Self = Self(17);
+    pub const C3: Self = Self(18);
+    pub const D3: Self = Self(19);
+    pub const E3: Self = Self(20);
+    pub const F3: Self = Self(21);
+    pub const G3: Self = Self(22);
+    pub const H3: Self = Self(23);
+    pub const A4: Self = Self(24);
+    pub const B4: Self = Self(25);
+    pub const C4: Self = Self(26);
+    pub const D4: Self = Self(27);
+    pub const E4: Self = Self(28);
+    pub const F4: Self = Self(29);
+    pub const G4: Self = Self(30);
+    pub const H4: Self = Self(31);
+    pub const A5: Self = Self(32);
+    pub const B5: Self = Self(33);
+    pub const C5: Self = Self(34);
+    pub const D5: Self = Self(35);
+    pub const E5: Self = Self(36);
+    pub const F5: Self = Self(37);
+    pub const G5: Self = Self(38);
+    pub const H5: Self = Self(39);
+    pub const A6: Self = Self(40);
+    pub const B6: Self = Self(41);
+    pub const C6: Self = Self(42);
+    pub const D6: Self = Self(43);
+    pub const E6: Self = Self(44);
+    pub const F6: Self = Self(45);
+    pub const G6: Self = Self(46);
+    pub const H6: Self = Self(47);
+    pub const A7: Self = Self(48);
+    pub const B7: Self = Self(49);
+    pub const C7: Self = Self(50);
+    pub const D7: Self = Self(51);
+    pub const E7: Self = Self(52);
+    pub const F7: Self = Self(53);
+    pub const G7: Self = Self(54);
+    pub const H7: Self = Self(55);
+    pub const A8: Self = Self(56);
+    pub const B8: Self = Self(57);
+    pub const C8: Self = Self(58);
+    pub const D8: Self = Self(59);
+    pub const E8: Self = Self(60);
+    pub const F8: Self = Self(61);
+    pub const G8: Self = Self(62);
+    pub const H8: Self = Self(63);
+    pub const TOTAL: usize = 64;
+    pub const NONE: Self = Self(64);
+}
+
 impl From<File> for char {
     /// Converts a rank into a character: 'a' to 'h'.
     fn from(file: File) -> Self {
@@ -209,154 +357,6 @@ impl FromStr for Square {
 
         Ok(Self(square))
     }
-}
-
-/// Enumerates files.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl File {
-    pub const FILE1: Self = Self(0);
-    pub const FILE2: Self = Self(1);
-    pub const FILE3: Self = Self(2);
-    pub const FILE4: Self = Self(3);
-    pub const FILE5: Self = Self(4);
-    pub const FILE6: Self = Self(5);
-    pub const FILE7: Self = Self(6);
-    pub const FILE8: Self = Self(7);
-    pub const TOTAL: usize = 8;
-}
-
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl MoveType {
-    /// All moves.
-    pub const ALL: u8 = 0;
-    /// Captures only.
-    pub const CAPTURES: u8 = 1;
-}
-
-/// Enumerates pieces for White and Black.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl Piece {
-    pub const WPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::WHITE);
-    pub const WKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::WHITE);
-    pub const WBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::WHITE);
-    pub const WROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::WHITE);
-    pub const WQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::WHITE);
-    pub const WKING: Self = Self::from_piecetype(PieceType::KING, Side::WHITE);
-    pub const BPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::BLACK);
-    pub const BKNIGHT: Self = Self::from_piecetype(PieceType::KNIGHT, Side::BLACK);
-    pub const BBISHOP: Self = Self::from_piecetype(PieceType::BISHOP, Side::BLACK);
-    pub const BROOK: Self = Self::from_piecetype(PieceType::ROOK, Side::BLACK);
-    pub const BQUEEN: Self = Self::from_piecetype(PieceType::QUEEN, Side::BLACK);
-    pub const BKING: Self = Self::from_piecetype(PieceType::KING, Side::BLACK);
-    pub const TOTAL: usize = 12;
-    pub const NONE: Self = Self(12);
-}
-
-/// Enumerates pieces.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl PieceType {
-    pub const PAWN: Self = Self(0);
-    pub const KNIGHT: Self = Self(1);
-    pub const BISHOP: Self = Self(2);
-    pub const ROOK: Self = Self(3);
-    pub const QUEEN: Self = Self(4);
-    pub const KING: Self = Self(5);
-    pub const TOTAL: usize = 6;
-    pub const NONE: Self = Self(6);
-}
-
-/// Enumerates ranks.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl Rank {
-    pub const RANK1: Self = Self(0);
-    pub const RANK2: Self = Self(1);
-    pub const RANK3: Self = Self(2);
-    pub const RANK4: Self = Self(3);
-    pub const RANK5: Self = Self(4);
-    pub const RANK6: Self = Self(5);
-    pub const RANK7: Self = Self(6);
-    pub const RANK8: Self = Self(7);
-    pub const TOTAL: usize = 8;
-}
-
-/// Enumerates sides.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl Side {
-    pub const BLACK: Self = Self(0);
-    pub const WHITE: Self = Self(1);
-    pub const TOTAL: usize = 2;
-    pub const NONE: Self = Self(2);
-}
-
-/// Enumerates squares.
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl Square {
-    pub const A1: Self = Self(0);
-    pub const B1: Self = Self(1);
-    pub const C1: Self = Self(2);
-    pub const D1: Self = Self(3);
-    pub const E1: Self = Self(4);
-    pub const F1: Self = Self(5);
-    pub const G1: Self = Self(6);
-    pub const H1: Self = Self(7);
-    pub const A2: Self = Self(8);
-    pub const B2: Self = Self(9);
-    pub const C2: Self = Self(10);
-    pub const D2: Self = Self(11);
-    pub const E2: Self = Self(12);
-    pub const F2: Self = Self(13);
-    pub const G2: Self = Self(14);
-    pub const H2: Self = Self(15);
-    pub const A3: Self = Self(16);
-    pub const B3: Self = Self(17);
-    pub const C3: Self = Self(18);
-    pub const D3: Self = Self(19);
-    pub const E3: Self = Self(20);
-    pub const F3: Self = Self(21);
-    pub const G3: Self = Self(22);
-    pub const H3: Self = Self(23);
-    pub const A4: Self = Self(24);
-    pub const B4: Self = Self(25);
-    pub const C4: Self = Self(26);
-    pub const D4: Self = Self(27);
-    pub const E4: Self = Self(28);
-    pub const F4: Self = Self(29);
-    pub const G4: Self = Self(30);
-    pub const H4: Self = Self(31);
-    pub const A5: Self = Self(32);
-    pub const B5: Self = Self(33);
-    pub const C5: Self = Self(34);
-    pub const D5: Self = Self(35);
-    pub const E5: Self = Self(36);
-    pub const F5: Self = Self(37);
-    pub const G5: Self = Self(38);
-    pub const H5: Self = Self(39);
-    pub const A6: Self = Self(40);
-    pub const B6: Self = Self(41);
-    pub const C6: Self = Self(42);
-    pub const D6: Self = Self(43);
-    pub const E6: Self = Self(44);
-    pub const F6: Self = Self(45);
-    pub const G6: Self = Self(46);
-    pub const H6: Self = Self(47);
-    pub const A7: Self = Self(48);
-    pub const B7: Self = Self(49);
-    pub const C7: Self = Self(50);
-    pub const D7: Self = Self(51);
-    pub const E7: Self = Self(52);
-    pub const F7: Self = Self(53);
-    pub const G7: Self = Self(54);
-    pub const H7: Self = Self(55);
-    pub const A8: Self = Self(56);
-    pub const B8: Self = Self(57);
-    pub const C8: Self = Self(58);
-    pub const D8: Self = Self(59);
-    pub const E8: Self = Self(60);
-    pub const F8: Self = Self(61);
-    pub const G8: Self = Self(62);
-    pub const H8: Self = Self(63);
-    pub const TOTAL: usize = 64;
-    pub const NONE: Self = Self(64);
 }
 
 impl Piece {

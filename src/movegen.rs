@@ -84,24 +84,6 @@ pub const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables.
 pub static LOOKUPS: Lookup = Lookup::new();
 
-impl Display for Move {
-    /// Displays a move in long algebraic notation.
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let start = self.start();
-        let end = self.end();
-        if self.is_promotion() {
-            // we want the lowercase letter here
-            write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
-        } else if *self == Self::null() {
-            // UCI specifies a null move should look like this. A null move
-            // should never be sent, but just in case.
-            write!(f, "0000")
-        } else {
-            write!(f, "{start}{end}")
-        }
-    }
-}
-
 impl Move {
     /// Flag for castling.
     const CASTLING: u8 = 0b0100_0000;
@@ -119,6 +101,24 @@ impl Move {
     /// Shift for the promotion piece. It does not need a mask because shifting
     /// already removes unwanted bits.
     const EXTRA_BITS_SHIFT: usize = 6;
+}
+
+impl Display for Move {
+    /// Displays a move in long algebraic notation.
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let start = self.start();
+        let end = self.end();
+        if self.is_promotion() {
+            // we want the lowercase letter here
+            write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
+        } else if *self == Self::null() {
+            // UCI specifies a null move should look like this. A null move
+            // should never be sent, but just in case.
+            write!(f, "0000")
+        } else {
+            write!(f, "{start}{end}")
+        }
+    }
 }
 
 impl Lookup {

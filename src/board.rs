@@ -82,6 +82,22 @@ pub struct Board {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CastlingRights(u8);
 
+#[allow(non_upper_case_globals)]
+impl CastlingRights {
+    /// The flag `K`.
+    const K: Self = Self(0b1000);
+    /// The flag `Q`.
+    const Q: Self = Self(0b0100);
+    /// The flag `k`.
+    const k: Self = Self(0b0010);
+    /// The flag `q`.
+    const q: Self = Self(0b0001);
+    /// The flags `KQkq`, i.e. all flags.
+    const KQkq: Self = Self(0b1111);
+    /// No flags.
+    const NONE: Self = Self(0b0000);
+}
+
 impl Default for Board {
     /// Returns a [`Board`] with the starting position.
     fn default() -> Self {
@@ -347,22 +363,6 @@ impl Shl<u8> for CastlingRights {
     fn shl(self, rhs: u8) -> Self::Output {
         Self(self.0 << rhs)
     }
-}
-
-#[allow(non_upper_case_globals)]
-impl CastlingRights {
-    /// The flag `K`.
-    const K: Self = Self(0b1000);
-    /// The flag `Q`.
-    const Q: Self = Self(0b0100);
-    /// The flag `k`.
-    const k: Self = Self(0b0010);
-    /// The flag `q`.
-    const q: Self = Self(0b0001);
-    /// The flags `KQkq`, i.e. all flags.
-    const KQkq: Self = Self(0b1111);
-    /// No flags.
-    const NONE: Self = Self(0b0000);
 }
 
 impl Board {
