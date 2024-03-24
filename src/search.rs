@@ -385,9 +385,8 @@ impl SearchInfo {
             }
             Limits::Timed { .. } => {
                 // if we do not have a realistic chance of finishing the next
-                // loop, assume we won't, and stop early. (Assuming a branching
-                // factor of >10.)
-                self.has_stopped = self.time_start.elapsed() > duration.mul_f32(0.1);
+                // loop, assume we won't, and stop early.
+                self.has_stopped = self.time_start.elapsed() > duration.mul_f32(0.4);
             }
             _ => (),
         }
