@@ -76,16 +76,8 @@ pub struct SearchInfo {
     nodes: u64,
     /// The principle variation: the optimal sequence of moves for both sides.
     pv: Pv,
-    // idk yet
-    //_multipv: [[Move]],
     /// The score of the position from the perspective of the side to move.
     score: Eval,
-    // Which move is currently being searched at root.
-    //_currmove: Move,
-    // Which move number is currently being searched at root.
-    //_currmovenumber: u8,
-    // How full the transposition table is (in permill).
-    //_hashfull: u16,
     /// How many positions have been reached on average per second.
     nps: u64,
     /// A channel to receive the 'stop' command from.
