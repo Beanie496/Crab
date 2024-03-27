@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::{Limits, SearchInfo};
+use super::{Limits, SearchParams};
 
 impl Limits {
     /// The maximum number of effective moves to go until the next time
@@ -11,7 +11,7 @@ impl Limits {
     const MAX_MOVES_TO_GO: u8 = 40;
 }
 
-impl SearchInfo {
+impl SearchParams {
     /// Calculates the maximum window of time that should be used for the next
     /// iterative deepening loop.
     ///
@@ -30,7 +30,7 @@ impl SearchInfo {
             let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
 
             (time / u32::from(moves_to_go) + inc)
-                .saturating_sub(self.time_start.elapsed() + self.move_overhead)
+                .saturating_sub(self.start.elapsed() + self.move_overhead)
         } else {
             Duration::MAX
         }

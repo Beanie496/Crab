@@ -124,6 +124,16 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         })
     }
 
+    /// Gets the item at the given index.
+    ///
+    /// Will panic in debug if the index is invalid.
+    pub fn get(&mut self, index: usize) -> T {
+        let item = index_unchecked!(self.stack, index);
+        // SAFETY: `index_unchecked` makes sure that the index is to within the
+        // stack (i.e. initialised memory)
+        unsafe { item.assume_init_read() }
+    }
+
     /// Clears the stack.
     pub fn clear(&mut self) {
         self.first_empty = 0;

@@ -4,3 +4,4 @@
   - sharing attacks halves the table size at the cost of one additional instruction
     - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
 - add repetition detection
+- call `check_status` after recursive AB search

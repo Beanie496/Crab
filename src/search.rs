@@ -1,14 +1,13 @@
 use std::{
     fmt::{self, Display, Formatter},
+    process::exit,
+    rc::Rc,
     sync::mpsc::Receiver,
     time::{Duration, Instant},
 };
 
 use crate::{
-    board::Board,
-    evaluation::{Eval, INF_EVAL},
-    index_into_unchecked, index_unchecked,
-    movegen::Move,
+    board::Board, evaluation::INF_EVAL, index_into_unchecked, index_unchecked, movegen::Move,
 };
 use alpha_beta::alpha_beta_search;
 
@@ -45,8 +44,18 @@ pub enum Limits {
     Infinite,
 }
 
+/// The current status of the search.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum SearchStatus {
+    /// Do nothing: continue the search as normal.
+    Continue,
+    /// Stop the search.
+    Stop,
+    /// Stop the search and then exit the process.
+    Quit,
+}
+
 /// The principle variation: the current best sequence of moves for both sides.
-// 512 bytes
 struct Pv {
     /// A non-circular queue of moves.
     ///
@@ -62,36 +71,41 @@ struct Pv {
 
 /// Information about a search.
 pub struct SearchInfo {
-    /// The moment our search started. Called as early as possible.
-    time_start: Instant,
-    /// The depth currently being searched.
+    /// The moment the search started.
+    start: Instant,
+    /// The depth being searched.
     depth: Depth,
     /// The maximum depth reached.
     seldepth: Depth,
-    /// How long the search has been going.
-    time: Duration,
-    /// The overhead of sending a move.
-    move_overhead: Duration,
     /// How many positions have been searched.
     nodes: u64,
-    /// The principle variation: the optimal sequence of moves for both sides.
-    pv: Pv,
-    /// The score of the position from the perspective of the side to move.
-    score: Eval,
-    /// How many positions have been reached on average per second.
-    nps: u64,
-    /// A channel to receive the 'stop' command from.
-    control_rx: Receiver<Stop>,
-    /// Whether or not the search has received the 'stop' command.
-    has_stopped: bool,
     /// The previous PV.
+    ///
+    /// This will be removed when I add TTs.
     history: Pv,
-    /// The limits of our search.
+    /// The status of the search: continue, stop or quit?
+    status: SearchStatus,
+    /// The limits of the search.
     limits: Limits,
+    /// How much time we're allocated.
+    allocated: Duration,
+    /// A receiver for the inputted UCI commands.
+    ///
+    /// It may seem odd to make this an [`Rc`] instead of a regular reference,
+    /// but I'll need to make it an [`Arc`](std::sync::Arc) when I add lazy SMP
+    /// and I'd like the transition to be as painless as possible.
+    uci_rx: Rc<Receiver<String>>,
 }
 
-/// Used to tell the search thread to stop.
-pub struct Stop;
+/// The parameters of a search.
+pub struct SearchParams {
+    /// The moment the search started. Called as early as possible.
+    start: Instant,
+    /// The limits of the search.
+    limits: Limits,
+    /// The overhead of sending a move.
+    move_overhead: Duration,
+}
 
 impl Default for Limits {
     fn default() -> Self {
@@ -116,22 +130,6 @@ impl Iterator for Pv {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
-    }
-}
-
-impl Display for SearchInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "info depth {} seldepth {} time {} nodes {} pv {} score cp {} nps {}",
-            self.depth,
-            self.seldepth,
-            self.time.as_millis(),
-            self.nodes,
-            self.history,
-            self.score,
-            self.nps,
-        )
     }
 }
 
@@ -301,41 +299,47 @@ impl Pv {
 }
 
 impl SearchInfo {
-    /// Creates a new [`SearchInfo`] with the initial information that searches
-    /// start with.
-    pub fn new(control_rx: Receiver<Stop>, limits: Limits, move_overhead: Duration) -> Self {
+    /// Creates a new [`SearchInfo`], which includes but is not limited to the
+    /// given parameters.
+    pub fn new(
+        start: Instant,
+        limits: Limits,
+        time_allocated: Duration,
+        uci_rx: Rc<Receiver<String>>,
+    ) -> Self {
         Self {
-            time_start: Instant::now(),
+            start,
             depth: 0,
             seldepth: 0,
-            time: Duration::ZERO,
-            move_overhead,
             nodes: 0,
-            pv: Pv::new(),
-            score: 0,
-            nps: 0,
-            control_rx,
-            has_stopped: false,
+            status: SearchStatus::Continue,
             history: Pv::new(),
             limits,
+            allocated: time_allocated,
+            uci_rx,
         }
     }
 
-    /// Checks if the search was stopped or if it finished on its own.
-    const fn has_stopped(&self) -> bool {
-        self.has_stopped
-    }
-
-    /// If the search needs to stop.
-    fn should_stop(&mut self) -> bool {
-        // only check every 2048 nodes
-        if self.nodes & 2047 != 0 {
-            return self.has_stopped;
+    /// Check the status of the search.
+    ///
+    /// This will check the UCI receiver to see if the GUI has told us to stop,
+    /// then check to see if we're exceeding the limits of the search.
+    fn check_status(&mut self) -> SearchStatus {
+        // only check every 2048 nodes, and don't bother wasting more time if
+        // we've already stopped
+        if self.nodes & 2047 != 0 || self.status != SearchStatus::Continue {
+            return self.status;
         }
 
-        if self.control_rx.try_recv().is_ok() {
-            self.has_stopped = true;
-            return true;
+        if let Ok(token) = self.uci_rx.try_recv() {
+            let token = token.trim();
+            if token == "stop" {
+                self.status = SearchStatus::Stop;
+            }
+            if token == "quit" {
+                self.status = SearchStatus::Quit;
+            }
+            return self.status;
         }
 
         // these are the only variants that can cause a search to exit early
@@ -343,91 +347,126 @@ impl SearchInfo {
         match self.limits {
             Limits::Nodes(n) => {
                 if self.nodes >= n {
-                    self.has_stopped = true;
+                    self.status = SearchStatus::Stop;
                 }
             }
             Limits::Movetime(m) => {
-                if self.time_start.elapsed() >= m {
-                    self.has_stopped = true;
+                if self.start.elapsed() >= m {
+                    self.status = SearchStatus::Stop;
                 }
             }
             Limits::Timed { time, .. } => {
-                // if we're about to pass our total time (not just our time
-                // window), stop the search
-                if self.time_start.elapsed() + self.move_overhead + Duration::from_micros(100)
-                    > time
-                {
-                    self.has_stopped = true;
+                // if we're about to pass our total amount of time (which
+                // includes the move overhead), stop the search
+                if self.start.elapsed() > time - Duration::from_millis(1) {
+                    self.status = SearchStatus::Stop;
                 }
             }
             _ => (),
         };
 
-        self.has_stopped
+        self.status
     }
 
     /// Calculates if the iterative deepening loop should be exited.
     ///
     /// Assumes that this is being called at the end of the loop.
-    pub fn should_exit_loop(&mut self, duration: Duration) -> bool {
-        if self.should_stop() || self.depth == Depth::MAX {
+    fn should_stop(&mut self) -> bool {
+        if self.check_status() != SearchStatus::Continue || self.depth == Depth::MAX {
             return true;
         }
 
-        // if any other cases would have resulted in `true`, `has_stopped`
-        // would have been true already
         #[allow(clippy::wildcard_enum_match_arm)]
         match self.limits {
             Limits::Depth(d) => {
                 if self.depth >= d {
-                    self.has_stopped = true;
+                    self.status = SearchStatus::Stop;
                 }
             }
             Limits::Timed { .. } => {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
-                self.has_stopped = self.time_start.elapsed() > duration.mul_f32(0.4);
+                if self.start.elapsed() > self.allocated.mul_f32(0.4) {
+                    self.status = SearchStatus::Stop;
+                }
             }
             _ => (),
         }
 
-        self.has_stopped
+        self.status != SearchStatus::Continue
+    }
+}
+
+impl SearchParams {
+    /// Creates a new [`SearchInfo`] with the initial information that searches
+    /// start with.
+    pub fn new(limits: Limits, move_overhead: Duration) -> Self {
+        Self {
+            start: Instant::now(),
+            limits,
+            move_overhead,
+        }
     }
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening(mut search_info: SearchInfo, board: Board) {
-    let alpha = -INF_EVAL;
-    let beta = INF_EVAL;
+pub fn iterative_deepening(
+    search_params: SearchParams,
+    board: &Board,
+    uci_rx: Rc<Receiver<String>>,
+) {
+    let time_allocated = search_params.calculate_time_window();
     let mut best_move = Move::null();
-    let time_allocated = search_info.calculate_time_window();
+    let mut pv = Pv::new();
+    let mut search_info = SearchInfo::new(
+        search_params.start,
+        search_params.limits,
+        time_allocated,
+        uci_rx,
+    );
+    let mut depth = 1;
 
     'iter_deep: loop {
-        search_info.depth += 1;
+        search_info.depth = depth;
         search_info.seldepth = 0;
-        let depth = search_info.depth;
+        search_info.status = SearchStatus::Continue;
 
-        let eval = alpha_beta_search(&mut search_info, &board, alpha, beta, depth);
+        let eval = alpha_beta_search(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
 
-        if search_info.has_stopped() {
+        if search_info.check_status() != SearchStatus::Continue {
             // technically `best_move` would be null if this is called before
             // even depth 1 finishes, but there isn't much we can do about that
             // currently
             break 'iter_deep;
         }
 
-        best_move = search_info.pv.get(0);
-        search_info.score = eval;
-        search_info.time = search_info.time_start.elapsed();
-        search_info.nps = 1_000_000 * search_info.nodes / search_info.time.as_micros() as u64;
-        search_info.history.set_pv(&mut search_info.pv);
-        search_info.pv.clear();
+        best_move = pv.get(0);
+        let time = search_info.start.elapsed();
+        let nps = 1_000_000 * search_info.nodes / time.as_micros() as u64;
 
-        println!("{search_info}");
+        println!(
+            "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
+            depth,
+            search_info.seldepth,
+            eval,
+            search_info.nodes,
+            time.as_millis(),
+            nps,
+            pv,
+        );
 
-        if search_info.should_exit_loop(time_allocated) {
+        if search_info.should_stop() {
             break 'iter_deep;
         }
+
+        search_info.history.set_pv(&mut pv);
+        pv.clear();
+        depth += 1;
     }
+
     println!("bestmove {best_move}");
+
+    if search_info.check_status() == SearchStatus::Quit {
+        exit(0);
+    }
 }

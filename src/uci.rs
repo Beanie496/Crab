@@ -1,9 +1,4 @@
-use std::{
-    io::{self, stdin},
-    ops::RangeInclusive,
-    process::exit,
-    time::Duration,
-};
+use std::{ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
 
 use crate::{defs::PieceType, engine::Engine, movegen::magic::find_magics};
 
@@ -76,16 +71,14 @@ impl Engine {
     /// Repeatedly waits for a command and executes it according to the UCI
     /// protocol.
     ///
-    /// Will run until `read_line()` returns an error (in which case it will
-    /// return [`io::Error`]) or the process exits. I would make the [`Ok`]
+    /// Will run until [`recv()`](std::sync::mpsc::Receiver::recv) on the UCI
+    /// receiver returns an error or the process exits. I would make the [`Ok`]
     /// type a never type, but that's experimental.
-    pub fn main_loop(&mut self) -> Result<(), io::Error> {
-        let mut input = String::new();
-
+    pub fn main_loop(&mut self) -> Result<(), RecvError> {
         loop {
-            stdin().read_line(&mut input)?;
-            self.handle_command(&input);
-            input.clear();
+            // the sender will never hang up
+            let command = self.uci_rx().recv()?;
+            self.handle_command(&command);
         }
     }
 
@@ -118,9 +111,6 @@ impl Engine {
             "setoption" => {
                 self.set_option(line);
             }
-            "stop" => {
-                self.stop_search();
-            }
             "uci" => {
                 UciOptions::print();
                 println!("uciok");
@@ -129,7 +119,6 @@ impl Engine {
                 self.reset();
             }
             "quit" => {
-                self.stop_search();
                 exit(0);
             }
             other => {

@@ -1,7 +1,9 @@
 use std::{
+    io::stdin,
+    rc::Rc,
     str::FromStr,
-    sync::mpsc::{channel, Sender},
-    thread::{spawn, JoinHandle},
+    sync::mpsc::{channel, Receiver},
+    thread::spawn,
     time::Duration,
 };
 
@@ -9,7 +11,7 @@ use crate::{
     board::Board,
     defs::Side,
     perft::perft,
-    search::{iterative_deepening, Limits, SearchInfo, Stop},
+    search::{iterative_deepening, Limits, SearchParams},
     uci::UciOptions,
 };
 
@@ -19,33 +21,35 @@ pub struct Engine {
     ///
     /// See [`Board`].
     board: Board,
-    /// A tramsmitter to the search thread to tell it to stop and a join handle
-    /// to the same thread.
-    search_thread_state: Option<(Sender<Stop>, JoinHandle<()>)>,
     /// The current set options.
     options: UciOptions,
-}
-
-impl Clone for Engine {
-    fn clone(&self) -> Self {
-        Self {
-            board: self.board,
-            search_thread_state: None,
-            options: self.options,
-        }
-    }
+    /// A receiver to receive UCI commands from.
+    uci_rx: Rc<Receiver<String>>,
 }
 
 impl Engine {
-    /// Creates a new [`Engine`].
+    /// Creates a new [`Engine`] and spawns a thread to receive UCI input from.
     ///
     /// Note that the board is completely empty, as UCI specifies that a
     /// `position` command should be given before `go`.
     pub fn new() -> Self {
+        let (tx, rx) = channel();
+
+        spawn(move || {
+            let stdin = stdin();
+
+            for command in stdin.lines() {
+                let command = command.expect("Error while reading from stdin");
+                tx.send(command).expect(
+                    "It's not possible for this thread to exit later than the main thread.",
+                );
+            }
+        });
+
         Self {
             board: Board::new(),
-            search_thread_state: None,
             options: UciOptions::new(),
+            uci_rx: Rc::new(rx),
         }
     }
 
@@ -62,33 +66,29 @@ impl Engine {
             let next = tokens.next();
 
             match token {
-                "wtime" => {
-                    if self.board().side_to_move() != Side::WHITE {
-                        continue;
-                    }
-                    let wtime = parse_into_nonzero_option(next).map(Duration::from_millis);
-                    limits.set_time(wtime);
+                "wtime" if self.board().side_to_move() == Side::WHITE => {
+                    let time = parse_into_nonzero_option(next)
+                        .map(Duration::from_millis)
+                        .map(|d| d.saturating_sub(self.options().move_overhead()));
+                    limits.set_time(time);
                 }
-                "btime" => {
-                    if self.board().side_to_move() != Side::BLACK {
-                        continue;
-                    }
-                    let btime = parse_into_nonzero_option(next).map(Duration::from_millis);
-                    limits.set_time(btime);
+                "btime" if self.board().side_to_move() == Side::BLACK => {
+                    let time = parse_into_nonzero_option(next)
+                        .map(Duration::from_millis)
+                        .map(|d| d.saturating_sub(self.options().move_overhead()));
+                    limits.set_time(time);
                 }
-                "winc" => {
-                    if self.board().side_to_move() != Side::WHITE {
-                        continue;
-                    }
-                    let winc = parse_into_nonzero_option(next).map(Duration::from_millis);
-                    limits.set_inc(winc);
+                "winc" if self.board().side_to_move() == Side::WHITE => {
+                    let time = parse_into_nonzero_option(next)
+                        .map(Duration::from_millis)
+                        .map(|d| d.saturating_sub(self.options().move_overhead()));
+                    limits.set_inc(time);
                 }
-                "binc" => {
-                    if self.board().side_to_move() != Side::BLACK {
-                        continue;
-                    }
-                    let binc = parse_into_nonzero_option(next).map(Duration::from_millis);
-                    limits.set_inc(binc);
+                "binc" if self.board().side_to_move() == Side::BLACK => {
+                    let time = parse_into_nonzero_option(next)
+                        .map(Duration::from_millis)
+                        .map(|d| d.saturating_sub(self.options().move_overhead()));
+                    limits.set_inc(time);
                 }
                 "movestogo" => limits.set_moves_to_go(parse_into_nonzero_option(next)),
                 "depth" => limits.set_depth(parse_into_nonzero_option(next)),
@@ -103,17 +103,9 @@ impl Engine {
             }
         }
 
-        let (control_tx, control_rx) = channel();
-        let search_info = SearchInfo::new(control_rx, limits, self.options().move_overhead());
-        let board = *self.board();
+        let search_params = SearchParams::new(limits, self.options().move_overhead());
 
-        self.stop_search();
-        *self.search_thread_state_mut() = Some((
-            control_tx,
-            spawn(move || {
-                iterative_deepening(search_info, board);
-            }),
-        ));
+        iterative_deepening(search_params, self.board(), self.uci_rx());
     }
 
     /// Given a `perft` command, run [`perft`] to the specified depth.
@@ -171,24 +163,9 @@ impl Engine {
         }
     }
 
-    /// Stops the search, if any.
-    pub fn stop_search(&mut self) {
-        // we don't particularly care if it's already stopped, we just want it
-        // to stop.
-        #[allow(unused_must_use)]
-        if let Some((tx, handle)) = self.search_thread_state_mut().take() {
-            tx.send(Stop);
-            #[allow(clippy::use_debug)]
-            handle
-                .join()
-                .map_err(|e| println!("info string Warning! Search thread panicked: {e:?}"));
-        }
-    }
-
     /// Sets the engine to its initial state. Should be called after the
     /// `ucinewgame` command.
     pub fn reset(&mut self) {
-        self.stop_search();
         self.board_mut().set_startpos();
     }
 
@@ -202,11 +179,6 @@ impl Engine {
         &mut self.board
     }
 
-    /// Returns a mutable reference to the search thread state.
-    pub fn search_thread_state_mut(&mut self) -> &mut Option<(Sender<Stop>, JoinHandle<()>)> {
-        &mut self.search_thread_state
-    }
-
     /// Returns a reference to the UCI options.
     pub const fn options(&self) -> &UciOptions {
         &self.options
@@ -215,6 +187,11 @@ impl Engine {
     /// Returns a mutable reference to the UCI options.
     pub fn options_mut(&mut self) -> &mut UciOptions {
         &mut self.options
+    }
+
+    /// Returns a reference-counted receiver to the inputted UCI commands.
+    pub fn uci_rx(&self) -> Rc<Receiver<String>> {
+        Rc::clone(&self.uci_rx)
     }
 }
 

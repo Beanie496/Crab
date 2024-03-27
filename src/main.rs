@@ -14,7 +14,7 @@
 //! - `ucinewgame`
 //! - `quit`
 
-use std::io;
+use std::sync::mpsc::RecvError;
 
 use engine::Engine;
 
@@ -43,7 +43,7 @@ mod uci;
 /// Utility.
 mod util;
 
-fn main() -> Result<(), io::Error> {
+fn main() -> Result<(), RecvError> {
     Engine::new().main_loop()?;
     Ok(())
 }

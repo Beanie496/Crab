@@ -1,4 +1,4 @@
-use super::SearchInfo;
+use super::{Depth, SearchInfo};
 use crate::{
     evaluation::Eval,
     movegen::{Move, Moves, MAX_LEGAL_MOVES},
@@ -33,7 +33,7 @@ impl Iterator for OrderedMoves {
 impl Moves {
     /// Scores the moves in `moves`, given the information in `search_info` and
     /// the current height.
-    pub fn score(self, search_info: &SearchInfo, height: u8) -> ScoredMoves {
+    pub fn score(self, search_info: &SearchInfo, height: Depth) -> ScoredMoves {
         self.map(|mv| ScoredMove::new(mv, search_info, height))
             .collect()
     }
@@ -57,7 +57,7 @@ impl OrderedMoves {
 impl ScoredMove {
     /// Scores a [`Move`] based off the information in `search_info` and
     /// `height`.
-    pub fn new(mv: Move, search_info: &SearchInfo, height: u8) -> Self {
+    pub fn new(mv: Move, search_info: &SearchInfo, height: Depth) -> Self {
         // always search the PV first
         // technically this will be reading from 1 past the end of the PV if
         // we're at a leaf node, but since it will just be a null move, it can

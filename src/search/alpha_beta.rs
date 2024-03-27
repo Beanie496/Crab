@@ -1,4 +1,4 @@
-use super::{Depth, Pv, SearchInfo};
+use super::{Depth, Pv, SearchInfo, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -10,6 +10,7 @@ use crate::{
 /// the given depth.
 pub fn alpha_beta_search(
     search_info: &mut SearchInfo,
+    pv: &mut Pv,
     board: &Board,
     mut alpha: Eval,
     mut beta: Eval,
@@ -21,7 +22,7 @@ pub fn alpha_beta_search(
 
     // Stop if needed. The return value isn't important because it will be
     // discarded anyway.
-    if search_info.should_stop() {
+    if search_info.check_status() != SearchStatus::Continue {
         return 0;
     }
 
@@ -57,7 +58,7 @@ pub fn alpha_beta_search(
         return beta;
     }
 
-    let mut pv = Pv::new();
+    let mut new_pv = Pv::new();
     let moves = generate_moves::<{ MoveType::ALL }>(board)
         .score(search_info, height)
         .sort();
@@ -69,7 +70,7 @@ pub fn alpha_beta_search(
             continue;
         }
 
-        let result = -alpha_beta_search(search_info, &copy, -beta, -alpha, depth - 1);
+        let result = -alpha_beta_search(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
         search_info.nodes += 1;
 
         // This position is too good - our opponent is guaranteed a worse
@@ -84,22 +85,20 @@ pub fn alpha_beta_search(
             alpha = result;
             pv.clear();
             pv.enqueue(mv);
-            pv.append_pv(&mut search_info.pv);
-            search_info.pv.clear();
+            pv.append_pv(&mut new_pv);
         }
 
+        new_pv.clear();
         total_moves += 1;
     }
 
     if total_moves == 0 {
         return if board.is_in_check() {
-            mated_in(search_info.depth - depth)
+            mated_in(height)
         } else {
             DRAW
         };
     }
-
-    search_info.pv.set_pv(&mut pv);
 
     alpha
 }
@@ -116,7 +115,7 @@ fn quiescent_search(
 ) -> Eval {
     // Stop if needed. The return value isn't important because it will be
     // discarded anyway.
-    if search_info.should_stop() {
+    if search_info.check_status() != SearchStatus::Continue {
         return 0;
     }
 
