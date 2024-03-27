@@ -7,11 +7,11 @@ use std::{
 
 use crate::{
     bitboard::Bitboard,
-    defs::{File, MoveType, Piece, PieceType, Rank, Side, Square},
+    defs::{File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
     evaluation::Score,
     index_into_unchecked, index_unchecked,
-    movegen::{generate_moves, Move, LOOKUPS},
+    movegen::{Move, LOOKUPS},
     util::is_double_pawn_push,
 };
 
@@ -27,8 +27,6 @@ pub type Key = u64;
 pub enum BoardParseError {
     /// A generic parsing error occured.
     ParseError(ParseError),
-    /// A move was invalid.
-    InvalidMove,
     /// An integer couldn't be parsed.
     ParseIntError(ParseIntError),
 }
@@ -180,104 +178,62 @@ impl FromStr for Board {
         let mut board = Self::new();
         let mut tokens = string.split_whitespace();
 
-        if "position" != tokens.next().ok_or(ParseError::ExpectedToken)? {
-            return Err(BoardParseError::from(ParseError::InvalidToken));
-        }
+        let board_str = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let side_to_move = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let castling_rights = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let ep_square = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let halfmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let fullmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
 
-        match tokens.next() {
-            Some("startpos") => board.set_startpos(),
-            Some("fen") => {
-                let board_str = tokens.next().ok_or(ParseError::ExpectedToken)?;
-                let side_to_move = tokens.next().ok_or(ParseError::ExpectedToken)?;
-                let castling_rights = tokens.next().ok_or(ParseError::ExpectedToken)?;
-                let ep_square = tokens.next().ok_or(ParseError::ExpectedToken)?;
-                let halfmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
-                let fullmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
-
-                // 1. the board itself
-                let mut square = 56;
-                let ranks = board_str.split('/');
-                for rank in ranks {
-                    for piece in rank.chars() {
-                        // if it's a number, skip over that many files
-                        if ('0'..='8').contains(&piece) {
-                            let empty_squares = piece as u8 - b'0';
-                            square += empty_squares;
-                        } else {
-                            board.add_piece(Square(square), Piece::try_from(piece)?);
-                            square += 1;
-                        }
-                    }
-                    square = square.wrapping_sub(16);
-                }
-
-                // 2. side to move
-                if side_to_move == "w" {
-                    board.set_side_to_move(Side::WHITE);
+        // 1. the board itself
+        let mut square = 56;
+        let ranks = board_str.split('/');
+        for rank in ranks {
+            for piece in rank.chars() {
+                // if it's a number, skip over that many files
+                if ('0'..='8').contains(&piece) {
+                    let empty_squares = piece as u8 - b'0';
+                    square += empty_squares;
                 } else {
-                    board.set_side_to_move(Side::BLACK);
-                    board.toggle_zobrist_side();
+                    board.add_piece(Square(square), Piece::try_from(piece)?);
+                    square += 1;
                 }
-
-                // 3. castling rights
-                for right in castling_rights.chars() {
-                    match right {
-                        'K' => board.castling_rights_mut().add_right(CastlingRights::K),
-                        'Q' => board.castling_rights_mut().add_right(CastlingRights::Q),
-                        'k' => board.castling_rights_mut().add_right(CastlingRights::k),
-                        'q' => board.castling_rights_mut().add_right(CastlingRights::q),
-                        _ => (),
-                    }
-                }
-                board.toggle_zobrist_castling_rights(board.castling_rights());
-
-                // 4. en passant
-                let ep_square = ep_square.parse::<Square>()?;
-                board.set_ep_square(ep_square);
-                board.toggle_zobrist_ep_square(ep_square);
-
-                // 5. halfmoves
-                let halfmoves = halfmoves.parse::<u8>()?;
-                board.set_halfmoves(halfmoves);
-
-                // 6. fullmoves
-                let fullmoves = fullmoves.parse::<u16>()?;
-                board.set_fullmoves(fullmoves);
             }
-            _ => return Err(BoardParseError::from(ParseError::ExpectedToken)),
-        };
+            square = square.wrapping_sub(16);
+        }
 
-        // check if we have any moves to parse
-        if let Some(token) = tokens.next() {
-            if token != "moves" {
-                return Err(BoardParseError::from(ParseError::InvalidToken));
-            }
+        // 2. side to move
+        if side_to_move == "w" {
+            board.set_side_to_move(Side::WHITE);
         } else {
-            return Ok(board);
+            board.set_side_to_move(Side::BLACK);
+            board.toggle_zobrist_side();
         }
 
-        #[allow(clippy::string_slice)]
-        for mv in tokens {
-            let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
-
-            let start = Square::from_str(&mv[0..=1])?;
-            let end = Square::from_str(&mv[2..=3])?;
-
-            // Each move should be exactly 4 characters; if it's a promotion,
-            // the last char will be the promotion char.
-            let mv = if mv.len() == 5 {
-                // SAFETY: It's not possible for it to be `None`.
-                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
-                moves.move_with_promo(start, end, PieceType::try_from(promotion_char)?)
-            } else {
-                moves.move_with(start, end)
-            }
-            .ok_or(BoardParseError::InvalidMove)?;
-
-            if !board.make_move(mv) {
-                return Err(BoardParseError::InvalidMove);
+        // 3. castling rights
+        for right in castling_rights.chars() {
+            match right {
+                'K' => board.castling_rights_mut().add_right(CastlingRights::K),
+                'Q' => board.castling_rights_mut().add_right(CastlingRights::Q),
+                'k' => board.castling_rights_mut().add_right(CastlingRights::k),
+                'q' => board.castling_rights_mut().add_right(CastlingRights::q),
+                _ => (),
             }
         }
+        board.toggle_zobrist_castling_rights(board.castling_rights());
+
+        // 4. en passant
+        let ep_square = ep_square.parse::<Square>()?;
+        board.set_ep_square(ep_square);
+        board.toggle_zobrist_ep_square(ep_square);
+
+        // 5. halfmoves
+        let halfmoves = halfmoves.parse::<u8>()?;
+        board.set_halfmoves(halfmoves);
+
+        // 6. fullmoves
+        let fullmoves = fullmoves.parse::<u16>()?;
+        board.set_fullmoves(fullmoves);
 
         Ok(board)
     }

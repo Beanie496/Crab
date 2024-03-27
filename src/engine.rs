@@ -9,7 +9,8 @@ use std::{
 
 use crate::{
     board::Board,
-    defs::Side,
+    defs::{MoveType, PieceType, Side, Square},
+    movegen::generate_moves,
     perft::perft,
     search::{iterative_deepening, Limits, SearchParams},
     uci::UciOptions,
@@ -127,9 +128,83 @@ impl Engine {
     /// Will not change anything if the command fails to get parsed
     /// successfully.
     pub fn set_position(&mut self, line: &str) {
-        if let Ok(b) = line.parse() {
-            *self.board_mut() = b;
+        let mut board = Board::new();
+        let mut tokens = line.split_whitespace();
+
+        if Some("position") != tokens.next() {
+            return;
         }
+
+        match tokens.next() {
+            Some("startpos") => board.set_startpos(),
+            Some("fen") => {
+                // Creating a new `String` is annoying, but probably not too
+                // expensive, considering this only happens a few tens of times
+                // per game.
+                let mut fen_str = String::with_capacity(128);
+
+                // The FEN string should have exactly 6 tokens - more or fewer
+                // should raise an error later or now respectively.
+                for _ in 0..6 {
+                    let Some(token) = tokens.next() else {
+                        return;
+                    };
+                    fen_str.push_str(token);
+                    fen_str.push(' ');
+                }
+
+                if let Ok(b) = fen_str.parse() {
+                    board = b;
+                } else {
+                    return;
+                }
+            }
+            _ => return,
+        };
+
+        // check if we have any moves to parse
+        if let Some(token) = tokens.next() {
+            if token != "moves" {
+                return;
+            }
+        } else {
+            // if there are no moves, that's ok
+            *self.board_mut() = board;
+            return;
+        }
+
+        #[allow(clippy::string_slice)]
+        for mv in tokens {
+            let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
+
+            let Ok(start) = Square::from_str(&mv[0..=1]) else {
+                return;
+            };
+            let Ok(end) = Square::from_str(&mv[2..=3]) else {
+                return;
+            };
+
+            // Each move should be exactly 4 characters; if it's a promotion,
+            // the last char will be the promotion char.
+            let Some(mv) = (if mv.len() == 5 {
+                // SAFETY: `mv` has 5 chars so `next_back()` must return `Some`
+                let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
+                let Ok(piece_type) = PieceType::try_from(promotion_char) else {
+                    return;
+                };
+                moves.move_with_promo(start, end, piece_type)
+            } else {
+                moves.move_with(start, end)
+            }) else {
+                return;
+            };
+
+            if !board.make_move(mv) {
+                return;
+            }
+        }
+
+        *self.board_mut() = board;
     }
 
     /// Sets a UCI option from a `setoption` command.

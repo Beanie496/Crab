@@ -44,7 +44,7 @@ fn test_positions() {
     // add all test positions to the queue
     for position in TEST_POSITIONS.lines() {
         let mut tokens = position.split_whitespace();
-        let mut fen = String::new();
+        let mut fen_str = String::new();
 
         // have to do this before `take()` because `take()` takes ownership of
         // `tokens`
@@ -53,17 +53,15 @@ fn test_positions() {
             .and_then(|result| result.parse::<u64>().ok())
             .unwrap();
 
-        fen.push_str("position fen ");
         for token in tokens.take(6) {
-            fen.push_str(&token);
-            fen.push(' ');
+            fen_str.push_str(token);
+            fen_str.push(' ');
         }
-        fen.pop();
 
         // each position is just to depth 4
         let depth = 4;
 
-        let test_pos = TestPosition::new(fen, depth, result);
+        let test_pos = TestPosition::new(fen_str, depth, result);
         tx.send(test_pos).unwrap();
     }
 
