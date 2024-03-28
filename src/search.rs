@@ -431,10 +431,15 @@ impl SearchInfo {
         self.status != SearchStatus::Continue
     }
 
-    /// Checks if the current position is the same as a previous position.
-    fn has_cycle(&self, halfmoves: u8) -> bool {
+    /// Checks if the position is drawn, either because of repetition or
+    /// because of the fifty-move rule.
+    fn is_draw(&self, halfmoves: u8) -> bool {
         if halfmoves < 4 {
             return false;
+        }
+
+        if halfmoves >= 100 {
+            return true;
         }
 
         let current_key = self.past_zobrists.peek();

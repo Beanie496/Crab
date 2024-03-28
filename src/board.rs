@@ -508,10 +508,6 @@ impl Board {
 
         if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
             self.halfmoves = 0;
-        // 75-move rule: if 75 moves have been made by both players, the game
-        // is adjucated as a draw. So the 151st move is illegal.
-        } else if self.halfmoves > 150 {
-            return false;
         }
 
         self.toggle_zobrist_ep_square(self.ep_square());

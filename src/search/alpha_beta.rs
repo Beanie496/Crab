@@ -30,16 +30,8 @@ pub fn alpha_beta_search<NodeType: Node>(
     let height = search_info.depth - depth;
 
     if !NodeType::IS_ROOT {
-        if search_info.has_cycle(board.halfmoves()) {
+        if search_info.is_draw(board.halfmoves()) {
             return DRAW;
-        }
-
-        // Fifty-move rule
-        if board.halfmoves() >= 100 {
-            alpha = alpha.max(DRAW);
-            if alpha >= beta {
-                return beta;
-            }
         }
 
         // Mate distance pruning
