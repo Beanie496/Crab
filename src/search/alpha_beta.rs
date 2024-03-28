@@ -1,4 +1,4 @@
-use super::{Depth, Pv, SearchInfo, SearchStatus};
+use super::{Depth, Node, OtherNode, Pv, SearchInfo, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -8,7 +8,7 @@ use crate::{
 
 /// Performs a search on `board`. Returns the evaluation of after searching to
 /// the given depth.
-pub fn alpha_beta_search(
+pub fn alpha_beta_search<NodeType: Node>(
     search_info: &mut SearchInfo,
     pv: &mut Pv,
     board: &Board,
@@ -26,36 +26,42 @@ pub fn alpha_beta_search(
         return 0;
     }
 
-    // Fifty-move rule
-    if board.halfmoves() >= 100 {
-        alpha = alpha.max(0);
-        if alpha >= beta {
-            return beta;
-        }
-    }
-
     // how many moves in the future we are
     let height = search_info.depth - depth;
 
-    // Mate distance pruning
-    // 4 options:
-    // - Neither side is getting mated. Alpha and beta will remain unchanged,
-    //   alpha will remain smaller than beta and this function will continue.
-    // - We have a mate in x, so alpha will be `MATE - x`.
-    //   * If we're already searching >= x positions in the future, it's not
-    //     possible to find a shorter mate. Alpha will not change but beta will
-    //     drop below alpha, meaning we can just return the lower bound of
-    //     beta.
-    //   * If we haven't got that far yet, beta will still remain above alpha
-    //     and we can keep searching.
-    // - They have a mate in x, so beta will be `-MATE + x`. This is pretty
-    //   much the same as above but with reversed and negated alpha and beta.
-    // - We both have a mate in x.
-    //   * Can't happen. Either one side is getting mated or the other.
-    beta = beta.min(mate_in(height));
-    alpha = alpha.max(mated_in(height));
-    if alpha >= beta {
-        return beta;
+    if !NodeType::IS_ROOT {
+        if search_info.has_cycle(board.halfmoves()) {
+            return DRAW;
+        }
+
+        // Fifty-move rule
+        if board.halfmoves() >= 100 {
+            alpha = alpha.max(DRAW);
+            if alpha >= beta {
+                return beta;
+            }
+        }
+
+        // Mate distance pruning
+        // 4 options:
+        // - Neither side is getting mated. Alpha and beta will remain unchanged,
+        //   alpha will remain smaller than beta and this function will continue.
+        // - We have a mate in x, so alpha will be `MATE - x`.
+        //   * If we're already searching >= x positions in the future, it's not
+        //     possible to find a shorter mate. Alpha will not change but beta will
+        //     drop below alpha, meaning we can just return the lower bound of
+        //     beta.
+        //   * If we haven't got that far yet, beta will still remain above alpha
+        //     and we can keep searching.
+        // - They have a mate in x, so beta will be `-MATE + x`. This is pretty
+        //   much the same as above but with reversed and negated alpha and beta.
+        // - We both have a mate in x.
+        //   * Can't happen. Either one side is getting mated or the other.
+        beta = beta.min(mate_in(height));
+        alpha = alpha.max(mated_in(height));
+        if alpha >= beta {
+            return beta;
+        }
     }
 
     let mut new_pv = Pv::new();
@@ -70,7 +76,16 @@ pub fn alpha_beta_search(
             continue;
         }
 
-        let result = -alpha_beta_search(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+        search_info.past_zobrists.push(copy.zobrist());
+        let result = -alpha_beta_search::<OtherNode>(
+            search_info,
+            &mut new_pv,
+            &copy,
+            -beta,
+            -alpha,
+            depth - 1,
+        );
+        search_info.past_zobrists.pop();
         search_info.nodes += 1;
 
         // This position is too good - our opponent is guaranteed a worse
@@ -92,7 +107,7 @@ pub fn alpha_beta_search(
         total_moves += 1;
     }
 
-    if total_moves == 0 {
+    if !NodeType::IS_ROOT && total_moves == 0 {
         return if board.is_in_check() {
             mated_in(height)
         } else {

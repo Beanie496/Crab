@@ -8,13 +8,17 @@ use std::{
 };
 
 use crate::{
-    board::Board,
+    board::{Board, Key},
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{iterative_deepening, Limits, SearchParams},
+    search::{iterative_deepening, Depth, Limits, SearchParams},
     uci::UciOptions,
+    util::Stack,
 };
+
+/// A stack of zobrist keys.
+pub type ZobristStack = Stack<Key, { Depth::MAX as usize }>;
 
 /// Master object that contains all the other major objects.
 pub struct Engine {
@@ -26,6 +30,12 @@ pub struct Engine {
     options: UciOptions,
     /// A receiver to receive UCI commands from.
     uci_rx: Rc<Receiver<String>>,
+    /// A stack of zobrist hashes of previous board states, beginning from the
+    /// initial `position fen ...` command.
+    ///
+    /// The first (bottom) element is the initial board and the top element is
+    /// the current board.
+    past_zobrists: ZobristStack,
 }
 
 impl Engine {
@@ -51,6 +61,7 @@ impl Engine {
             board: Board::new(),
             options: UciOptions::new(),
             uci_rx: Rc::new(rx),
+            past_zobrists: Stack::new(),
         }
     }
 
@@ -106,7 +117,12 @@ impl Engine {
 
         let search_params = SearchParams::new(limits, self.options().move_overhead());
 
-        iterative_deepening(search_params, self.board(), self.uci_rx());
+        iterative_deepening(
+            search_params,
+            self.board(),
+            self.uci_rx(),
+            self.past_zobrists().clone(),
+        );
     }
 
     /// Given a `perft` command, run [`perft`] to the specified depth.
@@ -129,6 +145,7 @@ impl Engine {
     /// successfully.
     pub fn set_position(&mut self, line: &str) {
         let mut board = Board::new();
+        let mut zobrists = Stack::new();
         let mut tokens = line.split_whitespace();
 
         if Some("position") != tokens.next() {
@@ -167,12 +184,10 @@ impl Engine {
             if token != "moves" {
                 return;
             }
-        } else {
-            // if there are no moves, that's ok
-            *self.board_mut() = board;
-            return;
         }
+        zobrists.push(board.zobrist());
 
+        // if there are no moves to begin with, this loop will just be skipped
         #[allow(clippy::string_slice)]
         for mv in tokens {
             let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
@@ -202,9 +217,17 @@ impl Engine {
             if !board.make_move(mv) {
                 return;
             }
+
+            // we can safely discard all moves before an irreversible move
+            if board.halfmoves() == 0 {
+                zobrists.clear();
+            }
+
+            zobrists.push(board.zobrist());
         }
 
         *self.board_mut() = board;
+        *self.past_zobrists_mut() = zobrists;
     }
 
     /// Sets a UCI option from a `setoption` command.
@@ -240,10 +263,13 @@ impl Engine {
         }
     }
 
-    /// Sets the engine to its initial state. Should be called after the
-    /// `ucinewgame` command.
-    pub fn reset(&mut self) {
+    /// Sets the state of the engine to the starting position. Should be called
+    /// after the `ucinewgame` command.
+    pub fn initialise(&mut self) {
         self.board_mut().set_startpos();
+        self.past_zobrists_mut().clear();
+        let board_zobrist = self.board().zobrist();
+        self.past_zobrists_mut().push(board_zobrist);
     }
 
     /// Returns a reference to the board.
@@ -269,6 +295,18 @@ impl Engine {
     /// Returns a reference-counted receiver to the inputted UCI commands.
     pub fn uci_rx(&self) -> Rc<Receiver<String>> {
         Rc::clone(&self.uci_rx)
+    }
+
+    /// Returns a reference to the current stack of zobrist hashes of board
+    /// states.
+    pub const fn past_zobrists(&self) -> &ZobristStack {
+        &self.past_zobrists
+    }
+
+    /// Returns a mutable reference to the current stack of zobrist hashes of
+    /// board states.
+    pub fn past_zobrists_mut(&mut self) -> &mut ZobristStack {
+        &mut self.past_zobrists
     }
 }
 

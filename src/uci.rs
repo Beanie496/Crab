@@ -116,7 +116,7 @@ impl Engine {
                 println!("uciok");
             }
             "ucinewgame" => {
-                self.reset();
+                self.initialise();
             }
             "quit" => {
                 exit(0);

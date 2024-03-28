@@ -7,7 +7,12 @@ use std::{
 };
 
 use crate::{
-    board::Board, evaluation::INF_EVAL, index_into_unchecked, index_unchecked, movegen::Move,
+    board::{Board, Key},
+    engine::ZobristStack,
+    evaluation::INF_EVAL,
+    index_into_unchecked, index_unchecked,
+    movegen::Move,
+    util::Stack,
 };
 use alpha_beta::alpha_beta_search;
 
@@ -20,6 +25,29 @@ mod time;
 
 /// The storage type for a given depth.
 pub type Depth = u8;
+
+/// A marker for a type of node to allow searches with generic node types.
+// Idea is taken from viridithas.
+#[allow(clippy::missing_docs_in_private_items)]
+trait Node {
+    const IS_PV: bool;
+    const IS_ROOT: bool;
+}
+
+/// A node that is not root.
+struct OtherNode;
+/// The node from which the search starts: there is only 1 per search.
+struct RootNode;
+
+impl Node for OtherNode {
+    const IS_ROOT: bool = false;
+    const IS_PV: bool = false;
+}
+
+impl Node for RootNode {
+    const IS_ROOT: bool = true;
+    const IS_PV: bool = true;
+}
 
 /// The type of a search and its limits.
 pub enum Limits {
@@ -95,6 +123,12 @@ pub struct SearchInfo {
     /// but I'll need to make it an [`Arc`](std::sync::Arc) when I add lazy SMP
     /// and I'd like the transition to be as painless as possible.
     uci_rx: Rc<Receiver<String>>,
+    /// A stack of zobrist hashes of previous board states, beginning from the
+    /// initial `position fen ...` command.
+    ///
+    /// The first (bottom) element is the initial board and the top element is
+    /// the current board.
+    past_zobrists: ZobristStack,
 }
 
 /// The parameters of a search.
@@ -302,21 +336,22 @@ impl SearchInfo {
     /// Creates a new [`SearchInfo`], which includes but is not limited to the
     /// given parameters.
     pub fn new(
-        start: Instant,
-        limits: Limits,
+        search_params: SearchParams,
         time_allocated: Duration,
         uci_rx: Rc<Receiver<String>>,
+        past_zobrists: Stack<Key, { Depth::MAX as usize }>,
     ) -> Self {
         Self {
-            start,
+            start: search_params.start,
             depth: 0,
             seldepth: 0,
             nodes: 0,
             status: SearchStatus::Continue,
             history: Pv::new(),
-            limits,
+            limits: search_params.limits,
             allocated: time_allocated,
             uci_rx,
+            past_zobrists,
         }
     }
 
@@ -395,6 +430,28 @@ impl SearchInfo {
 
         self.status != SearchStatus::Continue
     }
+
+    /// Checks if the current position is the same as a previous position.
+    fn has_cycle(&self, halfmoves: u8) -> bool {
+        if halfmoves < 4 {
+            return false;
+        }
+
+        let current_key = self.past_zobrists.peek();
+
+        // `rev()` because searching the most recent positions first will
+        // probably find a cycle more quickly. Probably.
+        for depth in ((self.past_zobrists.len() - halfmoves as usize - 1)
+            ..(self.past_zobrists.len() - 4))
+            .rev()
+            .step_by(2)
+        {
+            if self.past_zobrists.get(depth) == current_key {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl SearchParams {
@@ -414,16 +471,12 @@ pub fn iterative_deepening(
     search_params: SearchParams,
     board: &Board,
     uci_rx: Rc<Receiver<String>>,
+    past_zobrists: Stack<Key, { Depth::MAX as usize }>,
 ) {
     let time_allocated = search_params.calculate_time_window();
     let mut best_move = Move::null();
     let mut pv = Pv::new();
-    let mut search_info = SearchInfo::new(
-        search_params.start,
-        search_params.limits,
-        time_allocated,
-        uci_rx,
-    );
+    let mut search_info = SearchInfo::new(search_params, time_allocated, uci_rx, past_zobrists);
     let mut depth = 1;
 
     'iter_deep: loop {
@@ -431,7 +484,14 @@ pub fn iterative_deepening(
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
 
-        let eval = alpha_beta_search(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
+        let eval = alpha_beta_search::<RootNode>(
+            &mut search_info,
+            &mut pv,
+            board,
+            -INF_EVAL,
+            INF_EVAL,
+            depth,
+        );
 
         if search_info.check_status() != SearchStatus::Continue {
             // technically `best_move` would be null if this is called before

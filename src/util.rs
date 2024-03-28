@@ -70,6 +70,7 @@ macro_rules! out_of_bounds_is_unreachable {
 /// The point of this is to custom-make my own methods. Since this is a binary
 /// crate, I can do questionable things like `unreachable_unchecked` for some
 /// bounds checking without worrying about screwing over users.
+#[derive(Clone)]
 pub struct Stack<T: Copy, const SIZE: usize> {
     /// The internal array.
     stack: [MaybeUninit<T>; SIZE],
@@ -124,10 +125,20 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         })
     }
 
+    /// Returns the top item of the stack.
+    ///
+    /// Assumes that there is at least one item in the stack.
+    pub fn peek(&self) -> T {
+        let item = index_unchecked!(self.stack, self.first_empty - 1);
+        // SAFETY: `index_unchecked` makes sure that the index is to within the
+        // stack (i.e. initialised memory)
+        unsafe { item.assume_init_read() }
+    }
+
     /// Gets the item at the given index.
     ///
     /// Will panic in debug if the index is invalid.
-    pub fn get(&mut self, index: usize) -> T {
+    pub fn get(&self, index: usize) -> T {
         let item = index_unchecked!(self.stack, index);
         // SAFETY: `index_unchecked` makes sure that the index is to within the
         // stack (i.e. initialised memory)
@@ -139,13 +150,18 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         self.first_empty = 0;
     }
 
-    /// Sorts the elements in the stack with the comparator function, `cmp`.
+    /// Returns the height of the stack.
+    pub const fn len(&self) -> usize {
+        self.first_empty
+    }
+
+    /// Sorts the items in the stack with the comparator function, `cmp`.
     pub fn sort_by<F>(&mut self, mut cmp: F)
     where
         F: FnMut(&T, &T) -> Ordering,
     {
         self.stack[0..self.first_empty].sort_by(|a, b| {
-            // SAFETY: only the initialised elements are sorted
+            // SAFETY: only the initialised items are sorted
             cmp(&unsafe { a.assume_init_read() }, &unsafe {
                 b.assume_init_read()
             })
