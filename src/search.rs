@@ -393,7 +393,7 @@ impl SearchInfo {
             Limits::Timed { time, .. } => {
                 // if we're about to pass our total amount of time (which
                 // includes the move overhead), stop the search
-                if self.start.elapsed() > time - Duration::from_millis(1) {
+                if self.start.elapsed() + Duration::from_millis(1) > time {
                     self.status = SearchStatus::Stop;
                 }
             }
