@@ -218,7 +218,9 @@ impl Engine {
             return;
         }
 
-        let Some(token) = tokens.next() else { return };
+        let Some(token) = tokens.next() else {
+            return;
+        };
         // more options added later, so be quiet, clippy
         #[allow(clippy::single_match)]
         match token {

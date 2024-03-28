@@ -167,7 +167,7 @@ impl Bitboard {
     ///
     /// # Examples
     ///
-    /// `bb_edges_without(Square::H4)` ->
+    /// `edges_without(Square::H4)` ->
     /// ```text
     /// 1 1 1 1 1 1 1 1
     /// 1 0 0 0 0 0 0 0
@@ -181,7 +181,7 @@ impl Bitboard {
     ///
     /// ```
     ///
-    /// `bb_edges_without(Square::A1)` ->
+    /// `edges_without(Square::A1)` ->
     /// ```text
     /// 1 1 1 1 1 1 1 1
     /// 0 0 0 0 0 0 0 1
