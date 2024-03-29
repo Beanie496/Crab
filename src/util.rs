@@ -65,6 +65,20 @@ macro_rules! out_of_bounds_is_unreachable {
     }};
 }
 
+/// An iterator over the elements of a [`Stack`].
+pub struct Iter<'a, T: Copy, const SIZE: usize> {
+    /// The stack being iterated over.
+    stack: &'a Stack<T, SIZE>,
+    /// The index of the first item.
+    ///
+    /// Equal to `first_empty` if there are no items.
+    first_item: usize,
+    /// The first index out of the stack.
+    ///
+    /// Equal to `first_item` if there are no items.
+    first_empty: usize,
+}
+
 /// A generic stack.
 ///
 /// The point of this is to custom-make my own methods. Since this is a binary
@@ -76,6 +90,27 @@ pub struct Stack<T: Copy, const SIZE: usize> {
     stack: [MaybeUninit<T>; SIZE],
     /// The first index that can be written to.
     first_empty: usize,
+}
+
+impl<T: Copy, const SIZE: usize> DoubleEndedIterator for Iter<'_, T, SIZE> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        (self.first_item < self.first_empty).then(|| {
+            self.first_empty -= 1;
+            self.stack.get(self.first_empty)
+        })
+    }
+}
+
+impl<T: Copy, const SIZE: usize> Iterator for Iter<'_, T, SIZE> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        (self.first_item < self.first_empty).then(|| {
+            let item = self.stack.get(self.first_item);
+            self.first_item += 1;
+            item
+        })
+    }
 }
 
 impl<T: Copy, const SIZE: usize> FromIterator<T> for Stack<T, SIZE> {
@@ -95,6 +130,17 @@ impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop()
+    }
+}
+
+impl<'a, T: Copy, const SIZE: usize> Iter<'a, T, SIZE> {
+    /// Creates a new [`Iter`] over a stack.
+    const fn new(stack: &'a Stack<T, SIZE>) -> Self {
+        Self {
+            stack,
+            first_item: 0,
+            first_empty: stack.len(),
+        }
     }
 }
 
@@ -138,7 +184,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     /// Gets the item at the given index.
     ///
     /// Will panic in debug if the index is invalid.
-    pub fn get(&self, index: usize) -> T {
+    fn get(&self, index: usize) -> T {
         let item = index_unchecked!(self.stack, index);
         // SAFETY: `index_unchecked` makes sure that the index is to within the
         // stack (i.e. initialised memory)
@@ -166,6 +212,11 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
                 b.assume_init_read()
             })
         });
+    }
+
+    /// Returns a non-consuming iterator over the stack.
+    pub const fn iter(&self) -> Iter<'_, T, SIZE> {
+        Iter::new(self)
     }
 }
 

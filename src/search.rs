@@ -434,28 +434,26 @@ impl SearchInfo {
     /// Checks if the position is drawn, either because of repetition or
     /// because of the fifty-move rule.
     fn is_draw(&self, halfmoves: u8) -> bool {
-        if halfmoves < 4 {
-            return false;
-        }
-
+        // 50mr
         if halfmoves >= 100 {
             return true;
         }
 
         let current_key = self.past_zobrists.peek();
 
-        // `rev()` because searching the most recent positions first will
-        // probably find a cycle more quickly. Probably.
-        for depth in ((self.past_zobrists.len() - halfmoves as usize - 1)
-            ..(self.past_zobrists.len() - 4))
+        // check if any past position's key is the same as the current key
+        self.past_zobrists
+            .iter()
+            // start at the most recent position
             .rev()
+            // skip very recent positions
+            .skip(4)
+            // stop after an irreversible position, or stop immediately for
+            // halfmoves < 4
+            .take(usize::from(halfmoves).saturating_sub(3))
+            // skip positions with the wrong stm
             .step_by(2)
-        {
-            if self.past_zobrists.get(depth) == current_key {
-                return true;
-            }
-        }
-        false
+            .any(|key| key == current_key)
     }
 }
 
