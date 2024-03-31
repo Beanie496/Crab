@@ -8,7 +8,7 @@ use crate::{
     defs::{PieceType, Square},
 };
 
-/// Stores magic information for a square:
+/// Magic information about a square.
 #[derive(Clone, Copy)]
 pub struct Magic {
     /// The relevant attacked squares, excluding the edge.
@@ -16,9 +16,9 @@ pub struct Magic {
     /// The magic number.
     #[allow(clippy::struct_field_names)]
     magic: u64,
-    /// The bits required to index into the lookup table - it's the number of
-    /// permutations of blockers, excluding the edge (since it makes no
-    /// difference whether or not there is a piece on the edge).
+    /// The bits required to index into the lookup table.
+    ///
+    /// It's the number of permutations of blockers, excluding the edge.
     shift: u32,
     /// Where in the table the lookups are.
     offset: u32,
@@ -165,7 +165,7 @@ pub const ROOK_MAGICS: [u64; Square::TOTAL] = [
 ];
 
 impl Magic {
-    /// Returns a [`Magic`] with the fields set to the given parameters.
+    /// Returns a [`Magic`] with the given parameters.
     pub const fn new(magic: u64, mask: Bitboard, offset: usize, shift: u32) -> Self {
         Self {
             mask,
@@ -176,7 +176,7 @@ impl Magic {
     }
 
     /// Returns a 0-initialised [`Magic`].
-    pub const fn default() -> Self {
+    pub const fn null() -> Self {
         Self {
             mask: Bitboard::empty(),
             magic: 0,
@@ -221,8 +221,8 @@ pub fn find_magics<const PIECE: u8>() {
     let mut rand_gen = Rand64::new(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("Cannot panic as of rust 1.75.0")
-            .as_millis(),
+            .expect("Your clock is _very_ outdated")
+            .as_nanos(),
     );
 
     for square in 0..Square::TOTAL {
@@ -251,9 +251,9 @@ pub fn find_magics<const PIECE: u8>() {
                  * (i.e. epoch[index] < count), the index is marked as being
                  * visited (i.e. epoch[index] = count) and the loop continues.
                  * If it has, it checks to see if the collision is
-                 * constructive. If it's not, the magic doesn't work - discard
-                 * the magic and start the loop over. I've borrowed this epoch
-                 * trick from Stockfish.
+                 * constructive. If it's not, the magic doesn't work - it
+                 * discards the magic and start the loop over. I've borrowed
+                 * this epoch trick from Stockfish.
                  */
                 if epoch[index as usize] < count {
                     epoch[index as usize] = count;

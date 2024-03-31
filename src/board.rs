@@ -31,25 +31,32 @@ pub enum BoardParseError {
     ParseIntError(ParseIntError),
 }
 
-/// The board. It contains information about the current board state and can
-/// generate pseudo-legal moves. It uses copy-make.
+/// A chessboard.
+///
+/// It contains all the necessary information about a chess position, plus some
+/// extra accumulators for rapid lookup. It uses copy-make to make moves.
 #[derive(Clone, Copy)]
 pub struct Board {
-    /// An array of piece values, used for quick lookup of which piece is on a
-    /// given square.
+    /// An array of pieces, used for quick lookup of which piece is on a given
+    /// square.
     mailbox: [Piece; Square::TOTAL],
-    /// `pieces[0]` is the intersection of all pawns on the board, `pieces[1]`
-    /// is the knights, and so on, as according to the order set by [`Piece`].
+    /// An array of all six piece types, where one bitboard represents the
+    /// locations of all pieces of that type.
+    ///
+    /// Index `PieceType::PAWN.to_index()` is all the pawns, etc.
     pieces: [Bitboard; PieceType::TOTAL],
-    /// `sides[1]` is the intersection of all White piece bitboards; `sides[0]`
-    /// is is the intersection of all Black piece bitboards.
+    /// An array of both sides, where one bitboard represents the locations of
+    /// all pieces belonging to that side.
+    ///
+    /// Index `Side::WHITE.to_index()` is all White pieces, etc.
     sides: [Bitboard; Side::TOTAL],
     /// The current side to move.
     side_to_move: Side,
     /// Castling rights.
     castling_rights: CastlingRights,
-    /// The current en passant square. Is [`Square::NONE`] if there is no ep
-    /// square.
+    /// The en passant square.
+    ///
+    /// Is [`Square::NONE`] if there is no ep square.
     ep_square: Square,
     /// The number of halfmoves since the last capture or pawn move.
     halfmoves: u8,
@@ -73,12 +80,18 @@ pub struct Board {
     zobrist: Key,
 }
 
-/// Stores castling rights.
+/// Castling rights.
 ///
 /// Encoded as `KQkq`, with one bit for each right.  E.g. `0b1101` would be
 /// castling rights `KQq`.
-#[derive(Clone, Copy, Eq, PartialEq)]
+// It makes sense to test if flags are equal but it makes no sense to test if
+// one flag is greater in value than another
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct CastlingRights(u8);
+
+/// The FEN string of the starting position.
+pub const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 #[allow(non_upper_case_globals)]
 impl CastlingRights {
@@ -90,8 +103,6 @@ impl CastlingRights {
     const k: Self = Self(0b0010);
     /// The flag `q`.
     const q: Self = Self(0b0001);
-    /// The flags `KQkq`, i.e. all flags.
-    const KQkq: Self = Self(0b1111);
     /// No flags.
     const NONE: Self = Self(0b0000);
 }
@@ -99,59 +110,52 @@ impl CastlingRights {
 impl Default for Board {
     /// Returns a [`Board`] with the starting position.
     fn default() -> Self {
-        let mut board = Self {
-            mailbox: Self::default_mailbox(),
-            pieces: Self::default_pieces(),
-            sides: Self::default_sides(),
-            side_to_move: Side::WHITE,
-            castling_rights: CastlingRights::new(),
-            ep_square: Square::NONE,
-            halfmoves: 0,
-            fullmoves: 1,
-            phase: 0,
-            psq: Score(0, 0),
-            zobrist: Self::new_zobrist(),
-        };
-        board.refresh_accumulators();
-        board
+        // SAFETY: `STARTPOS` is hardcoded, therefore it will always parse
+        // correctly
+        unsafe { STARTPOS.parse().unwrap_unchecked() }
     }
 }
 
 impl Display for Board {
     /// Converts the board into a FEN string.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut board = String::new();
+        let mut board = String::with_capacity(128);
         let mut empty_squares = 0;
-        // I can't just iterate over the mailbox normally: the board goes from
-        // a1 to h8, rank-file, whereas the FEN goes from a8 to h1, also
-        // rank-file
-        for rank in (0..Rank::TOTAL).rev() {
-            for file in 0..File::TOTAL {
-                let square = Square::from_pos(Rank(rank as u8), File(file as u8));
-                let piece = self.piece_on(square);
+
+        let mut square = 56;
+        for _ in 0..Rank::TOTAL {
+            for _ in 0..File::TOTAL {
+                let piece = self.piece_on(Square(square));
 
                 if piece == Piece::NONE {
                     empty_squares += 1;
                 } else {
                     if empty_squares != 0 {
-                        // `from_digit`, unwrapping then mapping is a lot more
-                        // verbose and does pointless error checking
-                        board.push(char::from(b'0' + empty_squares));
+                        // SAFETY: `empty_squares` is less than 10
+                        let empty_squares_char =
+                            unsafe { char::from_digit(empty_squares, 10).unwrap_unchecked() };
+                        board.push(empty_squares_char);
                         empty_squares = 0;
                     }
                     board.push(char::from(piece));
                 }
+                square += 1;
             }
             if empty_squares != 0 {
-                board.push(char::from(b'0' + empty_squares));
+                // SAFETY: `empty_squares` is less than 10
+                let empty_squares_char =
+                    unsafe { char::from_digit(empty_squares, 10).unwrap_unchecked() };
+                board.push(empty_squares_char);
                 empty_squares = 0;
             }
+
             board.push('/');
+            square = square.wrapping_sub(16);
         }
         // remove the trailing slash
         board.pop();
 
-        let side_to_move = self.side_to_move();
+        let side_to_move = char::from(self.side_to_move());
         let rights = self.castling_rights();
         let ep_square = self.ep_square();
         let halfmoves = self.halfmoves();
@@ -159,9 +163,7 @@ impl Display for Board {
 
         write!(
             f,
-            "{} {} {rights} {ep_square} {halfmoves} {fullmoves}",
-            &board,
-            char::from(side_to_move),
+            "{board} {side_to_move} {rights} {ep_square} {halfmoves} {fullmoves}",
         )
     }
 }
@@ -192,8 +194,8 @@ impl FromStr for Board {
             for piece in rank.chars() {
                 // if it's a number, skip over that many files
                 if ('0'..='8').contains(&piece) {
-                    let empty_squares = piece as u8 - b'0';
-                    square += empty_squares;
+                    // SAFETY: we just checked `piece` is in the valid range
+                    square += unsafe { piece.to_digit(10).unwrap_unchecked() as u8 };
                 } else {
                     board.add_piece(Square(square), Piece::try_from(piece)?);
                     square += 1;
@@ -325,90 +327,28 @@ impl Board {
     /// Creates a new, empty [`Board`].
     pub const fn new() -> Self {
         Self {
-            mailbox: Self::no_mailbox(),
-            pieces: Self::no_pieces(),
-            sides: Self::no_sides(),
+            mailbox: [Piece::NONE; Square::TOTAL],
+            pieces: [Bitboard::empty(); PieceType::TOTAL],
+            sides: [Bitboard::empty(); Side::TOTAL],
             side_to_move: Side::NONE,
-            castling_rights: CastlingRights::none(),
+            castling_rights: CastlingRights::new(),
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
             phase: 0,
             psq: Score(0, 0),
-            zobrist: Self::new_zobrist(),
+            zobrist: 0,
         }
-    }
-
-    /// Returns the mailbox of the starting position.
-    #[rustfmt::skip]
-    #[allow(clippy::many_single_char_names, non_snake_case)]
-    const fn default_mailbox() -> [Piece; Square::TOTAL] {
-        let p = Piece::BPAWN;
-        let n = Piece::BKNIGHT;
-        let b = Piece::BBISHOP;
-        let r = Piece::BROOK;
-        let q = Piece::BQUEEN;
-        let k = Piece::BKING;
-        let P = Piece::WPAWN;
-        let N = Piece::WKNIGHT;
-        let B = Piece::WBISHOP;
-        let R = Piece::WROOK;
-        let Q = Piece::WQUEEN;
-        let K = Piece::WKING;
-        let e = Piece::NONE;
-        [
-            R, N, B, Q, K, B, N, R,
-            P, P, P, P, P, P, P, P,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            e, e, e, e, e, e, e, e,
-            p, p, p, p, p, p, p, p,
-            r, n, b, q, k, b, n, r,
-        ]
-    }
-
-    /// Returns an empty mailbox.
-    const fn no_mailbox() -> [Piece; Square::TOTAL] {
-        [Piece::NONE; Square::TOTAL]
-    }
-
-    /// Returns the piece [`Bitboard`]s of the starting position.
-    const fn default_pieces() -> [Bitboard; PieceType::TOTAL] {
-        [
-            Bitboard(0x00ff_0000_0000_ff00), // Pawns
-            Bitboard(0x4200_0000_0000_0042), // Knights
-            Bitboard(0x2400_0000_0000_0024), // Bishops
-            Bitboard(0x8100_0000_0000_0081), // Rooks
-            Bitboard(0x0800_0000_0000_0008), // Queens
-            Bitboard(0x1000_0000_0000_0010), // Kings
-        ]
-    }
-
-    /// Returns the piece [`Bitboard`]s of an empty board.
-    const fn no_pieces() -> [Bitboard; PieceType::TOTAL] {
-        [Bitboard::empty(); PieceType::TOTAL]
-    }
-
-    /// Returns the side [`Bitboard`]s of the starting position.
-    const fn default_sides() -> [Bitboard; Side::TOTAL] {
-        [
-            Bitboard(0xffff_0000_0000_0000), // Black
-            Bitboard(0x0000_0000_0000_ffff), // White
-        ]
-    }
-
-    /// Returns the side [`Bitboard`]s of an empty board.
-    const fn no_sides() -> [Bitboard; Side::TOTAL] {
-        [Bitboard::empty(); Side::TOTAL]
     }
 
     /// Pretty-prints the current state of the board.
     pub fn pretty_print(&self) {
-        for r in (0..Rank::TOTAL as u8).rev() {
-            print!("{} | ", r + 1);
-            for f in 0..File::TOTAL as u8 {
-                print!("{} ", self.char_piece_from_pos(Rank(r), File(f)));
+        for rank in (0..Rank::TOTAL as u8).rev() {
+            print!("{} | ", rank + 1);
+            for file in 0..File::TOTAL as u8 {
+                let square = Square::from_pos(Rank(rank), File(file));
+                let piece = self.piece_on(square);
+                print!("{} ", char::from(piece));
             }
             println!();
         }
@@ -473,11 +413,6 @@ impl Board {
         self.fullmoves
     }
 
-    /// Tests if the king is in check.
-    pub fn is_in_check(&self) -> bool {
-        self.is_square_attacked(self.king_square())
-    }
-
     /// Sets the board to the starting position.
     pub fn set_startpos(&mut self) {
         *self = Self::default();
@@ -501,13 +436,13 @@ impl Board {
         let them = us.flip();
         let end_bb = Bitboard::from(end);
 
-        self.halfmoves += 1;
+        self.increment_halfmoves();
         if us == Side::BLACK {
-            self.fullmoves += 1;
+            self.increment_fullmoves();
         }
 
         if piece_type == PieceType::PAWN || captured_type != PieceType::NONE {
-            self.halfmoves = 0;
+            self.reset_halfmoves();
         }
 
         self.toggle_zobrist_ep_square(self.ep_square());
@@ -597,7 +532,7 @@ impl Board {
             self.add_accumulated_piece(end, promotion_piece);
         }
 
-        if self.is_square_attacked(self.king_square()) {
+        if self.is_in_check() {
             return false;
         }
 
@@ -626,16 +561,6 @@ impl Board {
         self.flip_side();
 
         true
-    }
-
-    /// Finds the piece on the given rank and file and converts it to its
-    /// character representation.
-    ///
-    /// If no piece is on the square, returns '0' instead.
-    fn char_piece_from_pos(&self, rank: Rank, file: File) -> char {
-        let square = Square::from_pos(rank, file);
-        let piece = self.piece_on(square);
-        char::from(piece)
     }
 
     /// Moves `piece` from `start` to `end`, updating all relevant fields.
@@ -747,14 +672,34 @@ impl Board {
         self.ep_square = Square::NONE;
     }
 
+    /// Increments the halfmove counter.
+    fn increment_halfmoves(&mut self) {
+        self.halfmoves += 1;
+    }
+
     /// Sets halfmoves.
     fn set_halfmoves(&mut self, count: u8) {
         self.halfmoves = count;
     }
 
+    /// Zeroes the halfmove counter.
+    fn reset_halfmoves(&mut self) {
+        self.halfmoves = 0;
+    }
+
+    /// Increments the fullmove counter.
+    fn increment_fullmoves(&mut self) {
+        self.fullmoves += 1;
+    }
+
     /// Sets fullmoves.
     fn set_fullmoves(&mut self, count: u16) {
         self.fullmoves = count;
+    }
+
+    /// Tests if the king is in check.
+    pub fn is_in_check(&self) -> bool {
+        self.is_square_attacked(self.king_square())
     }
 
     /// Calculates the square the king is on.
@@ -801,13 +746,8 @@ impl Board {
 }
 
 impl CastlingRights {
-    /// Returns new [`CastlingRights`] with the default castling rights.
+    /// Returns new, empty [`CastlingRights`].
     const fn new() -> Self {
-        Self::KQkq
-    }
-
-    /// Returns empty [`CastlingRights`].
-    const fn none() -> Self {
         Self::NONE
     }
 

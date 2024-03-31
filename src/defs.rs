@@ -1,16 +1,22 @@
 use std::{
     fmt::{self, Display, Formatter},
+    ops::{Add, Sub},
     str::FromStr,
 };
 
 use crate::{bitboard::Bitboard, error::ParseError};
 
+/// A cardinal direction.
+// it doesn't make sense to say a direction is 'less than' another
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct Direction(pub i8);
+
 /// A file: file A = 0 to file F = 7.
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
 
-/// A wrapper for certain types of move. See associated constants for the
-/// current types.
+/// A certain type of move. See associated constants.
 pub struct MoveType;
 
 /// A piece, containing the type of piece and side.
@@ -31,7 +37,7 @@ pub struct PieceType(pub u8);
 #[derive(Clone, Copy)]
 pub struct Rank(pub u8);
 
-/// A side: 0, 1 for a regular side or 2 for no side.
+/// A side: 0 or 1 for a regular side or 2 for no side.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Side(pub u8);
 
@@ -44,11 +50,24 @@ pub struct Square(pub u8);
 ///
 /// e.g. `PIECE_CHARS[Piece::WKNIGHT] == 'N'`; `PIECE_CHARS[Piece::BKING] ==
 /// 'k'`; `PIECE_CHARS[Piece::NONE] == '0'`.
-const PIECE_CHARS: [char; Piece::TOTAL + 1] = [
+static PIECE_CHARS: [char; Piece::TOTAL + 1] = [
     'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
 ];
 
-/// Enumerates files.
+/// Cardinal directions, according to little-endian rank-fink file mapping.
+#[allow(dead_code, clippy::missing_docs_in_private_items)]
+impl Direction {
+    pub const N: Self = Self(8);
+    pub const NE: Self = Self(9);
+    pub const E: Self = Self(1);
+    pub const SE: Self = Self(-7);
+    pub const S: Self = Self(-8);
+    pub const SW: Self = Self(-9);
+    pub const W: Self = Self(-1);
+    pub const NW: Self = Self(7);
+}
+
+/// File enumerations.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl File {
     pub const FILE1: Self = Self(0);
@@ -70,7 +89,7 @@ impl MoveType {
     pub const CAPTURES: u8 = 1;
 }
 
-/// Enumerates pieces for White and Black.
+/// Piece enumerations for White and Black.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Piece {
     pub const WPAWN: Self = Self::from_piecetype(PieceType::PAWN, Side::WHITE);
@@ -89,7 +108,7 @@ impl Piece {
     pub const NONE: Self = Self(12);
 }
 
-/// Enumerates pieces.
+/// Piece type enumerations.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl PieceType {
     pub const PAWN: Self = Self(0);
@@ -102,7 +121,7 @@ impl PieceType {
     pub const NONE: Self = Self(6);
 }
 
-/// Enumerates ranks.
+/// Rank enumerations.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Rank {
     pub const RANK1: Self = Self(0);
@@ -116,7 +135,7 @@ impl Rank {
     pub const TOTAL: usize = 8;
 }
 
-/// Enumerates sides.
+/// Side enumerations.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Side {
     pub const BLACK: Self = Self(0);
@@ -125,7 +144,7 @@ impl Side {
     pub const NONE: Self = Self(2);
 }
 
-/// Enumerates squares.
+/// Square enumerations.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
 impl Square {
     pub const A1: Self = Self(0);
@@ -305,6 +324,14 @@ impl From<Piece> for Side {
     }
 }
 
+impl Add<Direction> for Square {
+    type Output = Self;
+
+    fn add(self, rhs: Direction) -> Self::Output {
+        Self(self.0.wrapping_add_signed(rhs.0))
+    }
+}
+
 impl Display for Square {
     /// Converts a square into its string representation: the square if `self`
     /// isn't [`NONE`](Self::NONE) (e.g. "b3") or "-" otherwise.
@@ -356,6 +383,14 @@ impl FromStr for Square {
         }
 
         Ok(Self(square))
+    }
+}
+
+impl Sub<Direction> for Square {
+    type Output = Self;
+
+    fn sub(self, rhs: Direction) -> Self::Output {
+        Self(self.0.wrapping_add_signed(-rhs.0))
     }
 }
 

@@ -3,10 +3,11 @@
 //! Accepted commands:
 //! - `f`: find magics for the bishop and rook
 //! - `go` with the options `wtime`, `btime`, `winc`, `binc`, `movestogo`,
-//!   `depth`, `nodes`, `movetime` and `infinite`
+//!   `depth`, `nodes`, `movetime` and `infinite`. There's also a special
+//!   option `perft <depth>`, which overrides the regular search to run perft
+//!   to `<depth>`.
 //! - `isready`
 //! - `p`: pretty-print the current board
-//! - `perft <depth>`: run perft to `<depth>`
 //! - `position`
 //! - `setoption`: see output of `uci` command for more detail
 //! - `stop`
@@ -18,7 +19,7 @@ use std::sync::mpsc::RecvError;
 
 use engine::Engine;
 
-/// For unit testing.
+/// Unit testing.
 mod bench;
 /// Items associated with [`Bitboard`](bitboard::Bitboard).
 mod bitboard;
@@ -28,7 +29,7 @@ mod board;
 mod defs;
 /// Items associated with [`Engine`].
 mod engine;
-/// Error handling.
+/// Error variants.
 mod error;
 /// Items related to evaluation.
 mod evaluation;
@@ -36,9 +37,9 @@ mod evaluation;
 mod movegen;
 /// Perft: see <https://www.chessprogramming.org/Perft>.
 mod perft;
-/// The search.
+/// Items related to searching.
 mod search;
-/// UCI input.
+/// Items for handling UCI input.
 mod uci;
 /// Utility.
 mod util;

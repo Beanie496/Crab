@@ -17,20 +17,25 @@ mod piece_square_tables;
 pub type Eval = i16;
 
 #[allow(clippy::doc_markdown)]
-/// Piece-square tables. A bonus/malus for each piece depending on its
-/// position. Copied verbatim from PeSTO:
-/// <https://www.chessprogramming.org/PeSTO>.
+/// Piece-square tables: a bonus/malus for each piece depending on its
+/// position.
 ///
 /// Order: pawn, knight, bishop, rook, queen, king. An extra table is included
 /// so that [`Piece::NONE`] can index into this array for a value of `0`.
-pub const PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
+///
+/// Copied verbatim from PeSTO: <https://www.chessprogramming.org/PeSTO>.
+pub static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
     create_piece_square_tables();
 
-/// The weight of each piece towards a middlegame. A total weight of 0 means
-/// it's an endgame. The starting weight (24) is the middlegame. The order is
-/// Black pawn, White pawn, Black knight, etc. Kings always exist so they have
-/// weight 0; an extra 0 is added to allow [`Piece::NONE`] to index into it.
-pub const PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+/// The weight of each piece towards a middlegame.
+///
+/// A total weight of 0 is interpreted as an endgame. A total weight of 24 (the
+/// starting weight) is represented as the middlegame.
+///
+/// Order: Black pawn, White pawn, Black knight, etc. Kings always exist so
+/// they have weight 0. An extra 0 is added to allow [`Piece::NONE`] to index
+/// into it.
+pub static PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
 /// The highest possible (positive) evaluation.
 pub const INF_EVAL: Eval = Eval::MAX;
@@ -82,8 +87,9 @@ impl SubAssign for Score {
 }
 
 impl Score {
-    /// Lerps the score to an eval given a game phase, where `0` means use the
-    /// middlegame score and `>= 24` means use the endgame score.
+    /// Lerps the score between the middlegame and endgame value depending on
+    /// the given phase. `0` means use the endgame value and `>= 24` means use
+    /// the middlegame value.
     fn lerp_to_eval(self, phase: u8) -> Eval {
         // `>= 24` can happen because of early promotion
         let phase: Eval = min(24, Eval::from(phase));

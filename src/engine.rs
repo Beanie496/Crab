@@ -111,6 +111,12 @@ impl Engine {
                 // if depth is specified and then `infinite` is give, the
                 // latter should override the former
                 "infinite" => limits.set_infinite(),
+                "perft" => {
+                    if let Some(depth) = parse_into_nonzero_option(next) {
+                        perft::<true, true>(self.board(), depth);
+                    }
+                    return;
+                }
                 _ => (),
             }
         }
@@ -123,20 +129,6 @@ impl Engine {
             self.uci_rx(),
             self.past_zobrists().clone(),
         );
-    }
-
-    /// Given a `perft` command, run [`perft`] to the specified depth.
-    pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(&self, line: &str) -> u64 {
-        let mut tokens = line.split_whitespace();
-
-        if tokens.next() != Some("perft") {
-            return 0;
-        }
-        let Some(depth) = parse_into_nonzero_option(tokens.next()) else {
-            return 0;
-        };
-
-        perft::<SHOULD_PRINT, IS_TIMED>(self.board(), depth)
     }
 
     /// Sets the board to a position specified by the `position` command.
@@ -188,6 +180,7 @@ impl Engine {
         zobrists.push(board.zobrist());
 
         // if there are no moves to begin with, this loop will just be skipped
+        // lint allowed because I would rather panic than deal with non-ASCII
         #[allow(clippy::string_slice)]
         for mv in tokens {
             let mut moves = generate_moves::<{ MoveType::ALL }>(&board);

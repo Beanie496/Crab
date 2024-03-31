@@ -1,16 +1,19 @@
 use std::{
     fmt::{self, Display, Formatter},
-    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, Shr},
+    ops::{
+        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
+        ShrAssign,
+    },
 };
 
 use crate::defs::{File, Rank, Square};
 
-/// A wrapper over a `u64`.
+/// A bitboard: a set of bits representing a certain state of the board.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Bitboard(pub u64);
 
 /// An iterator over the bits of a [`Bitboard`].
-pub struct BitIter(u64);
+pub struct BitIter(Bitboard);
 
 impl Bitboard {
     /// The squares betwen the White king and kingside rook in the starting
@@ -71,14 +74,19 @@ impl BitXorAssign for Bitboard {
 
 impl Display for Bitboard {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut ret = String::new();
+        let mut ret = String::with_capacity(121);
+        let mut bb = Self::from(Square::H7);
 
-        for r in (0..Rank::TOTAL as u8).rev() {
-            for f in 0..File::TOTAL as u8 {
-                let is_bit_set = !(*self & Self::from_pos(Rank(r), File(f))).is_empty();
-                ret.push(char::from(b'0' + u8::from(is_bit_set)));
-                ret.push(' ');
+        for _ in 0..Rank::TOTAL {
+            for _ in 0..File::TOTAL {
+                bb <<= 1;
+                if (*self & bb).is_empty() {
+                    ret.push_str("0 ");
+                } else {
+                    ret.push_str("1 ");
+                }
             }
+            bb >>= 16;
             ret.pop();
             ret.push('\n');
         }
@@ -99,7 +107,7 @@ impl IntoIterator for Bitboard {
     type IntoIter = BitIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        BitIter(self.0)
+        BitIter(self)
     }
 }
 
@@ -127,27 +135,35 @@ impl Shr<u8> for Bitboard {
     }
 }
 
+impl ShlAssign<u8> for Bitboard {
+    fn shl_assign(&mut self, rhs: u8) {
+        self.0 <<= rhs;
+    }
+}
+
+impl ShrAssign<u8> for Bitboard {
+    fn shr_assign(&mut self, rhs: u8) {
+        self.0 >>= rhs;
+    }
+}
+
 impl Iterator for BitIter {
     type Item = Square;
 
     /// Clears the LSB of the wrapped [`Bitboard`] and returns the position of
-    /// that bit. Returns [`None`] if there are no set bits.
+    /// that bit.
+    ///
+    /// Returns [`None`] if there are no set bits.
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0 == 0 {
+        if self.0.is_empty() {
             None
         } else {
-            Some(self.pop_next_square())
+            Some(self.0.pop_next_square())
         }
     }
 }
 
 impl Bitboard {
-    /// Converts `rank` and `file` into a [`Bitboard`] with the bit in the
-    /// given position set.
-    fn from_pos(rank: Rank, file: File) -> Self {
-        Self::from(Square::from_pos(rank, file))
-    }
-
     /// Returns the given file represented on a bitboard.
     ///
     /// e.g. `file_bb(File::FILE2) == 0x0202020202020202`.
@@ -252,9 +268,19 @@ impl Bitboard {
         self << 8
     }
 
+    /// Shifts the bitboard one square east without wrapping.
+    pub fn east(self) -> Self {
+        (self << 1) & !Self::file_bb(File::FILE1)
+    }
+
     /// Shifts the bitboard one square south without wrapping.
     pub fn south(self) -> Self {
         self >> 8
+    }
+
+    /// Shifts the bitboard one square west without wrapping.
+    pub fn west(self) -> Self {
+        (self >> 1) & !Self::file_bb(File::FILE8)
     }
 
     /// Clears the least significant bit of the bitboard and returns it.
@@ -263,14 +289,12 @@ impl Bitboard {
         self.0 ^= popped_bit;
         Self(popped_bit)
     }
-}
 
-impl BitIter {
     /// Clears the least significant bit of the bitboard and converts the
     /// position of that bit to a [`Square`].
     pub fn pop_next_square(&mut self) -> Square {
-        let shift = self.0.trailing_zeros();
-        self.0 ^= 1 << shift;
-        Square(shift as u8)
+        let square = Square(self.0.trailing_zeros() as u8);
+        *self ^= Self::from(square);
+        square
     }
 }

@@ -102,9 +102,6 @@ impl Engine {
             "p" => {
                 self.board().pretty_print();
             }
-            "perft" => {
-                self.perft::<true, true>(line);
-            }
             "position" => {
                 self.set_position(line);
             }

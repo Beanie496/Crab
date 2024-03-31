@@ -36,7 +36,7 @@ trait Node {
 
 /// A node that is not root.
 struct OtherNode;
-/// The node from which the search starts: there is only 1 per search.
+/// The node from which the search starts.
 struct RootNode;
 
 impl Node for OtherNode {
@@ -86,12 +86,10 @@ enum SearchStatus {
 /// The principle variation: the current best sequence of moves for both sides.
 struct Pv {
     /// A non-circular queue of moves.
-    ///
-    /// All the moves are enqueued exactly once before all the moves are
-    /// dequeued exactly once (then it goes out of scope)
     moves: [Move; Depth::MAX as usize],
-    /// Index of the first [`Move`]. This will be equal to `first_empty` if
-    /// there are no [`Move`]s.
+    /// Index of the first [`Move`].
+    ///
+    /// This will be equal to `first_empty` if there are no [`Move`]s.
     first_item: u8,
     /// Index of the first empty space.
     first_empty: u8,
@@ -124,7 +122,7 @@ pub struct SearchInfo {
     /// and I'd like the transition to be as painless as possible.
     uci_rx: Rc<Receiver<String>>,
     /// A stack of zobrist hashes of previous board states, beginning from the
-    /// initial `position fen ...` command.
+    /// FEN string in the initial `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
@@ -133,7 +131,7 @@ pub struct SearchInfo {
 
 /// The parameters of a search.
 pub struct SearchParams {
-    /// The moment the search started. Called as early as possible.
+    /// The moment the search started. Set as early as possible.
     start: Instant,
     /// The limits of the search.
     limits: Limits,
@@ -280,19 +278,13 @@ impl Pv {
         }
     }
 
-    /// Appends another [`Pv`].
+    /// Appends and consumes another [`Pv`] without clearing it afterwards.
     fn append_pv(&mut self, other_pv: &mut Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
         for mv in other_pv {
             self.enqueue(mv);
         }
-    }
-
-    /// Sets the PV to the other PV.
-    fn set_pv(&mut self, other_pv: &mut Self) {
-        self.clear();
-        self.append_pv(other_pv);
     }
 
     /// Adds a [`Move`] to the back of the queue.
@@ -370,11 +362,12 @@ impl SearchInfo {
             let token = token.trim();
             if token == "stop" {
                 self.status = SearchStatus::Stop;
+                return self.status;
             }
             if token == "quit" {
                 self.status = SearchStatus::Quit;
+                return self.status;
             }
-            return self.status;
         }
 
         // these are the only variants that can cause a search to exit early
@@ -477,9 +470,9 @@ pub fn iterative_deepening(
     past_zobrists: Stack<Key, { Depth::MAX as usize }>,
 ) {
     let time_allocated = search_params.calculate_time_window();
-    let mut best_move = Move::null();
-    let mut pv = Pv::new();
     let mut search_info = SearchInfo::new(search_params, time_allocated, uci_rx, past_zobrists);
+    let mut pv = Pv::new();
+    let mut best_move;
     let mut depth = 1;
 
     'iter_deep: loop {
@@ -496,14 +489,14 @@ pub fn iterative_deepening(
             depth,
         );
 
+        // the root search guarantees that there will always be 1 valid move in
+        // the PV
+        best_move = pv.get(0);
+
         if search_info.check_status() != SearchStatus::Continue {
-            // technically `best_move` would be null if this is called before
-            // even depth 1 finishes, but there isn't much we can do about that
-            // currently
             break 'iter_deep;
         }
 
-        best_move = pv.get(0);
         let time = search_info.start.elapsed();
         let nps = 1_000_000 * search_info.nodes / time.as_micros() as u64;
 
@@ -522,7 +515,8 @@ pub fn iterative_deepening(
             break 'iter_deep;
         }
 
-        search_info.history.set_pv(&mut pv);
+        search_info.history.clear();
+        search_info.history.append_pv(&mut pv);
         pv.clear();
         depth += 1;
     }

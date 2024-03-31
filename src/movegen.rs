@@ -4,7 +4,7 @@ use crate::{
     bitboard::Bitboard,
     board::Board,
     cfor,
-    defs::{MoveType, PieceType, Rank, Side, Square},
+    defs::{Direction, MoveType, PieceType, Rank, Side, Square},
     index_unchecked, out_of_bounds_is_unreachable,
     util::Stack,
 };
@@ -32,11 +32,13 @@ pub struct Lookup {
     /// The rook attacks are before all the bishop attacks. It uses the 'fancy'
     /// approach. See <https://www.chessprogramming.org/Magic_Bitboards>.
     magic_table: [Bitboard; ROOK_SIZE + BISHOP_SIZE],
-    /// The (wrapped) magic numbers for the bishop. One per square. See
-    /// <https://www.chessprogramming.org/Magic_Bitboards>.
+    /// The (wrapped) magic numbers for the bishop. One per square.
+    ///
+    /// See <https://www.chessprogramming.org/Magic_Bitboards>.
     bishop_magics: [Magic; Square::TOTAL],
-    /// The (wrapped) magic numbers for the rook. One per square. See
-    /// <https://www.chessprogramming.org/Magic_Bitboards>.
+    /// The (wrapped) magic numbers for the rook. One per square.
+    ///
+    /// See <https://www.chessprogramming.org/Magic_Bitboards>.
     rook_magics: [Magic; Square::TOTAL],
 }
 
@@ -64,17 +66,19 @@ pub struct Move {
 pub type Moves = Stack<Move, MAX_LEGAL_MOVES>;
 
 /// The number of bitboards required to store all bishop attacks, where each
-/// element corresponds to one permutation of blockers. (This means some
-/// elements will be duplicates, as different blockers can have the same
-/// attacks.) Repeated once per quadrant: `2.pow(6)` blocker permutations for
+/// element corresponds to one permutation of blockers.
+///
+/// Some elements will be duplicates, as different blockers can have the same
+/// attacks. Repeated once per quadrant: `2.pow(6)` blocker permutations for
 /// the corner, `2.pow(5)` for each non-corner edge and each square adjacent to
 /// an edge, `2.pow(7)` for the squares adjacent or diagonal to a corner and
 /// `2.pow(9)` for the centre.
 const BISHOP_SIZE: usize = 5_248;
 /// The number of bitboards required to store all rook attacks, where each
-/// element corresponds to one permutation of blockers. (This means some
-/// elements will be duplicates, as different blockers can have the same
-/// attacks.) There are `2.pow(12)` blocker permutations for each corner,
+/// element corresponds to one permutation of blockers.
+///
+/// Some elements will be duplicates, as different blockers can have the same
+/// attacks. There are `2.pow(12)` blocker permutations for each corner,
 /// `2.pow(11)` for each non-corner edge and `2.pow(10)` for all others.
 const ROOK_SIZE: usize = 102_400;
 /// Maximum number of legal moves that can be reached in a standard chess game.
@@ -93,13 +97,11 @@ impl Move {
     const PROMOTION: u8 = 0b1100_0000;
     /// No flags.
     const NORMAL: u8 = 0b0000_0000;
-    /// Mask for the start square.
+    /// Mask for the squares.
     const SQUARE_MASK: u8 = 0b11_1111;
-    /// Mask for the flags. They do not need a shift because they simply need
-    /// to be set or unset.
+    /// Mask for the flags.
     const FLAG_MASK: u8 = 0b1100_0000;
-    /// Shift for the promotion piece. It does not need a mask because shifting
-    /// already removes unwanted bits.
+    /// Shift for the promotion piece/rook offset.
     const EXTRA_BITS_SHIFT: usize = 6;
 }
 
@@ -142,7 +144,7 @@ impl Lookup {
         }
     }
 
-    /// Calculates a lookup table for both pawns.
+    /// Calculates and returns lookup tables for both pawns.
     ///
     /// `init_pawn_attacks()[Side::WHITE.to_index() == White pawn attack table`
     const fn init_pawn_attacks() -> [[Bitboard; Square::TOTAL]; Side::TOTAL] {
@@ -194,10 +196,10 @@ impl Lookup {
         king_attacks
     }
 
-    /// Calculates the magic lookup table and magic structs.
+    /// Calculates and returns the magic lookup table and magic structs.
     ///
     /// `init_magics() == (magic_table, bishop_magics, rook_magics)`.
-    #[allow(clippy::large_stack_frames, clippy::large_stack_arrays)]
+    #[allow(clippy::large_stack_arrays, clippy::large_stack_frames)]
     const fn init_magics() -> (
         [Bitboard; ROOK_SIZE + BISHOP_SIZE],
         [Magic; Square::TOTAL],
@@ -206,8 +208,8 @@ impl Lookup {
         let mut b_offset = ROOK_SIZE;
         let mut r_offset = 0;
         let mut magic_table = [Bitboard::empty(); ROOK_SIZE + BISHOP_SIZE];
-        let mut bishop_magics = [Magic::default(); Square::TOTAL];
-        let mut rook_magics = [Magic::default(); Square::TOTAL];
+        let mut bishop_magics = [Magic::null(); Square::TOTAL];
+        let mut rook_magics = [Magic::null(); Square::TOTAL];
 
         cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             let square = Square(square as u8);
@@ -379,16 +381,16 @@ impl Move {
     }
 
     /// Returns the difference from the king destination square to the rook
-    /// starting square. Assumes `self.is_castling()`.
+    /// starting square.
     ///
-    /// Can only return -2 or 1.
+    /// Assumes `self.is_castling()`. Can only return -2 or 1.
     pub const fn rook_offset(self) -> i8 {
         (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
     }
 
-    /// Returns the piece to be promoted to. Assumes `self.is_promotion()`.
+    /// Returns the piece to be promoted to.
     ///
-    /// The piece will only ever be a valid piece.
+    /// Assumes `self.is_promotion()`. The piece will only ever be a valid piece.
     pub const fn promotion_piece(self) -> PieceType {
         PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
     }
@@ -471,19 +473,118 @@ pub fn generate_moves<const MOVE_TYPE: u8>(board: &Board) -> Moves {
     moves
 }
 
-/// Generates the castling moves for the given side and puts them in `moves`.
-fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
+/// Calculates all legal pawn moves for `board` and puts them in `moves`.
+// god dammit this function could be so much shorter if full const generics
+// existed
+#[rustfmt::skip]
+fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
+    board: &Board,
+    moves: &mut Moves,
+) {
+    let penultimate_rank = if IS_WHITE {
+        Bitboard::rank_bb(Rank::RANK7)
+    } else {
+        Bitboard::rank_bb(Rank::RANK2)
+    };
+    let double_push_rank = if IS_WHITE {
+        Bitboard::rank_bb(Rank::RANK4)
+    } else {
+        Bitboard::rank_bb(Rank::RANK5)
+    };
+    let forward = if IS_WHITE { Direction::N } else { Direction::S };
+    let forward_right = if IS_WHITE { Direction::NE } else { Direction::SE };
+    let forward_left = if IS_WHITE { Direction::NW } else { Direction::SW };
+    let us_bb = board.side::<IS_WHITE>();
     let occupancies = board.occupancies();
+    let them_bb = occupancies ^ us_bb;
+    let empty = !occupancies;
+    let ep_square = board.ep_square();
+    let pawns = board.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
 
-    if board.castling_rights().can_castle_kingside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
-    {
-        moves.push(Move::new_castle::<IS_WHITE, true>());
+    let normal_pawns = pawns & !penultimate_rank;
+    let promotion_pawns = pawns & penultimate_rank;
+
+    // regular pushes
+    if MOVE_TYPE != MoveType::CAPTURES {
+        let single_push = normal_pawns.pawn_push::<IS_WHITE>() & empty;
+        let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
+
+        for dest_pawn in single_push {
+            moves.push(Move::new(dest_pawn - forward, dest_pawn));
+        }
+        for dest_pawn in double_push {
+            moves.push(Move::new(dest_pawn - forward - forward, dest_pawn));
+        }
     }
-    if board.castling_rights().can_castle_queenside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
-    {
-        moves.push(Move::new_castle::<IS_WHITE, false>());
+
+    // regular captures
+    let right_captures = if IS_WHITE {
+        normal_pawns.north().east() & them_bb
+    } else {
+        normal_pawns.south().east() & them_bb
+    };
+    let left_captures = if IS_WHITE {
+        normal_pawns.north().west() & them_bb
+    } else {
+        normal_pawns.south().west() & them_bb
+    };
+
+    for dest_pawn in right_captures {
+        moves.push(Move::new(dest_pawn - forward_right, dest_pawn));
+    }
+    for dest_pawn in left_captures {
+        moves.push(Move::new(dest_pawn - forward_left, dest_pawn));
+    }
+
+    // en passant
+    if ep_square != Square::NONE {
+        let attackers = if IS_WHITE {
+            LOOKUPS.pawn_attacks(Side::BLACK, ep_square) & normal_pawns
+        } else {
+            LOOKUPS.pawn_attacks(Side::WHITE, ep_square) & normal_pawns
+        };
+
+        for pawn in attackers {
+            moves.push(Move::new_en_passant(pawn, ep_square));
+        }
+    }
+
+    // promotions: both pushes and captures
+    let single_push = promotion_pawns.pawn_push::<IS_WHITE>() & empty;
+    let right_captures = if IS_WHITE {
+        promotion_pawns.north().east() & them_bb
+    } else {
+        promotion_pawns.south().east() & them_bb
+    };
+    let left_captures = if IS_WHITE {
+        promotion_pawns.north().west() & them_bb
+    } else {
+        promotion_pawns.south().west() & them_bb
+    };
+
+    for dest_pawn in single_push {
+        let origin = dest_pawn - forward;
+        if MOVE_TYPE != MoveType::CAPTURES {
+            moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
+        }
+        // count queen promotions as captures
+        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+    }
+    for dest_pawn in right_captures {
+        let origin = dest_pawn - forward_right;
+        moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+    }
+    for dest_pawn in left_captures {
+        let origin = dest_pawn - forward_left;
+        moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
+        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
     }
 }
 
@@ -494,18 +595,17 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     moves: &mut Moves,
 ) {
     let us_bb = board.side::<IS_WHITE>();
-    let target_squares = if MOVE_TYPE == MoveType::ALL {
-        // all squares that aren't us
-        !us_bb
-    } else if MOVE_TYPE == MoveType::CAPTURES {
-        // the opponent's piece
+    let target_squares = if MOVE_TYPE == MoveType::CAPTURES {
+        // all squares that are occupied by them
+        // oh how I wish Rust allowed operations on consts generics
         if IS_WHITE {
             board.side::<false>()
         } else {
             board.side::<true>()
         }
     } else {
-        panic!("Unknown movetype");
+        // all squares that aren't occupied by us
+        !us_bb
     };
 
     let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
@@ -525,77 +625,6 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     }
 }
 
-/// Calculates all legal pawn moves for `board` and puts them in `moves`.
-fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
-    board: &Board,
-    moves: &mut Moves,
-) {
-    let us_bb = board.side::<IS_WHITE>();
-    let occupancies = board.occupancies();
-    let them_bb = occupancies ^ us_bb;
-    let ep_square = board.ep_square();
-    let ep_square_bb = if ep_square == Square::NONE {
-        Bitboard::empty()
-    } else {
-        Bitboard::from(ep_square)
-    };
-    let empty = !occupancies;
-
-    let mut pawns = board.piece::<{ PieceType::PAWN.to_index() }>() & us_bb;
-    while !pawns.is_empty() {
-        let pawn = pawns.pop_lsb();
-        let pawn_sq = Square::from(pawn);
-
-        let potential_captures = if IS_WHITE {
-            LOOKUPS.pawn_attacks(Side::WHITE, pawn_sq)
-        } else {
-            LOOKUPS.pawn_attacks(Side::BLACK, pawn_sq)
-        };
-        let normal_captures = potential_captures & them_bb;
-        let ep_targets = potential_captures & ep_square_bb;
-
-        // if we're just looking at captures, loop through all captures
-        // early. Otherwise, wait a bit longer to loop through pushes and
-        // captures in the same loop.
-        if MOVE_TYPE == MoveType::CAPTURES {
-            for target in normal_captures {
-                moves.push(Move::new(pawn_sq, target));
-            }
-            for target in ep_targets {
-                moves.push(Move::new_en_passant(pawn_sq, target));
-            }
-            continue;
-        }
-
-        let single_push = pawn.pawn_push::<IS_WHITE>() & empty;
-
-        let double_push_rank = if IS_WHITE {
-            Bitboard::rank_bb(Rank::RANK4)
-        } else {
-            Bitboard::rank_bb(Rank::RANK5)
-        };
-        let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
-
-        let targets = single_push | normal_captures | double_push;
-        let promotion_targets =
-            targets & (Bitboard::rank_bb(Rank::RANK1) | Bitboard::rank_bb(Rank::RANK8));
-        let normal_targets = targets ^ promotion_targets;
-
-        for target in normal_targets {
-            moves.push(Move::new(pawn_sq, target));
-        }
-        for target in ep_targets {
-            moves.push(Move::new_en_passant(pawn_sq, target));
-        }
-        for target in promotion_targets {
-            moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(pawn_sq, target));
-            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(pawn_sq, target));
-        }
-    }
-}
-
 /// Generates all legal bishop, rook and queen moves for `board` and puts them
 /// in `moves`.
 fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
@@ -604,12 +633,11 @@ fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
 ) {
     let us_bb = board.side::<IS_WHITE>();
     let occupancies = board.occupancies();
-    let target_squares = if MOVE_TYPE == MoveType::ALL {
-        !us_bb
-    } else if MOVE_TYPE == MoveType::CAPTURES {
+    let target_squares = if MOVE_TYPE == MoveType::CAPTURES {
+        // the bitboard of our opponent
         us_bb ^ occupancies
     } else {
-        panic!("Unknown movetype");
+        !us_bb
     };
 
     let bishops = board.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
@@ -634,5 +662,21 @@ fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
         for target in targets {
             moves.push(Move::new(queen, target));
         }
+    }
+}
+
+/// Generates the castling moves for the given side and puts them in `moves`.
+fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
+    let occupancies = board.occupancies();
+
+    if board.castling_rights().can_castle_kingside::<IS_WHITE>()
+        && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
+    {
+        moves.push(Move::new_castle::<IS_WHITE, true>());
+    }
+    if board.castling_rights().can_castle_queenside::<IS_WHITE>()
+        && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
+    {
+        moves.push(Move::new_castle::<IS_WHITE, false>());
     }
 }
