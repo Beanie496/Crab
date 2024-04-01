@@ -477,11 +477,6 @@ pub fn iterative_deepening(
         // the root search guarantees that there will always be 1 valid move in
         // the PV
         best_move = pv.get(0);
-
-        if search_info.check_status() != SearchStatus::Continue {
-            break 'iter_deep;
-        }
-
         let time = search_info.start.elapsed();
         let nps = 1_000_000 * search_info.nodes / time.as_micros() as u64;
 
