@@ -9,17 +9,14 @@ use std::{
 use crate::{
     board::{Board, Key},
     engine::ZobristStack,
-    evaluation::INF_EVAL,
     index_into_unchecked, index_unchecked,
     movegen::Move,
     util::Stack,
 };
-use alpha_beta::alpha_beta_search;
+use main_search::search;
 
 /// For carrying out the search.
-mod alpha_beta;
-/// Move ordering.
-mod ordering;
+mod main_search;
 /// Time management.
 mod time;
 
@@ -105,10 +102,6 @@ pub struct SearchInfo {
     seldepth: Depth,
     /// How many positions have been searched.
     nodes: u64,
-    /// The previous PV.
-    ///
-    /// This will be removed when I add TTs.
-    history: Pv,
     /// The status of the search: continue, stop or quit?
     status: SearchStatus,
     /// The limits of the search.
@@ -339,7 +332,6 @@ impl SearchInfo {
             seldepth: 0,
             nodes: 0,
             status: SearchStatus::Continue,
-            history: Pv::new(),
             limits: search_params.limits,
             allocated: time_allocated,
             uci_rx,
@@ -480,14 +472,7 @@ pub fn iterative_deepening(
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
 
-        let eval = alpha_beta_search::<RootNode>(
-            &mut search_info,
-            &mut pv,
-            board,
-            -INF_EVAL,
-            INF_EVAL,
-            depth,
-        );
+        let eval = search::<RootNode>(&mut search_info, &mut pv, board, depth);
 
         // the root search guarantees that there will always be 1 valid move in
         // the PV
@@ -515,8 +500,6 @@ pub fn iterative_deepening(
             break 'iter_deep;
         }
 
-        search_info.history.clear();
-        search_info.history.append_pv(&mut pv);
         pv.clear();
         depth += 1;
     }

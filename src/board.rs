@@ -63,17 +63,10 @@ pub struct Board {
     /// Which move number the current move is. Starts at 1 and is incremented
     /// when Black moves.
     fullmoves: u16,
-    /// The current phase of the game, where 0 means the midgame and 24 means
-    /// the endgame.
-    ///
-    /// `psq` uses this value to lerp between its midgame and endgame values.
-    /// It is incrementally updated.
-    phase: u8,
-    /// The current material balance weighted with piece-square tables, from
-    /// the perspective of White.
+    /// The current material balance from the perspective of White.
     ///
     /// It is incrementally updated.
-    psq: Score,
+    eval: Score,
     /// The current zobrist key of the board.
     ///
     /// It is incrementally updated.
@@ -209,7 +202,7 @@ impl FromStr for Board {
             board.set_side_to_move(Side::WHITE);
         } else {
             board.set_side_to_move(Side::BLACK);
-            board.toggle_zobrist_side();
+            board.toggle_side_zobrist();
         }
 
         // 3. castling rights
@@ -222,12 +215,12 @@ impl FromStr for Board {
                 _ => (),
             }
         }
-        board.toggle_zobrist_castling_rights(board.castling_rights());
+        board.toggle_castling_rights_zobrist(board.castling_rights());
 
         // 4. en passant
         let ep_square = ep_square.parse::<Square>()?;
         board.set_ep_square(ep_square);
-        board.toggle_zobrist_ep_square(ep_square);
+        board.toggle_ep_square_zobrist(ep_square);
 
         // 5. halfmoves
         let halfmoves = halfmoves.parse::<u8>()?;
@@ -335,8 +328,7 @@ impl Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            phase: 0,
-            psq: Score(0, 0),
+            eval: Score(0),
             zobrist: 0,
         }
     }
@@ -445,16 +437,16 @@ impl Board {
             self.reset_halfmoves();
         }
 
-        self.toggle_zobrist_ep_square(self.ep_square());
+        self.toggle_ep_square_zobrist(self.ep_square());
         // it's easiest just to unset them now and then re-set them later
         // rather than doing additional checks
-        self.toggle_zobrist_castling_rights(self.castling_rights());
+        self.toggle_castling_rights_zobrist(self.castling_rights());
         self.clear_ep_square();
 
         self.move_piece(start, end, piece, piece_type, us);
 
         if captured_type != PieceType::NONE {
-            self.update_bb_piece(end_bb, captured_type, them);
+            self.update_piece_bb(end_bb, captured_type, them);
             self.remove_accumulated_piece(end, captured);
 
             // check if we need to unset the castling rights if we're capturing
@@ -507,7 +499,7 @@ impl Board {
         } else if is_double_pawn_push(start, end, piece_type) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
-            self.toggle_zobrist_ep_square(ep_square);
+            self.toggle_ep_square_zobrist(ep_square);
         } else if is_en_passant {
             let dest = Square(if us == Side::WHITE {
                 end.0 - 8
@@ -557,7 +549,7 @@ impl Board {
             self.castling_rights_mut().clear_side(us);
         }
 
-        self.toggle_zobrist_castling_rights(self.castling_rights());
+        self.toggle_castling_rights_zobrist(self.castling_rights());
         self.flip_side();
 
         true
@@ -579,7 +571,7 @@ impl Board {
         // passing a full `u64` by argument
         let bb = Bitboard::from(start) | Bitboard::from(end);
         self.move_mailbox_piece(start, end, piece);
-        self.update_bb_piece(bb, piece_type, side);
+        self.update_piece_bb(bb, piece_type, side);
         self.move_accumulated_piece(start, end, piece);
     }
 
@@ -634,7 +626,7 @@ impl Board {
 
     /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
     /// the side bitboard of `side`.
-    fn update_bb_piece(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
+    fn update_piece_bb(&mut self, bb: Bitboard, piece_type: PieceType, side: Side) {
         self.toggle_piece_bb(piece_type, bb);
         self.toggle_side_bb(side, bb);
     }
@@ -658,7 +650,7 @@ impl Board {
 
     /// Flip the side to move.
     fn flip_side(&mut self) {
-        self.toggle_zobrist_side();
+        self.toggle_side_zobrist();
         self.side_to_move = self.side_to_move.flip();
     }
 

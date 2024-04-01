@@ -2,7 +2,7 @@ use super::{Board, CastlingRights, Key};
 use crate::{
     cfor,
     defs::{Piece, Square},
-    evaluation::{Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
+    evaluation::{Score, PIECE_VALUES},
     index_unchecked, out_of_bounds_is_unreachable,
 };
 
@@ -37,20 +37,9 @@ struct ZobristKeys {
 static ZOBRIST_KEYS: ZobristKeys = ZobristKeys::new();
 
 impl Board {
-    /// Gets the phase of the game. 0 is midgame and 24 is endgame.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn phase(&self) -> u8 {
-        self.phase
-    }
-
-    /// Calculates the current material + piece-square table balance.
-    ///
-    /// Since this value is incrementally upadated, this function is zero-cost
-    /// to call.
-    pub const fn psq(&self) -> Score {
-        self.psq
+    /// Returns the accumuted material balance.
+    pub const fn eval(&self) -> Score {
+        self.eval
     }
 
     /// Gets the zobrist key.
@@ -60,83 +49,58 @@ impl Board {
 
     /// Moves the accumulated `piece` from `start` to `end`.
     pub fn move_accumulated_piece(&mut self, start: Square, end: Square, piece: Piece) {
-        self.move_psq_piece(start, end, piece);
-        self.move_zobrist_piece(start, end, piece);
+        self.move_piece_zobrist(start, end, piece);
     }
 
     /// Adds `piece` on `square` to the accumulators.
     pub fn add_accumulated_piece(&mut self, square: Square, piece: Piece) {
-        self.add_phase_piece(piece);
-        self.add_psq_piece(square, piece);
-        self.toggle_zobrist_piece(square, piece);
+        self.add_piece_eval(piece);
+        self.toggle_piece_zobrist(square, piece);
     }
 
     /// Removes `piece` on `square` from the accumulators.
     pub fn remove_accumulated_piece(&mut self, square: Square, piece: Piece) {
-        self.remove_phase_piece(piece);
-        self.remove_psq_piece(square, piece);
-        self.toggle_zobrist_piece(square, piece);
+        self.remove_piece_eval(piece);
+        self.toggle_piece_zobrist(square, piece);
     }
 
-    /// Adds `piece` to `self.phase`.
-    fn add_phase_piece(&mut self, piece: Piece) {
-        self.phase += index_unchecked!(PHASE_WEIGHTS, piece.to_index());
+    /// Adds the value of `piece` to the eval accumulator.
+    fn add_piece_eval(&mut self, piece: Piece) {
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_VALUES.len());
+        self.eval += PIECE_VALUES[piece.to_index()];
     }
 
-    /// Removes `piece` from `self.phase`.
-    fn remove_phase_piece(&mut self, piece: Piece) {
-        self.phase -= index_unchecked!(PHASE_WEIGHTS, piece.to_index());
-    }
-
-    /// Updates the piece-square table accumulator by adding the difference
-    /// between the psqt value of the start and end square (which can be
-    /// negative).
-    fn move_psq_piece(&mut self, start: Square, end: Square, piece: Piece) {
-        self.remove_psq_piece(start, piece);
-        self.add_psq_piece(end, piece);
-    }
-
-    /// Adds the piece-square table value for `piece` at `square` to the psqt
-    /// accumulator.
-    fn add_psq_piece(&mut self, square: Square, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
-        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
-        self.psq += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
-    }
-
-    /// Removes the piece-square table value for `piece` at `square` from the
-    /// psqt accumulator.
-    fn remove_psq_piece(&mut self, square: Square, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
-        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
-        self.psq -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+    /// Removes the value of `piece` to the eval accumulator.
+    fn remove_piece_eval(&mut self, piece: Piece) {
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_VALUES.len());
+        self.eval -= PIECE_VALUES[piece.to_index()];
     }
 
     /// Removes the zobrist key of `piece` on `start` and adds it to `end`.
-    fn move_zobrist_piece(&mut self, start: Square, end: Square, piece: Piece) {
-        self.toggle_zobrist_piece(start, piece);
-        self.toggle_zobrist_piece(end, piece);
+    fn move_piece_zobrist(&mut self, start: Square, end: Square, piece: Piece) {
+        self.toggle_piece_zobrist(start, piece);
+        self.toggle_piece_zobrist(end, piece);
     }
 
     /// Toggles the zobrist key of the given piece on the given square.
     ///
     /// `piece` can be [`Piece::NONE`] but `square` has to be a valid square.
-    fn toggle_zobrist_piece(&mut self, square: Square, piece: Piece) {
+    fn toggle_piece_zobrist(&mut self, square: Square, piece: Piece) {
         self.zobrist ^= ZOBRIST_KEYS.piece_key(square, piece);
     }
 
     /// Toggles the side to move zobrist key.
-    pub fn toggle_zobrist_side(&mut self) {
+    pub fn toggle_side_zobrist(&mut self) {
         self.zobrist ^= ZOBRIST_KEYS.side_key();
     }
 
     /// Toggles the zobrist keys of the given castling rights.
-    pub fn toggle_zobrist_castling_rights(&mut self, rights: CastlingRights) {
+    pub fn toggle_castling_rights_zobrist(&mut self, rights: CastlingRights) {
         self.zobrist ^= ZOBRIST_KEYS.castling_rights_key(rights);
     }
 
     /// Toggles the zobrist keys of the given en passant square.
-    pub fn toggle_zobrist_ep_square(&mut self, square: Square) {
+    pub fn toggle_ep_square_zobrist(&mut self, square: Square) {
         self.zobrist ^= ZOBRIST_KEYS.ep_square_key(square);
     }
 }

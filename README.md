@@ -1,5 +1,7 @@
-This is a chess engine originally made for my Year 2 Computer Science A-level project.
+This is a chess engine made in Rust. It was originally made for my Year 2 Computer Science A-level project.
 
-To run, first make sure you have Cargo installed (which can be done by installing rust: https://rustup.rs). Then, run `cargo run --release` from any directory.
+Current elo: 705 ±82 against Stash v8
 
-If you want to contribute, read style.md for rules on style.
+Features:
+- Negamax
+- Material-only evaluation
