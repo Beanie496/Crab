@@ -27,4 +27,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: ${{ github.sha }}-linux-${{ matrix.vector_flags }}-${{ matrix.bit_flags }}
-        path: crab
+        path: crab/target/release
