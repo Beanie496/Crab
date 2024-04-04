@@ -20,7 +20,7 @@ use super::{Board, CastlingRights, Key};
 use crate::{
     cfor,
     defs::{Piece, Square},
-    evaluation::{Score, PIECE_VALUES},
+    evaluation::{Phase, Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
     index_unchecked, out_of_bounds_is_unreachable,
 };
 
@@ -55,9 +55,14 @@ struct ZobristKeys {
 static ZOBRIST_KEYS: ZobristKeys = ZobristKeys::new();
 
 impl Board {
-    /// Returns the accumuted material balance.
-    pub const fn eval(&self) -> Score {
-        self.eval
+    /// Returns the accumuted phase of the board.
+    pub const fn phase(&self) -> Phase {
+        self.phase
+    }
+
+    /// Returns the accumuted score of the board.
+    pub const fn score(&self) -> Score {
+        self.score
     }
 
     /// Gets the zobrist key.
@@ -67,31 +72,52 @@ impl Board {
 
     /// Moves the accumulated `piece` from `start` to `end`.
     pub fn move_accumulated_piece(&mut self, start: Square, end: Square, piece: Piece) {
+        self.move_piece_score(start, end, piece);
         self.move_piece_zobrist(start, end, piece);
     }
 
     /// Adds `piece` on `square` to the accumulators.
     pub fn add_accumulated_piece(&mut self, square: Square, piece: Piece) {
-        self.add_piece_eval(piece);
+        self.add_piece_phase(piece);
+        self.add_piece_score(square, piece);
         self.toggle_piece_zobrist(square, piece);
     }
 
     /// Removes `piece` on `square` from the accumulators.
     pub fn remove_accumulated_piece(&mut self, square: Square, piece: Piece) {
-        self.remove_piece_eval(piece);
+        self.remove_piece_phase(piece);
+        self.remove_piece_score(square, piece);
         self.toggle_piece_zobrist(square, piece);
     }
 
-    /// Adds the value of `piece` to the eval accumulator.
-    fn add_piece_eval(&mut self, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_VALUES.len());
-        self.eval += PIECE_VALUES[piece.to_index()];
+    /// Adds the value of `piece` to the phase accumulator.
+    fn add_piece_phase(&mut self, piece: Piece) {
+        self.phase += index_unchecked!(PHASE_WEIGHTS, piece.to_index());
     }
 
-    /// Removes the value of `piece` to the eval accumulator.
-    fn remove_piece_eval(&mut self, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_VALUES.len());
-        self.eval -= PIECE_VALUES[piece.to_index()];
+    /// Removes the value of `piece` to the phase accumulator.
+    fn remove_piece_phase(&mut self, piece: Piece) {
+        self.phase -= index_unchecked!(PHASE_WEIGHTS, piece.to_index());
+    }
+
+    /// Adds the value of `piece` to the score accumulator.
+    fn move_piece_score(&mut self, start: Square, end: Square, piece: Piece) {
+        self.remove_piece_score(start, piece);
+        self.add_piece_score(end, piece);
+    }
+
+    /// Adds the value of `piece` to the score accumulator.
+    fn add_piece_score(&mut self, square: Square, piece: Piece) {
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
+        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
+        self.score += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+    }
+
+    /// Removes the value of `piece` to the score accumulator.
+    fn remove_piece_score(&mut self, square: Square, piece: Piece) {
+        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
+        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
+        self.score -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
     }
 
     /// Removes the zobrist key of `piece` on `start` and adds it to `end`.

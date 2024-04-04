@@ -16,55 +16,65 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    fmt::{self, Display, Formatter},
-    ops::{Add, AddAssign, Neg, SubAssign},
-};
+use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 use crate::{
     board::Board,
-    defs::{Piece, Side},
+    defs::{Piece, Side, Square},
 };
 
-use values::create_piece_values;
+use values::create_piece_square_tables;
 
 /// Values related to evaluation.
 pub mod values;
 
 /// The result of an evaluation.
 pub type Eval = i16;
+/// The phase of the game, represented by the sum of the weights of the pieces
+/// of the board.
+///
+/// `0` is the endgame (because fewer pieces is closer to an endgame) and `24`
+/// is the middlegame (because the sum of the weights of the pieces of the
+/// starting position is 24). `> 24` is allowed: it happens with early
+/// promotion. It should be treated as 24.
+pub type Phase = u8;
 
 /// The highest possible (positive) evaluation.
 pub const INF_EVAL: Eval = Eval::MAX;
 /// The evaluation of a draw.
 pub const DRAW: Eval = 0;
-/// The piece values for White and black, with an extra value of 0 at the end
-/// to allow [`Piece::NONE`] to index into it.
-///
-/// `PIECE_VALUES[Piece::PIECE_TYPE] == value for that piece type and side`.
-pub static PIECE_VALUES: [Score; Piece::TOTAL + 1] = create_piece_values();
 
-/// A blend between middlegame value and endgame value.
+/// The piece-square tables for White and black, with an extra table of 0's to
+/// allow [`Piece::NONE`] to index into it. The piece values are baked in.
+///
+/// `PIECE_SQUARE_TABLES[Piece::PIECE_TYPE][Square::SQUARE] == value for that
+/// piece type and side on that square`.
+pub static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
+    create_piece_square_tables();
+/// The weight of each piece towards the phase.
+///
+/// Order: pawn, knight, bishop, rook, queen, king. Each piece has two values:
+/// one per side. The order of those two values depends on the order of
+/// [`Side::WHITE`] and [`Side::BLACK`]. An extra `0` is added at the end to
+/// allow [`Piece::NONE`] to index into it.
+pub static PHASE_WEIGHTS: [Phase; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+
+/// A blend between a middlegame and endgame value.
 #[derive(Clone, Copy)]
-pub struct Score(pub Eval);
+pub struct Score(pub Eval, pub Eval);
 
 impl Add for Score {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
+        Self(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
 
 impl AddAssign for Score {
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0;
-    }
-}
-
-impl Display for Score {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Score({})", self.0)
+        self.1 += rhs.1;
     }
 }
 
@@ -73,6 +83,7 @@ impl Neg for Score {
 
     fn neg(mut self) -> Self {
         self.0 = -self.0;
+        self.1 = -self.1;
         self
     }
 }
@@ -80,12 +91,27 @@ impl Neg for Score {
 impl SubAssign for Score {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
+        self.1 -= rhs.1;
+    }
+}
+
+impl Score {
+    /// Lerps the score between its middlegame and endgame value depending on
+    /// the phase.
+    fn lerp_to(self, phase: Phase) -> Eval {
+        let phase = Eval::from(phase.min(24));
+        let diff = self.1 - self.0;
+        self.1 - (diff * phase) / 24
     }
 }
 
 /// Calculates a static evaluation of the current board.
 pub fn evaluate(board: &Board) -> Eval {
-    let eval = board.eval().0;
+    let phase = board.phase();
+    let score = board.score();
+
+    let eval = score.lerp_to(phase);
+
     if board.side_to_move() == Side::WHITE {
         eval
     } else {

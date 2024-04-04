@@ -27,7 +27,7 @@ use crate::{
     bitboard::Bitboard,
     defs::{File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
-    evaluation::Score,
+    evaluation::{Phase, Score},
     index_into_unchecked, index_unchecked,
     movegen::{Move, LOOKUPS},
     util::is_double_pawn_push,
@@ -81,10 +81,14 @@ pub struct Board {
     /// Which move number the current move is. Starts at 1 and is incremented
     /// when Black moves.
     fullmoves: u16,
-    /// The current material balance from the perspective of White.
+    /// The current phase.
     ///
     /// It is incrementally updated.
-    eval: Score,
+    phase: Phase,
+    /// The current score from the perspective of White.
+    ///
+    /// It is incrementally updated.
+    score: Score,
     /// The current zobrist key of the board.
     ///
     /// It is incrementally updated.
@@ -346,7 +350,8 @@ impl Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            eval: Score(0),
+            phase: 0,
+            score: Score(0, 0),
             zobrist: 0,
         }
     }
