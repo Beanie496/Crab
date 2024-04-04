@@ -1,0 +1,30 @@
+name: OpenBench
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build_and_archive:
+    name: build and archive
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        vector_flags: [avx2, avx512]
+        bit_flags: [popcnt, pext]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: clone
+      uses: actions/checkout@v3
+    - name: build
+      run: cargo build --release --verbose
+    - name: test
+      run: cargo test --verbose
+    - name: archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ github.sha }}-linux-${{ matrix.vector_flags }}-${{ matrix.bit_flags }}
+        path: crab
