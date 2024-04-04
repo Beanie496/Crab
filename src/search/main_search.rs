@@ -99,10 +99,8 @@ pub fn search<NodeType: Node>(
     }
 
     if !NodeType::IS_ROOT && total_moves == 0 {
-        -INF_EVAL
-    } else {
-        DRAW
-    };
+        return if board.is_in_check() { -INF_EVAL } else { DRAW };
+    }
 
     best_score
 }
