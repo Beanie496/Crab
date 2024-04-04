@@ -27,6 +27,7 @@ use std::{
 use crate::{
     board::{Board, Key},
     engine::ZobristStack,
+    evaluation::INF_EVAL,
     index_into_unchecked, index_unchecked,
     movegen::Move,
     util::Stack,
@@ -490,7 +491,7 @@ pub fn iterative_deepening(
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
 
-        let eval = search::<RootNode>(&mut search_info, &mut pv, board, depth);
+        let eval = search::<RootNode>(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
 
         // the root search guarantees that there will always be 1 valid move in
         // the PV

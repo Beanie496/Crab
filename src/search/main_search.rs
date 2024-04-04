@@ -33,6 +33,8 @@ pub fn search<NodeType: Node>(
     search_info: &mut SearchInfo,
     pv: &mut Pv,
     board: &Board,
+    mut alpha: Eval,
+    beta: Eval,
     depth: Depth,
 ) -> Eval {
     if depth == 0 {
@@ -53,14 +55,15 @@ pub fn search<NodeType: Node>(
         if !copy.make_move(mv) {
             continue;
         }
+        search_info.past_zobrists.push(copy.zobrist());
 
         // make sure we always have at least one legal move ready to play
         if NodeType::IS_ROOT && total_moves == 0 {
             pv.enqueue(mv);
         }
 
-        search_info.past_zobrists.push(copy.zobrist());
-        let result = -search::<OtherNode>(search_info, &mut new_pv, &copy, depth - 1);
+        let eval = -search::<OtherNode>(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+
         search_info.past_zobrists.pop();
         search_info.nodes += 1;
 
@@ -69,12 +72,26 @@ pub fn search<NodeType: Node>(
             return 0;
         }
 
-        // We've found a better move for us, but not good enough to raise beta.
-        if result > best_score {
-            best_score = result;
-            pv.clear();
-            pv.enqueue(mv);
-            pv.append_pv(&mut new_pv);
+        // the move is the best so far at this node
+        if eval > best_score {
+            best_score = eval;
+
+            // the move is even better than what we originally had
+            if eval > alpha {
+                alpha = eval;
+                pv.clear();
+                pv.enqueue(mv);
+                pv.append_pv(&mut new_pv);
+
+                // the move is too good: our opponent is never going to pick
+                // the move that leads to this node because it is guaranteed to
+                // result in a worse position for them, so we can safely prune
+                // this node
+                if eval >= beta {
+                    // fail-soft
+                    return eval;
+                }
+            }
         }
 
         new_pv.clear();
