@@ -496,7 +496,9 @@ pub fn iterative_deepening(
         // the PV
         best_move = pv.get(0);
         let time = search_info.start.elapsed();
-        let nps = 1_000_000 * search_info.nodes / time.as_micros() as u64;
+        // `max(1)` because a search can apparently take less than 1
+        // microsecond
+        let nps = 1_000_000 * search_info.nodes / time.as_micros().max(1) as u64;
 
         println!(
             "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
