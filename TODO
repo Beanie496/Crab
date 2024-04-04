@@ -1,5 +1,28 @@
-- look into all the variations of magic bitboards
-  - black magic is a nice table size reduction of 18% at the cost of one additional instruction
-  - byte lookup massively reduces the table size (all tables fit into my l1 cache!!) at the cost of an additional lookup
-  - sharing attacks halves the table size at the cost of one additional instruction
-    - adding the shift as well reduces the size of the magic struct at the cost of an additional instruction
+- psq
+- ab pruning
+- qs
+- TT
+- move ordering
+- pvs
+- asp windows
+- tune psq
+- lazy smp
+- nmp
+- fp
+- rfp
+- lmr
+- lmp
+- butterfly history
+- counter move history
+- followup move history
+- qs see
+- pvs see (captures and quiets)
+- qs delta pruning
+- history pruning
+- capture history
+- singular extensions
+- multicut
+- nnue
+- buckets
+- black magic bitboards
+- magic bitboards that share attacks
