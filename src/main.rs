@@ -19,6 +19,7 @@
 //! Crab, a UCI-compatible chess engine written in Rust.
 //!
 //! Accepted commands:
+//! - `bench`: run a benchmark
 //! - `f`: find magics for the bishop and rook
 //! - `go` with the options `wtime`, `btime`, `winc`, `binc`, `movestogo`,
 //!   `depth`, `nodes`, `movetime` and `infinite`. There's also a special
@@ -32,6 +33,13 @@
 //! - `uci`
 //! - `ucinewgame`
 //! - `quit`
+//!
+//! This program also accepted command-line arguments, which it will process
+//! and execute before running the UCI loop as normal.
+//! Accepted command-line arguments:
+//! - `bench`: runs a benchmark on the test positions in the root-level
+//!   directory
+//! - `quit`: same as UCI `quit`
 
 use std::sync::mpsc::RecvError;
 

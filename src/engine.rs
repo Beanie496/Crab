@@ -140,12 +140,13 @@ impl Engine {
         }
 
         let search_params = SearchParams::new(limits, self.options().move_overhead());
+        let board = *self.board();
 
         iterative_deepening(
             search_params,
-            self.board(),
+            &board,
             self.uci_rx(),
-            self.past_zobrists().clone(),
+            self.past_zobrists_mut(),
         );
     }
 
@@ -306,12 +307,6 @@ impl Engine {
     /// Returns a reference-counted receiver to the inputted UCI commands.
     pub fn uci_rx(&self) -> Rc<Receiver<String>> {
         Rc::clone(&self.uci_rx)
-    }
-
-    /// Returns a reference to the current stack of zobrist hashes of board
-    /// states.
-    pub const fn past_zobrists(&self) -> &ZobristStack {
-        &self.past_zobrists
     }
 
     /// Returns a mutable reference to the current stack of zobrist hashes of

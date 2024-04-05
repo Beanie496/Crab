@@ -16,9 +16,9 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
+use std::{env::args, ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
 
-use crate::{defs::PieceType, engine::Engine, movegen::magic::find_magics};
+use crate::{bench::bench, defs::PieceType, engine::Engine, movegen::magic::find_magics};
 
 /// The UCI options this engine supports.
 #[derive(Clone, Copy)]
@@ -86,13 +86,21 @@ impl UciOptions {
 }
 
 impl Engine {
-    /// Repeatedly waits for a command and executes it according to the UCI
-    /// protocol.
+    /// Handles command-line arguments, then repeatedly waits for a command and
+    /// executes it according to the UCI protocol.
     ///
     /// Will run until [`recv()`](std::sync::mpsc::Receiver::recv) on the UCI
     /// receiver returns an error or the process exits. I would make the [`Ok`]
     /// type a never type, but that's experimental.
     pub fn main_loop(&mut self) -> Result<(), RecvError> {
+        for token in args() {
+            match token.as_str() {
+                "bench" => bench(),
+                "quit" => exit(0),
+                _ => (),
+            }
+        }
+
         loop {
             // the sender will never hang up
             let command = self.uci_rx().recv()?;
@@ -107,6 +115,7 @@ impl Engine {
         };
 
         match command {
+            "bench" => bench(),
             "f" => {
                 find_magics::<{ PieceType::BISHOP.0 }>();
                 find_magics::<{ PieceType::ROOK.0 }>();

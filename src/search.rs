@@ -25,12 +25,11 @@ use std::{
 };
 
 use crate::{
-    board::{Board, Key},
+    board::Board,
     engine::ZobristStack,
-    evaluation::INF_EVAL,
+    evaluation::{Eval, INF_EVAL},
     index_into_unchecked, index_unchecked,
     movegen::Move,
-    util::Stack,
 };
 use main_search::search;
 
@@ -66,6 +65,7 @@ impl Node for RootNode {
 }
 
 /// The type of a search and its limits.
+#[derive(Clone, Copy)]
 pub enum Limits {
     /// Go under timed conditions.
     Timed {
@@ -100,7 +100,8 @@ enum SearchStatus {
 }
 
 /// The principle variation: the current best sequence of moves for both sides.
-struct Pv {
+#[derive(Clone)]
+pub struct Pv {
     /// A non-circular queue of moves.
     moves: [Move; Depth::MAX as usize],
     /// Index of the first [`Move`].
@@ -112,7 +113,7 @@ struct Pv {
 }
 
 /// Information about a search.
-pub struct SearchInfo {
+pub struct SearchInfo<'a> {
     /// The moment the search started.
     start: Instant,
     /// The depth being searched.
@@ -138,7 +139,7 @@ pub struct SearchInfo {
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
-    past_zobrists: ZobristStack,
+    past_zobrists: &'a mut ZobristStack,
 }
 
 /// The parameters of a search.
@@ -149,6 +150,24 @@ pub struct SearchParams {
     limits: Limits,
     /// The overhead of sending a move.
     move_overhead: Duration,
+}
+
+/// The final results of a search.
+pub struct SearchReport {
+    /// The maximum depth searched.
+    pub depth: Depth,
+    /// The maximum depth reached.
+    pub seldepth: Depth,
+    /// How many positions were searched.
+    pub nodes: u64,
+    /// How long the search took.
+    pub time: Duration,
+    /// The average number of nodes searches per second.
+    pub nps: u64,
+    /// The final evaluation.
+    pub eval: Eval,
+    /// The principle variation.
+    pub pv: Pv,
 }
 
 impl Default for Limits {
@@ -174,6 +193,22 @@ impl Iterator for Pv {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
+    }
+}
+
+impl Display for SearchReport {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
+            self.depth,
+            self.seldepth,
+            self.eval,
+            self.nodes,
+            self.time.as_millis(),
+            self.nps,
+            self.pv,
+        )
     }
 }
 
@@ -336,14 +371,17 @@ impl Pv {
     }
 }
 
-impl SearchInfo {
+impl<'a> SearchInfo<'a> {
     /// Creates a new [`SearchInfo`], which includes but is not limited to the
     /// given parameters.
+    // I do want `search_params` to be consumed here because I don't want it to
+    // be used afterwards
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         search_params: SearchParams,
         time_allocated: Duration,
         uci_rx: Rc<Receiver<String>>,
-        past_zobrists: Stack<Key, { Depth::MAX as usize }>,
+        past_zobrists: &'a mut ZobristStack,
     ) -> Self {
         Self {
             start: search_params.start,
@@ -473,20 +511,42 @@ impl SearchParams {
     }
 }
 
+impl SearchReport {
+    /// Creates a new [`SearchReport`] given the information of a completed
+    /// search.
+    const fn new(
+        search_info: &SearchInfo<'_>,
+        time: Duration,
+        nps: u64,
+        eval: Eval,
+        pv: Pv,
+    ) -> Self {
+        Self {
+            depth: search_info.depth,
+            seldepth: search_info.seldepth,
+            nodes: search_info.nodes,
+            time,
+            nps,
+            eval,
+            pv,
+        }
+    }
+}
+
 /// Performs iterative deepening on the given board.
 pub fn iterative_deepening(
     search_params: SearchParams,
     board: &Board,
     uci_rx: Rc<Receiver<String>>,
-    past_zobrists: Stack<Key, { Depth::MAX as usize }>,
-) {
+    past_zobrists: &mut ZobristStack,
+) -> SearchReport {
     let time_allocated = search_params.calculate_time_window();
     let mut search_info = SearchInfo::new(search_params, time_allocated, uci_rx, past_zobrists);
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;
 
-    'iter_deep: loop {
+    let report = 'iter_deep: loop {
         search_info.depth = depth;
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
@@ -500,29 +560,23 @@ pub fn iterative_deepening(
         // `max(1)` because a search can apparently take less than 1
         // microsecond
         let nps = 1_000_000 * search_info.nodes / time.as_micros().max(1) as u64;
+        let report = SearchReport::new(&search_info, time, nps, eval, pv.clone());
 
-        println!(
-            "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
-            depth,
-            search_info.seldepth,
-            eval,
-            search_info.nodes,
-            time.as_millis(),
-            nps,
-            pv,
-        );
+        println!("{report}");
 
         if search_info.should_stop() {
-            break 'iter_deep;
+            break 'iter_deep report;
         }
 
         pv.clear();
         depth += 1;
-    }
+    };
 
     println!("bestmove {best_move}");
 
     if search_info.check_status() == SearchStatus::Quit {
         exit(0);
     }
+
+    report
 }

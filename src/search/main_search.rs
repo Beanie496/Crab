@@ -30,7 +30,7 @@ use crate::{
 /// is `Root`, `pv` will always have at least one legal move in it after the
 /// search.
 pub fn search<NodeType: Node>(
-    search_info: &mut SearchInfo,
+    search_info: &mut SearchInfo<'_>,
     pv: &mut Pv,
     board: &Board,
     mut alpha: Eval,
@@ -69,7 +69,7 @@ pub fn search<NodeType: Node>(
 
         // if the search was stopped early, we can't trust its results
         if search_info.check_status() != SearchStatus::Continue {
-            return 0;
+            return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 
         // the move is the best so far at this node
