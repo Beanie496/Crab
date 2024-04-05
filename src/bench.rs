@@ -60,7 +60,7 @@ pub fn bench() {
 
     let total_time = total_time.as_millis();
     println!(
-        "nodes {total_nodes} time {total_time} nps {}",
+        "{total_nodes} nodes {} nps {total_time} ms",
         (total_nodes * 1000) / total_time.max(1) as u64,
     );
 }
