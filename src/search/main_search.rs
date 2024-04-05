@@ -38,7 +38,7 @@ pub fn search<NodeType: Node>(
     depth: Depth,
 ) -> Eval {
     if depth == 0 {
-        return evaluate(board);
+        return quiescence_search(search_info, board, alpha, beta, 0);
     }
 
     if !NodeType::IS_ROOT && search_info.is_draw(board.halfmoves()) {
@@ -100,6 +100,61 @@ pub fn search<NodeType: Node>(
 
     if !NodeType::IS_ROOT && total_moves == 0 {
         return if board.is_in_check() { -INF_EVAL } else { DRAW };
+    }
+
+    best_score
+}
+
+/// Performs a search that only considers captures and uses a static evaluation
+/// at the leaf nodes.
+///
+/// This should be called at the leaf nodes of the main search.
+fn quiescence_search(
+    search_info: &mut SearchInfo<'_>,
+    board: &Board,
+    mut alpha: Eval,
+    beta: Eval,
+    height: Depth,
+) -> Eval {
+    search_info.seldepth = search_info.seldepth.max(search_info.depth + height);
+
+    let mut best_score = evaluate(board);
+
+    if best_score > alpha {
+        alpha = best_score;
+
+        if best_score >= beta {
+            return best_score;
+        }
+    }
+
+    let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
+
+    for mv in moves {
+        let mut copy = *board;
+        if !copy.make_move(mv) {
+            continue;
+        }
+
+        let eval = -quiescence_search(search_info, &copy, -beta, -alpha, height + 1);
+
+        search_info.nodes += 1;
+
+        if search_info.check_status() != SearchStatus::Continue {
+            return 0;
+        }
+
+        if eval > best_score {
+            best_score = eval;
+
+            if eval > alpha {
+                alpha = eval;
+
+                if eval >= beta {
+                    return eval;
+                }
+            }
+        }
     }
 
     best_score
