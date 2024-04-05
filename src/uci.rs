@@ -16,7 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{env::args, ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
+use std::{ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
 
 use crate::{bench::bench, defs::PieceType, engine::Engine, movegen::magic::find_magics};
 
@@ -86,21 +86,13 @@ impl UciOptions {
 }
 
 impl Engine {
-    /// Handles command-line arguments, then repeatedly waits for a command and
-    /// executes it according to the UCI protocol.
+    /// Repeatedly waits for a command and executes it according to the UCI
+    /// protocol.
     ///
     /// Will run until [`recv()`](std::sync::mpsc::Receiver::recv) on the UCI
     /// receiver returns an error or the process exits. I would make the [`Ok`]
     /// type a never type, but that's experimental.
     pub fn main_loop(&mut self) -> Result<(), RecvError> {
-        for token in args() {
-            match token.as_str() {
-                "bench" => bench(),
-                "quit" => exit(0),
-                _ => (),
-            }
-        }
-
         loop {
             // the sender will never hang up
             let command = self.uci_rx().recv()?;

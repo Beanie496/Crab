@@ -41,8 +41,9 @@
 //!   directory
 //! - `quit`: same as UCI `quit`
 
-use std::sync::mpsc::RecvError;
+use std::{env::args, process::exit, sync::mpsc::RecvError};
 
+use bench::bench;
 use engine::Engine;
 
 /// Unit testing.
@@ -71,6 +72,18 @@ mod uci;
 mod util;
 
 fn main() -> Result<(), RecvError> {
+    // if there are any command-line arguments, run them and exit
+    if args().len() > 1 {
+        for token in args() {
+            match token.as_str() {
+                "bench" => bench(),
+                "quit" => exit(0),
+                _ => (),
+            }
+        }
+        exit(0);
+    }
+
     Engine::new().main_loop()?;
     Ok(())
 }
