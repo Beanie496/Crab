@@ -72,25 +72,21 @@ pub fn search<NodeType: Node>(
             return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 
-        // the move is the best so far at this node
-        if score > best_score {
-            best_score = score;
+        best_score = best_score.max(score);
+        // the move is even better than what we originally had
+        if score > alpha {
+            alpha = score;
+            pv.clear();
+            pv.enqueue(mv);
+            pv.append_pv(&mut new_pv);
 
-            // the move is even better than what we originally had
-            if score > alpha {
-                alpha = score;
-                pv.clear();
-                pv.enqueue(mv);
-                pv.append_pv(&mut new_pv);
-
-                // the move is too good: our opponent is never going to pick
-                // the move that leads to this node because it is guaranteed to
-                // result in a worse position for them, so we can safely prune
-                // this node
-                if score >= beta {
-                    // fail-soft
-                    return score;
-                }
+            // the move is too good: our opponent is never going to pick
+            // the move that leads to this node because it is guaranteed to
+            // result in a worse position for them, so we can safely prune
+            // this node
+            if alpha >= beta {
+                // fail-soft
+                return alpha;
             }
         }
 
@@ -120,12 +116,9 @@ fn quiescence_search(
 
     let mut best_score = evaluate(board);
 
-    if best_score > alpha {
-        alpha = best_score;
-
-        if best_score >= beta {
-            return best_score;
-        }
+    alpha = alpha.max(best_score);
+    if alpha >= beta {
+        return alpha;
     }
 
     let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
@@ -144,16 +137,10 @@ fn quiescence_search(
             return 0;
         }
 
-        if score > best_score {
-            best_score = score;
-
-            if score > alpha {
-                alpha = score;
-
-                if score >= beta {
-                    return score;
-                }
-            }
+        best_score = best_score.max(score);
+        alpha = alpha.max(score);
+        if alpha >= beta {
+            return alpha;
         }
     }
 
