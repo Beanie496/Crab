@@ -38,7 +38,8 @@ mod main_search;
 /// Time management.
 mod time;
 
-/// The storage type for a given depth.
+/// The difference between the root or leaf node (for height or depth
+/// respectively) and the current node.
 pub type Depth = u8;
 
 /// A marker for a type of node to allow searches with generic node types.
@@ -558,8 +559,6 @@ pub fn iterative_deepening(
         // the PV
         best_move = pv.get(0);
         let time = search_info.start.elapsed();
-        // `max(1)` because a search can apparently take less than 1
-        // microsecond
         let nps = 1_000_000 * search_info.nodes / time.as_micros().max(1) as u64;
         let report = SearchReport::new(&search_info, time, nps, score, pv.clone());
 
