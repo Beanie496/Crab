@@ -25,6 +25,8 @@ use crate::{bench::bench, defs::PieceType, engine::Engine, movegen::magic::find_
 pub struct UciOptions {
     /// The overhead of sending a move from the engine to the GUI.
     move_overhead: Duration,
+    /// How many threads should be used.
+    threads: usize,
 }
 
 /// The name of the author of this engine.
@@ -38,12 +40,15 @@ const ID_VERSION: &str = env!("CARGO_PKG_VERSION");
 impl UciOptions {
     /// The range that the move overhead can take, in milliseconds.
     pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1000);
+    /// The range that the number of threads can take.
+    pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
 }
 
 impl Default for UciOptions {
     fn default() -> Self {
         Self {
             move_overhead: Duration::from_millis(1),
+            threads: 1,
         }
     }
 }
@@ -59,6 +64,7 @@ impl UciOptions {
     fn print() {
         let defaults = Self::default();
         let move_overhead_range = Self::MOVE_OVERHEAD_RANGE;
+        let thread_range = Self::THREAD_RANGE;
 
         println!("id name {ID_NAME} {ID_VERSION}");
         println!("id author {ID_AUTHOR}");
@@ -67,6 +73,12 @@ impl UciOptions {
             defaults.move_overhead().as_millis(),
             move_overhead_range.start(),
             move_overhead_range.end(),
+        );
+        println!(
+            "option name Threads type spin default {} min {} max {}",
+            defaults.threads(),
+            thread_range.start(),
+            thread_range.end(),
         );
     }
 
@@ -79,9 +91,20 @@ impl UciOptions {
         ));
     }
 
+    /// Sets the move overhead, in milliseconds, clamped in the range
+    /// [`THREAD_RANGE`](Self::THREAD_RANGE).
+    pub fn set_threads(&mut self, threads: usize) {
+        self.threads = threads.clamp(*Self::THREAD_RANGE.start(), *Self::THREAD_RANGE.end());
+    }
+
     /// Returns the move overhead.
     pub const fn move_overhead(&self) -> Duration {
         self.move_overhead
+    }
+
+    /// Returns the number of threads.
+    pub const fn threads(&self) -> usize {
+        self.threads
     }
 }
 

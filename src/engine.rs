@@ -256,8 +256,7 @@ impl Engine {
         let Some(token) = tokens.next() else {
             return;
         };
-        // more options added later, so be quiet, clippy
-        #[allow(clippy::single_match)]
+
         match token {
             "Move" => {
                 if tokens.next() != Some("Overhead") {
@@ -269,6 +268,15 @@ impl Engine {
 
                 if let Some(d) = parse_option(tokens.next()) {
                     self.options_mut().set_move_overhead(d);
+                }
+            }
+            "Threads" => {
+                if tokens.next() != Some("value") {
+                    return;
+                }
+
+                if let Some(t) = parse_option(tokens.next()) {
+                    self.options_mut().set_threads(t);
                 }
             }
             _ => (),
