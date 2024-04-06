@@ -164,8 +164,8 @@ pub struct SearchReport {
     pub time: Duration,
     /// The average number of nodes searches per second.
     pub nps: u64,
-    /// The final evaluation.
-    pub eval: Eval,
+    /// The final score.
+    pub score: Eval,
     /// The principle variation.
     pub pv: Pv,
 }
@@ -203,7 +203,7 @@ impl Display for SearchReport {
             "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
             self.depth,
             self.seldepth,
-            self.eval,
+            self.score,
             self.nodes,
             self.time.as_millis(),
             self.nps,
@@ -518,7 +518,7 @@ impl SearchReport {
         search_info: &SearchInfo<'_>,
         time: Duration,
         nps: u64,
-        eval: Eval,
+        score: Eval,
         pv: Pv,
     ) -> Self {
         Self {
@@ -527,7 +527,7 @@ impl SearchReport {
             nodes: search_info.nodes,
             time,
             nps,
-            eval,
+            score,
             pv,
         }
     }
@@ -551,7 +551,8 @@ pub fn iterative_deepening(
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
 
-        let eval = search::<RootNode>(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
+        let score =
+            search::<RootNode>(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
 
         // the root search guarantees that there will always be 1 valid move in
         // the PV
@@ -560,7 +561,7 @@ pub fn iterative_deepening(
         // `max(1)` because a search can apparently take less than 1
         // microsecond
         let nps = 1_000_000 * search_info.nodes / time.as_micros().max(1) as u64;
-        let report = SearchReport::new(&search_info, time, nps, eval, pv.clone());
+        let report = SearchReport::new(&search_info, time, nps, score, pv.clone());
 
         println!("{report}");
 

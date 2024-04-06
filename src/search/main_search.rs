@@ -62,7 +62,7 @@ pub fn search<NodeType: Node>(
             pv.enqueue(mv);
         }
 
-        let eval = -search::<OtherNode>(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+        let score = -search::<OtherNode>(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
 
         search_info.past_zobrists.pop();
         search_info.nodes += 1;
@@ -73,12 +73,12 @@ pub fn search<NodeType: Node>(
         }
 
         // the move is the best so far at this node
-        if eval > best_score {
-            best_score = eval;
+        if score > best_score {
+            best_score = score;
 
             // the move is even better than what we originally had
-            if eval > alpha {
-                alpha = eval;
+            if score > alpha {
+                alpha = score;
                 pv.clear();
                 pv.enqueue(mv);
                 pv.append_pv(&mut new_pv);
@@ -87,9 +87,9 @@ pub fn search<NodeType: Node>(
                 // the move that leads to this node because it is guaranteed to
                 // result in a worse position for them, so we can safely prune
                 // this node
-                if eval >= beta {
+                if score >= beta {
                     // fail-soft
-                    return eval;
+                    return score;
                 }
             }
         }
@@ -136,7 +136,7 @@ fn quiescence_search(
             continue;
         }
 
-        let eval = -quiescence_search(search_info, &copy, -beta, -alpha, height + 1);
+        let score = -quiescence_search(search_info, &copy, -beta, -alpha, height + 1);
 
         search_info.nodes += 1;
 
@@ -144,14 +144,14 @@ fn quiescence_search(
             return 0;
         }
 
-        if eval > best_score {
-            best_score = eval;
+        if score > best_score {
+            best_score = score;
 
-            if eval > alpha {
-                alpha = eval;
+            if score > alpha {
+                alpha = score;
 
-                if eval >= beta {
-                    return eval;
+                if score >= beta {
+                    return score;
                 }
             }
         }

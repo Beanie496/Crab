@@ -23,4 +23,3 @@
 - buckets
 - black magic bitboards
 - magic bitboards that share attacks
-- test `best_score.max(eval)` etc. instead of the `if` statements
