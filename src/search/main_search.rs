@@ -53,7 +53,9 @@ pub fn search<NodeType: Node>(
                 || entry.bound() == Bound::Lower && entry.score() >= beta
                 || entry.bound() == Bound::Upper && entry.score() <= alpha)
         {
-            pv.enqueue(entry.mv());
+            if NodeType::IS_ROOT {
+                pv.enqueue(entry.mv());
+            }
             return entry.score();
         }
     }
