@@ -37,7 +37,6 @@ static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
 /// If the 7th token is not the last, it will use that as the depth instead of
 /// the default.
 pub fn bench() {
-    let start = Instant::now();
     let mut limits = Limits::default();
     let mut zobrists = ZobristStack::new();
     let (_tx, rx) = channel();
@@ -63,6 +62,7 @@ pub fn bench() {
         let board = fen_str.parse::<Board>().expect("Malformed test position");
         fen_str.clear();
 
+        let start = Instant::now();
         let report = iterative_deepening(
             board,
             UciOptions::default(),
