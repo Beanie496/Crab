@@ -29,6 +29,7 @@ use crate::{
     evaluation::{Eval, INF_EVAL},
     index_into_unchecked, index_unchecked,
     movegen::Move,
+    transposition_table::TranspositionTable,
     uci::UciOptions,
 };
 use main_search::search;
@@ -138,6 +139,8 @@ pub struct SearchInfo<'a> {
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     past_zobrists: &'a mut ZobristStack,
+    /// The transposition table.
+    tt: &'a TranspositionTable,
 }
 
 /// The final results of a search.
@@ -368,6 +371,7 @@ impl<'a> SearchInfo<'a> {
         allocated: Duration,
         uci_rx: &'a Mutex<Receiver<String>>,
         past_zobrists: &'a mut ZobristStack,
+        tt: &'a TranspositionTable,
     ) -> Self {
         Self {
             start,
@@ -379,6 +383,7 @@ impl<'a> SearchInfo<'a> {
             allocated,
             uci_rx,
             past_zobrists,
+            tt,
         }
     }
 
@@ -516,9 +521,10 @@ pub fn iterative_deepening(
     past_zobrists: &mut ZobristStack,
     limits: Limits,
     start: Instant,
+    tt: &TranspositionTable,
 ) -> SearchReport {
     let allocated = calculate_time_window(limits, start, options.move_overhead());
-    let mut search_info = SearchInfo::new(start, limits, allocated, uci_rx, past_zobrists);
+    let mut search_info = SearchInfo::new(start, limits, allocated, uci_rx, past_zobrists, tt);
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;

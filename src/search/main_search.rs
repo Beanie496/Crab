@@ -21,7 +21,8 @@ use crate::{
     board::Board,
     defs::MoveType,
     evaluation::{evaluate, Eval, DRAW, INF_EVAL},
-    movegen::generate_moves,
+    movegen::{generate_moves, Move},
+    transposition_table::{Bound, TranspositionEntry},
 };
 
 /// Performs a search on `board`.
@@ -45,7 +46,22 @@ pub fn search<NodeType: Node>(
         return DRAW;
     }
 
+    // load from tt
+    if let Some(entry) = search_info.tt.load(board.zobrist()) {
+        if entry.depth() >= depth
+            && (entry.bound() == Bound::Exact
+                || entry.bound() == Bound::Lower && entry.score() >= beta
+                || entry.bound() == Bound::Upper && entry.score() <= alpha)
+        {
+            if NodeType::IS_ROOT {
+                pv.enqueue(entry.mv());
+            }
+            return entry.score();
+        }
+    }
+
     let mut best_score = -INF_EVAL;
+    let mut best_move = Move::null();
     let mut new_pv = Pv::new();
     let moves = generate_moves::<{ MoveType::ALL }>(board);
 
@@ -56,6 +72,7 @@ pub fn search<NodeType: Node>(
             continue;
         }
         search_info.past_zobrists.push(copy.zobrist());
+        total_moves += 1;
 
         // make sure we always have at least one legal move ready to play
         if NodeType::IS_ROOT && total_moves == 0 {
@@ -76,6 +93,8 @@ pub fn search<NodeType: Node>(
         // the move is even better than what we originally had
         if score > alpha {
             alpha = score;
+            best_move = mv;
+
             pv.clear();
             pv.enqueue(mv);
             pv.append_pv(&mut new_pv);
@@ -85,18 +104,28 @@ pub fn search<NodeType: Node>(
             // result in a worse position for them, so we can safely prune
             // this node
             if alpha >= beta {
-                // fail-soft
-                return alpha;
+                break;
             }
         }
 
         new_pv.clear();
-        total_moves += 1;
     }
 
     if !NodeType::IS_ROOT && total_moves == 0 {
         return if board.is_in_check() { -INF_EVAL } else { DRAW };
     }
+
+    // store into tt
+    let bound = if best_score >= beta {
+        Bound::Lower
+    // this only happens if we fail to raise alpha
+    } else if best_move == Move::null() {
+        Bound::Upper
+    } else {
+        Bound::Exact
+    };
+    let tt_entry = TranspositionEntry::new(board.zobrist(), best_score, best_move, bound, depth);
+    search_info.tt.store(board.zobrist(), tt_entry);
 
     best_score
 }

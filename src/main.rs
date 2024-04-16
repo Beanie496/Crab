@@ -66,6 +66,8 @@ mod movegen;
 mod perft;
 /// Items related to searching.
 mod search;
+/// A transposition table.
+mod transposition_table;
 /// Items for handling UCI input.
 mod uci;
 /// Utility.
