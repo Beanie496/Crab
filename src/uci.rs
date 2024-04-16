@@ -45,7 +45,8 @@ impl UciOptions {
     /// The range that the number of threads can take.
     pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
     /// The range that the hash size can take.
-    pub const HASH_RANGE: RangeInclusive<usize> = (1..=isize::MAX as usize);
+    // cutechess can't handle anything bigger than a C int
+    pub const HASH_RANGE: RangeInclusive<usize> = (1..=i32::MAX as usize);
 }
 
 impl Default for UciOptions {
