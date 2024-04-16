@@ -27,6 +27,8 @@ pub struct UciOptions {
     move_overhead: Duration,
     /// How many threads should be used.
     threads: usize,
+    /// How large the transposition table should be, in MiB.
+    hash: usize,
 }
 
 /// The name of the author of this engine.
@@ -42,6 +44,8 @@ impl UciOptions {
     pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1_000);
     /// The range that the number of threads can take.
     pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
+    /// The range that the hash size can take.
+    pub const HASH_RANGE: RangeInclusive<usize> = (1..=isize::MAX as usize);
 }
 
 impl Default for UciOptions {
@@ -49,6 +53,7 @@ impl Default for UciOptions {
         Self {
             move_overhead: Duration::from_millis(1),
             threads: 1,
+            hash: 32,
         }
     }
 }
@@ -65,6 +70,7 @@ impl UciOptions {
         let defaults = Self::default();
         let move_overhead_range = Self::MOVE_OVERHEAD_RANGE;
         let thread_range = Self::THREAD_RANGE;
+        let hash_range = Self::HASH_RANGE;
 
         println!("id name {ID_NAME} {ID_VERSION}");
         println!("id author {ID_AUTHOR}");
@@ -80,6 +86,13 @@ impl UciOptions {
             thread_range.start(),
             thread_range.end(),
         );
+        println!(
+            "option name Hash type spin default {} min {} max {}",
+            defaults.hash(),
+            hash_range.start(),
+            hash_range.end(),
+        );
+        println!("option name Clear Hash type button");
     }
 
     /// Sets the move overhead, in milliseconds, clamped in the range
@@ -97,6 +110,12 @@ impl UciOptions {
         self.threads = threads.clamp(*Self::THREAD_RANGE.start(), *Self::THREAD_RANGE.end());
     }
 
+    /// Sets the hash range, clamped in the range
+    /// [`HASH_RANGE`](Self::HASH_RANGE).
+    pub fn set_hash(&mut self, hash: usize) {
+        self.hash = hash.clamp(*Self::HASH_RANGE.start(), *Self::HASH_RANGE.end());
+    }
+
     /// Returns the move overhead.
     pub const fn move_overhead(&self) -> Duration {
         self.move_overhead
@@ -105,6 +124,11 @@ impl UciOptions {
     /// Returns the number of threads.
     pub const fn threads(&self) -> usize {
         self.threads
+    }
+
+    /// Returns the hash size.
+    pub const fn hash(&self) -> usize {
+        self.hash
     }
 }
 
@@ -155,7 +179,7 @@ impl Engine {
                 println!("uciok");
             }
             "ucinewgame" => {
-                self.initialise();
+                self.reset();
             }
             "quit" => {
                 exit(0);

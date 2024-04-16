@@ -1,4 +1,4 @@
-- TT
+- remove the last 3 fields from `SearchInfo`
 - move ordering
 - pvs
 - asp windows

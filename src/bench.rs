@@ -25,6 +25,7 @@ use crate::{
     board::Board,
     engine::ZobristStack,
     search::{iterative_deepening, Limits},
+    transposition_table::TranspositionTable,
     uci::UciOptions,
 };
 
@@ -41,6 +42,8 @@ pub fn bench() {
     let mut zobrists = ZobristStack::new();
     let (_tx, rx) = channel();
     let rx = Mutex::new(rx);
+    let options = UciOptions::default();
+    let mut tt = TranspositionTable::with_capacity(options.hash());
 
     let mut fen_str = String::new();
     let mut total_time = Duration::ZERO;
@@ -63,14 +66,8 @@ pub fn bench() {
         fen_str.clear();
 
         let start = Instant::now();
-        let report = iterative_deepening(
-            board,
-            UciOptions::default(),
-            &rx,
-            &mut zobrists,
-            limits,
-            start,
-        );
+        let report = iterative_deepening(board, options, &rx, &mut zobrists, limits, start, &tt);
+        tt.clear();
 
         total_time += report.time;
         total_nodes += report.nodes;

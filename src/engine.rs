@@ -33,6 +33,7 @@ use crate::{
     movegen::generate_moves,
     perft::perft,
     search::{iterative_deepening, Depth, Limits},
+    transposition_table::TranspositionTable,
     uci::UciOptions,
     util::Stack,
 };
@@ -56,6 +57,8 @@ pub struct Engine {
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     past_zobrists: ZobristStack,
+    /// A hash table of previously-encountered positions.
+    tt: TranspositionTable,
 }
 
 impl Engine {
@@ -77,11 +80,13 @@ impl Engine {
             }
         });
 
+        let options = UciOptions::new();
         Self {
             board: Board::new(),
-            options: UciOptions::new(),
+            options,
             uci_rx: Mutex::new(rx),
             past_zobrists: Stack::new(),
+            tt: TranspositionTable::with_capacity(options.hash()),
         }
     }
 
@@ -146,8 +151,17 @@ impl Engine {
         let options = *self.options();
         let uci_rx = self.uci_rx();
         let mut past_zobrists = self.past_zobrists().clone();
+        let tt = self.tt();
 
-        iterative_deepening(board, options, uci_rx, &mut past_zobrists, limits, start);
+        iterative_deepening(
+            board,
+            options,
+            uci_rx,
+            &mut past_zobrists,
+            limits,
+            start,
+            tt,
+        );
     }
 
     /// Sets the board to a position specified by the `position` command.
@@ -279,17 +293,34 @@ impl Engine {
                     self.options_mut().set_threads(t);
                 }
             }
+            "Hash" => {
+                if tokens.next() != Some("value") {
+                    return;
+                }
+
+                if let Some(h) = parse_option(tokens.next()) {
+                    self.options_mut().set_hash(h);
+                    self.tt_mut().resize(h);
+                }
+            }
+            "Clear" => {
+                if tokens.next() != Some("Hash") {
+                    return;
+                }
+                self.tt_mut().clear();
+            }
             _ => (),
         }
     }
 
     /// Sets the state of the engine to the starting position. Should be called
     /// after the `ucinewgame` command.
-    pub fn initialise(&mut self) {
+    pub fn reset(&mut self) {
         self.board_mut().set_startpos();
         self.past_zobrists_mut().clear();
         let board_zobrist = self.board().zobrist();
         self.past_zobrists_mut().push(board_zobrist);
+        self.tt_mut().clear();
     }
 
     /// Returns a reference to the board.
@@ -327,6 +358,16 @@ impl Engine {
     /// board states.
     pub fn past_zobrists_mut(&mut self) -> &mut ZobristStack {
         &mut self.past_zobrists
+    }
+
+    /// Returns a reference to the transposition table.
+    pub const fn tt(&self) -> &TranspositionTable {
+        &self.tt
+    }
+
+    /// Returns a mutable reference to the transposition table.
+    pub fn tt_mut(&mut self) -> &mut TranspositionTable {
+        &mut self.tt
     }
 }
 
