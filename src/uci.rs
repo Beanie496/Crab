@@ -39,7 +39,7 @@ const ID_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[allow(clippy::missing_docs_in_private_items)]
 impl UciOptions {
     /// The range that the move overhead can take, in milliseconds.
-    pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1000);
+    pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1_000);
     /// The range that the number of threads can take.
     pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
 }
@@ -91,7 +91,7 @@ impl UciOptions {
         ));
     }
 
-    /// Sets the move overhead, in milliseconds, clamped in the range
+    /// Sets the thread range, clamped in the range
     /// [`THREAD_RANGE`](Self::THREAD_RANGE).
     pub fn set_threads(&mut self, threads: usize) {
         self.threads = threads.clamp(*Self::THREAD_RANGE.start(), *Self::THREAD_RANGE.end());
@@ -118,7 +118,7 @@ impl Engine {
     pub fn main_loop(&mut self) -> Result<(), RecvError> {
         loop {
             // the sender will never hang up
-            let command = self.uci_rx().recv()?;
+            let command = self.uci_rx().lock().map_err(|_e| RecvError)?.recv()?;
             self.handle_command(&command);
         }
     }

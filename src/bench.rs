@@ -16,12 +16,16 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{rc::Rc, sync::mpsc::channel, time::Duration};
+use std::{
+    sync::{mpsc::channel, Mutex},
+    time::{Duration, Instant},
+};
 
 use crate::{
     board::Board,
     engine::ZobristStack,
-    search::{iterative_deepening, Limits, SearchParams},
+    search::{iterative_deepening, Limits},
+    uci::UciOptions,
 };
 
 /// Test positions with an expected depth 4 perft result at the end.
@@ -33,10 +37,11 @@ static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
 /// If the 7th token is not the last, it will use that as the depth instead of
 /// the default.
 pub fn bench() {
+    let start = Instant::now();
     let mut limits = Limits::default();
     let mut zobrists = ZobristStack::new();
     let (_tx, rx) = channel();
-    let rx = Rc::new(rx);
+    let rx = Mutex::new(rx);
 
     let mut fen_str = String::new();
     let mut total_time = Duration::ZERO;
@@ -58,14 +63,20 @@ pub fn bench() {
         let board = fen_str.parse::<Board>().expect("Malformed test position");
         fen_str.clear();
 
-        let search_params = SearchParams::new(limits, Duration::ZERO);
-
-        let report = iterative_deepening(search_params, &board, Rc::clone(&rx), &mut zobrists);
+        let report = iterative_deepening(
+            board,
+            UciOptions::default(),
+            &rx,
+            &mut zobrists,
+            limits,
+            start,
+        );
 
         total_time += report.time;
         total_nodes += report.nodes;
     }
 
+    // I can't just do `start.elapsed()` because that includes the boilerplate
     let total_time = total_time.as_millis();
     println!(
         "{total_nodes} nodes {} nps {total_time} ms",

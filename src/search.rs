@@ -19,8 +19,7 @@
 use std::{
     fmt::{self, Display, Formatter},
     process::exit,
-    rc::Rc,
-    sync::mpsc::Receiver,
+    sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
 
@@ -30,8 +29,10 @@ use crate::{
     evaluation::{Eval, INF_EVAL},
     index_into_unchecked, index_unchecked,
     movegen::Move,
+    uci::UciOptions,
 };
 use main_search::search;
+use time::calculate_time_window;
 
 /// For carrying out the search.
 mod main_search;
@@ -130,27 +131,13 @@ pub struct SearchInfo<'a> {
     /// How much time we're allocated.
     allocated: Duration,
     /// A receiver for the inputted UCI commands.
-    ///
-    /// It may seem odd to make this an [`Rc`] instead of a regular reference,
-    /// but I'll need to make it an [`Arc`](std::sync::Arc) when I add lazy SMP
-    /// and I'd like the transition to be as painless as possible.
-    uci_rx: Rc<Receiver<String>>,
+    uci_rx: &'a Mutex<Receiver<String>>,
     /// A stack of zobrist hashes of previous board states, beginning from the
     /// FEN string in the initial `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     past_zobrists: &'a mut ZobristStack,
-}
-
-/// The parameters of a search.
-pub struct SearchParams {
-    /// The moment the search started. Set as early as possible.
-    start: Instant,
-    /// The limits of the search.
-    limits: Limits,
-    /// The overhead of sending a move.
-    move_overhead: Duration,
 }
 
 /// The final results of a search.
@@ -375,23 +362,21 @@ impl Pv {
 impl<'a> SearchInfo<'a> {
     /// Creates a new [`SearchInfo`], which includes but is not limited to the
     /// given parameters.
-    // I do want `search_params` to be consumed here because I don't want it to
-    // be used afterwards
-    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        search_params: SearchParams,
-        time_allocated: Duration,
-        uci_rx: Rc<Receiver<String>>,
+        start: Instant,
+        limits: Limits,
+        allocated: Duration,
+        uci_rx: &'a Mutex<Receiver<String>>,
         past_zobrists: &'a mut ZobristStack,
     ) -> Self {
         Self {
-            start: search_params.start,
+            start,
             depth: 0,
             seldepth: 0,
             nodes: 0,
             status: SearchStatus::Continue,
-            limits: search_params.limits,
-            allocated: time_allocated,
+            limits,
+            allocated,
             uci_rx,
             past_zobrists,
         }
@@ -408,7 +393,8 @@ impl<'a> SearchInfo<'a> {
             return self.status;
         }
 
-        if let Ok(token) = self.uci_rx.try_recv() {
+        #[allow(clippy::unwrap_used)]
+        if let Ok(token) = self.uci_rx.lock().unwrap().try_recv() {
             let token = token.trim();
             if token == "stop" {
                 self.status = SearchStatus::Stop;
@@ -500,18 +486,6 @@ impl<'a> SearchInfo<'a> {
     }
 }
 
-impl SearchParams {
-    /// Creates a new [`SearchInfo`] with the initial information that searches
-    /// start with.
-    pub fn new(limits: Limits, move_overhead: Duration) -> Self {
-        Self {
-            start: Instant::now(),
-            limits,
-            move_overhead,
-        }
-    }
-}
-
 impl SearchReport {
     /// Creates a new [`SearchReport`] given the information of a completed
     /// search.
@@ -536,13 +510,15 @@ impl SearchReport {
 
 /// Performs iterative deepening on the given board.
 pub fn iterative_deepening(
-    search_params: SearchParams,
-    board: &Board,
-    uci_rx: Rc<Receiver<String>>,
+    board: Board,
+    options: UciOptions,
+    uci_rx: &Mutex<Receiver<String>>,
     past_zobrists: &mut ZobristStack,
+    limits: Limits,
+    start: Instant,
 ) -> SearchReport {
-    let time_allocated = search_params.calculate_time_window();
-    let mut search_info = SearchInfo::new(search_params, time_allocated, uci_rx, past_zobrists);
+    let allocated = calculate_time_window(limits, start, options.move_overhead());
+    let mut search_info = SearchInfo::new(start, limits, allocated, uci_rx, past_zobrists);
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;
@@ -552,8 +528,14 @@ pub fn iterative_deepening(
         search_info.seldepth = 0;
         search_info.status = SearchStatus::Continue;
 
-        let score =
-            search::<RootNode>(&mut search_info, &mut pv, board, -INF_EVAL, INF_EVAL, depth);
+        let score = search::<RootNode>(
+            &mut search_info,
+            &mut pv,
+            &board,
+            -INF_EVAL,
+            INF_EVAL,
+            depth,
+        );
 
         // the root search guarantees that there will always be 1 valid move in
         // the PV

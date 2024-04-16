@@ -18,11 +18,13 @@
 
 use std::{
     io::stdin,
-    rc::Rc,
     str::FromStr,
-    sync::mpsc::{channel, Receiver},
+    sync::{
+        mpsc::{channel, Receiver},
+        Mutex,
+    },
     thread::spawn,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -30,7 +32,7 @@ use crate::{
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{iterative_deepening, Depth, Limits, SearchParams},
+    search::{iterative_deepening, Depth, Limits},
     uci::UciOptions,
     util::Stack,
 };
@@ -47,7 +49,7 @@ pub struct Engine {
     /// The current set options.
     options: UciOptions,
     /// A receiver to receive UCI commands from.
-    uci_rx: Rc<Receiver<String>>,
+    uci_rx: Mutex<Receiver<String>>,
     /// A stack of zobrist hashes of previous board states, beginning from the
     /// initial `position fen ...` command.
     ///
@@ -78,13 +80,14 @@ impl Engine {
         Self {
             board: Board::new(),
             options: UciOptions::new(),
-            uci_rx: Rc::new(rx),
+            uci_rx: Mutex::new(rx),
             past_zobrists: Stack::new(),
         }
     }
 
     /// Interprets and executes the `go` command.
     pub fn go(&mut self, line: &str) {
+        let start = Instant::now();
         let mut tokens = line.split_whitespace();
         let mut limits = Limits::default();
 
@@ -139,15 +142,12 @@ impl Engine {
             }
         }
 
-        let search_params = SearchParams::new(limits, self.options().move_overhead());
         let board = *self.board();
+        let options = *self.options();
+        let uci_rx = self.uci_rx();
+        let mut past_zobrists = self.past_zobrists().clone();
 
-        iterative_deepening(
-            search_params,
-            &board,
-            self.uci_rx(),
-            self.past_zobrists_mut(),
-        );
+        iterative_deepening(board, options, uci_rx, &mut past_zobrists, limits, start);
     }
 
     /// Sets the board to a position specified by the `position` command.
@@ -312,9 +312,15 @@ impl Engine {
         &mut self.options
     }
 
-    /// Returns a reference-counted receiver to the inputted UCI commands.
-    pub fn uci_rx(&self) -> Rc<Receiver<String>> {
-        Rc::clone(&self.uci_rx)
+    /// Returns a reference to the receiver of the inputted UCI commands.
+    pub const fn uci_rx(&self) -> &Mutex<Receiver<String>> {
+        &self.uci_rx
+    }
+
+    /// Returns a reference to the current stack of zobrist hashes of board
+    /// states.
+    pub const fn past_zobrists(&self) -> &ZobristStack {
+        &self.past_zobrists
     }
 
     /// Returns a mutable reference to the current stack of zobrist hashes of
