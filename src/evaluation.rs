@@ -21,6 +21,7 @@ use std::ops::{Add, AddAssign, Neg, SubAssign};
 use crate::{
     board::Board,
     defs::{Piece, Side, Square},
+    search::Depth,
 };
 
 use values::create_piece_square_tables;
@@ -41,6 +42,8 @@ pub type Phase = u8;
 
 /// The highest possible (positive) evaluation.
 pub const INF_EVAL: Eval = Eval::MAX;
+/// The evaluation of a mate.
+pub const MATE: Eval = INF_EVAL;
 /// The evaluation of a draw.
 pub const DRAW: Eval = 0;
 
@@ -117,4 +120,14 @@ pub fn evaluate(board: &Board) -> Eval {
     } else {
         -eval
     }
+}
+
+/// Calculates the evaluation if we're mating in `depth` halfmoves.
+pub fn mate_in(depth: Depth) -> Eval {
+    MATE - Eval::from(depth)
+}
+
+/// Calculates the evaluation if we're getting mated in `depth` halfmoves.
+pub fn mated_in(depth: Depth) -> Eval {
+    -MATE + Eval::from(depth)
 }

@@ -20,7 +20,7 @@ use super::{Depth, Node, OtherNode, Pv, SearchInfo, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
-    evaluation::{evaluate, Eval, DRAW, INF_EVAL},
+    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
     movegen::{generate_moves, Move},
     transposition_table::{Bound, TranspositionEntry},
 };
@@ -35,15 +35,31 @@ pub fn search<NodeType: Node>(
     pv: &mut Pv,
     board: &Board,
     mut alpha: Eval,
-    beta: Eval,
+    mut beta: Eval,
     depth: Depth,
 ) -> Eval {
     if depth == 0 {
-        return quiescence_search(search_info, board, alpha, beta, 0);
+        return quiescence_search(search_info, board, alpha, beta, search_info.depth);
     }
 
-    if !NodeType::IS_ROOT && search_info.is_draw(board.halfmoves()) {
-        return DRAW;
+    let height = search_info.depth - depth;
+
+    if !NodeType::IS_ROOT {
+        // mate distance pruning
+        // if the score of mating in the next move (`mate_in(height + 1)`) is
+        // still unable to exceed alpha, we can prune. Likewise, if we're
+        // getting mated right now (`mated_in(height)`) and we're still
+        // exceeding beta, we can prune.
+        alpha = alpha.max(mated_in(height));
+        beta = beta.min(mate_in(height + 1));
+        if alpha >= beta {
+            return alpha;
+        }
+
+        // draw by repetition or 50mr
+        if search_info.is_draw(board.halfmoves()) {
+            return DRAW;
+        }
     }
 
     // load from tt
@@ -141,7 +157,7 @@ fn quiescence_search(
     beta: Eval,
     height: Depth,
 ) -> Eval {
-    search_info.seldepth = search_info.seldepth.max(search_info.depth + height);
+    search_info.seldepth = search_info.seldepth.max(height);
 
     let mut best_score = evaluate(board);
 
