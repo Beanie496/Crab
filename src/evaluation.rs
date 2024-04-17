@@ -44,6 +44,8 @@ pub type Phase = u8;
 pub const INF_EVAL: Eval = Eval::MAX;
 /// The evaluation of a mate.
 pub const MATE: Eval = INF_EVAL;
+/// The lowest score a mate can have.
+pub const MATE_BOUND: Eval = MATE - Depth::MAX as Eval;
 /// The evaluation of a draw.
 pub const DRAW: Eval = 0;
 
@@ -130,4 +132,9 @@ pub fn mate_in(depth: Depth) -> Eval {
 /// Calculates the evaluation if we're getting mated in `depth` halfmoves.
 pub fn mated_in(depth: Depth) -> Eval {
     -MATE + Eval::from(depth)
+}
+
+/// Checks if the score is low or high enough to be a mate score.
+pub const fn is_mate(score: Eval) -> bool {
+    score >= MATE_BOUND || score <= -MATE_BOUND
 }

@@ -20,7 +20,7 @@ use super::{Depth, Node, OtherNode, Pv, SearchInfo, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
-    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
+    evaluation::{evaluate, is_mate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
     movegen::{generate_moves, Move},
     transposition_table::{Bound, TranspositionEntry},
 };
@@ -68,6 +68,7 @@ pub fn search<NodeType: Node>(
             && (entry.bound() == Bound::Exact
                 || entry.bound() == Bound::Lower && entry.score() >= beta
                 || entry.bound() == Bound::Upper && entry.score() <= alpha)
+            && !is_mate(entry.score())
         {
             if NodeType::IS_ROOT {
                 pv.enqueue(entry.mv());
@@ -128,7 +129,11 @@ pub fn search<NodeType: Node>(
     }
 
     if !NodeType::IS_ROOT && total_moves == 0 {
-        return if board.is_in_check() { -INF_EVAL } else { DRAW };
+        return if board.is_in_check() {
+            mated_in(height)
+        } else {
+            DRAW
+        };
     }
 
     // store into tt
