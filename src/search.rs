@@ -17,7 +17,7 @@
  */
 
 use std::{
-    fmt::{self, Display, Formatter},
+    fmt::{self, Display, Formatter, Write},
     process::exit,
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
@@ -26,7 +26,7 @@ use std::{
 use crate::{
     board::Board,
     engine::{uci::UciOptions, ZobristStack},
-    evaluation::{Eval, INF_EVAL},
+    evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
     index_into_unchecked, index_unchecked,
     movegen::Move,
     transposition_table::TranspositionTable,
@@ -150,6 +150,8 @@ pub struct SearchReport {
     pub seldepth: Depth,
     /// How many positions were searched.
     pub nodes: u64,
+    /// The proportion of the transposition table used, per mille.
+    pub hashfull: usize,
     /// How long the search took.
     pub time: Duration,
     /// The average number of nodes searches per second.
@@ -188,17 +190,25 @@ impl Iterator for Pv {
 
 impl Display for SearchReport {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut ret = format!("info depth {} seldepth {}", self.depth, self.seldepth);
+
+        if is_mate(self.score) {
+            write!(&mut ret, " score mate {}", moves_to_mate(self.score))?;
+        } else {
+            write!(&mut ret, " score cp {}", self.score)?;
+        }
+
         write!(
-            f,
-            "info depth {} seldepth {} score cp {} nodes {} time {} nps {} pv {}",
-            self.depth,
-            self.seldepth,
-            self.score,
+            &mut ret,
+            " hashfull {} nodes {} time {} nps {} pv {}",
+            self.hashfull,
             self.nodes,
             self.time.as_millis(),
             self.nps,
             self.pv,
-        )
+        )?;
+
+        f.write_str(&ret)
     }
 }
 
@@ -493,17 +503,12 @@ impl<'a> SearchInfo<'a> {
 impl SearchReport {
     /// Creates a new [`SearchReport`] given the information of a completed
     /// search.
-    const fn new(
-        search_info: &SearchInfo<'_>,
-        time: Duration,
-        nps: u64,
-        score: Eval,
-        pv: Pv,
-    ) -> Self {
+    fn new(search_info: &SearchInfo<'_>, time: Duration, nps: u64, score: Eval, pv: Pv) -> Self {
         Self {
             depth: search_info.depth,
             seldepth: search_info.seldepth,
             nodes: search_info.nodes,
+            hashfull: search_info.tt.estimate_hashfull(),
             time,
             nps,
             score,

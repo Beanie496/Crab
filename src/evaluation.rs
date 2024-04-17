@@ -138,3 +138,15 @@ pub fn mated_in(depth: Depth) -> Eval {
 pub const fn is_mate(score: Eval) -> bool {
     score >= MATE_BOUND || score <= -MATE_BOUND
 }
+
+/// Calculates the number of fullmoves to a mate.
+///
+/// A positive number represents fullmoves to performing a mate and a negative
+/// number means fullmoves to being mated.
+pub const fn moves_to_mate(score: Eval) -> i16 {
+    if score > 0 {
+        (MATE - score + 1) / 2
+    } else {
+        (-MATE - score) / 2
+    }
+}

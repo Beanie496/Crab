@@ -162,6 +162,15 @@ impl TranspositionTable {
         atomic_entry.store(u64::from(entry), Ordering::Relaxed);
     }
 
+    /// Estimates how full the hash is, per mille.
+    pub fn estimate_hashfull(&self) -> usize {
+        self.tt()
+            .iter()
+            .take(1000)
+            .filter(|entry| entry.load(Ordering::Relaxed) != 0)
+            .count()
+    }
+
     /// Converts a key into a valid index.
     fn index(&self, key: Key) -> usize {
         // this maps the key from range 0..2.pow(64) to 0..self.tt().len(), with
