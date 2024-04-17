@@ -23,10 +23,9 @@ use std::{
 
 use crate::{
     board::Board,
-    engine::ZobristStack,
+    engine::{uci::UciOptions, ZobristStack},
     search::{iterative_deepening, Limits},
     transposition_table::TranspositionTable,
-    uci::UciOptions,
 };
 
 /// Test positions with an expected depth 4 perft result at the end.

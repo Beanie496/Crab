@@ -68,8 +68,6 @@ mod perft;
 mod search;
 /// A transposition table.
 mod transposition_table;
-/// Items for handling UCI input.
-mod uci;
 /// Utility.
 mod util;
 

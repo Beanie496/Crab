@@ -25,12 +25,11 @@ use std::{
 
 use crate::{
     board::Board,
-    engine::ZobristStack,
+    engine::{uci::UciOptions, ZobristStack},
     evaluation::{Eval, INF_EVAL},
     index_into_unchecked, index_unchecked,
     movegen::Move,
     transposition_table::TranspositionTable,
-    uci::UciOptions,
 };
 use main_search::search;
 use time::calculate_time_window;

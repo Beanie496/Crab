@@ -18,7 +18,8 @@
 
 use std::{ops::RangeInclusive, process::exit, sync::mpsc::RecvError, time::Duration};
 
-use crate::{bench::bench, defs::PieceType, engine::Engine, movegen::magic::find_magics};
+use super::Engine;
+use crate::{bench::bench, defs::PieceType, movegen::magic::find_magics};
 
 /// The UCI options this engine supports.
 #[derive(Clone, Copy)]

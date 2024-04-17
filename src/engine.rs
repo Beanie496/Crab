@@ -34,9 +34,12 @@ use crate::{
     perft::perft,
     search::{iterative_deepening, Depth, Limits},
     transposition_table::TranspositionTable,
-    uci::UciOptions,
     util::Stack,
 };
+use uci::UciOptions;
+
+/// Items for handling UCI input.
+pub mod uci;
 
 /// A stack of zobrist keys.
 pub type ZobristStack = Stack<Key, { Depth::MAX as usize }>;
