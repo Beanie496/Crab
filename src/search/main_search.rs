@@ -16,7 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{Depth, Node, OtherNode, Pv, SearchInfo, SearchStatus};
+use super::{Depth, Node, OtherNode, Pv, SearchReferences, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -31,7 +31,7 @@ use crate::{
 /// is `Root`, `pv` will always have at least one legal move in it after the
 /// search.
 pub fn search<NodeType: Node>(
-    search_info: &mut SearchInfo<'_>,
+    search_refs: &mut SearchReferences<'_>,
     pv: &mut Pv,
     board: &Board,
     mut alpha: Eval,
@@ -39,10 +39,10 @@ pub fn search<NodeType: Node>(
     depth: Depth,
 ) -> Eval {
     if depth == 0 {
-        return quiescence_search(search_info, board, alpha, beta, search_info.depth);
+        return quiescence_search(search_refs, board, alpha, beta, search_refs.depth);
     }
 
-    let height = search_info.depth - depth;
+    let height = search_refs.depth - depth;
 
     if !NodeType::IS_ROOT {
         // mate distance pruning
@@ -57,13 +57,13 @@ pub fn search<NodeType: Node>(
         }
 
         // draw by repetition or 50mr
-        if search_info.is_draw(board.halfmoves()) {
+        if search_refs.is_draw(board.halfmoves()) {
             return DRAW;
         }
     }
 
     // load from tt
-    if let Some(entry) = search_info.tt.load(board.zobrist()) {
+    if let Some(entry) = search_refs.tt.load(board.zobrist()) {
         if entry.depth() >= depth
             && (entry.bound() == Bound::Exact
                 || entry.bound() == Bound::Lower && entry.score() >= beta
@@ -88,7 +88,7 @@ pub fn search<NodeType: Node>(
         if !copy.make_move(mv) {
             continue;
         }
-        search_info.past_zobrists.push(copy.zobrist());
+        search_refs.past_zobrists.push(copy.zobrist());
         total_moves += 1;
 
         // make sure we always have at least one legal move ready to play
@@ -96,13 +96,13 @@ pub fn search<NodeType: Node>(
             pv.enqueue(mv);
         }
 
-        let score = -search::<OtherNode>(search_info, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+        let score = -search::<OtherNode>(search_refs, &mut new_pv, &copy, -beta, -alpha, depth - 1);
 
-        search_info.past_zobrists.pop();
-        search_info.nodes += 1;
+        search_refs.past_zobrists.pop();
+        search_refs.nodes += 1;
 
         // if the search was stopped early, we can't trust its results
-        if search_info.check_status() != SearchStatus::Continue {
+        if search_refs.check_status() != SearchStatus::Continue {
             return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 
@@ -146,7 +146,7 @@ pub fn search<NodeType: Node>(
         Bound::Exact
     };
     let tt_entry = TranspositionEntry::new(board.zobrist(), best_score, best_move, bound, depth);
-    search_info.tt.store(board.zobrist(), tt_entry);
+    search_refs.tt.store(board.zobrist(), tt_entry);
 
     best_score
 }
@@ -156,13 +156,13 @@ pub fn search<NodeType: Node>(
 ///
 /// This should be called at the leaf nodes of the main search.
 fn quiescence_search(
-    search_info: &mut SearchInfo<'_>,
+    search_refs: &mut SearchReferences<'_>,
     board: &Board,
     mut alpha: Eval,
     beta: Eval,
     height: Depth,
 ) -> Eval {
-    search_info.seldepth = search_info.seldepth.max(height);
+    search_refs.seldepth = search_refs.seldepth.max(height);
 
     let mut best_score = evaluate(board);
 
@@ -179,11 +179,11 @@ fn quiescence_search(
             continue;
         }
 
-        let score = -quiescence_search(search_info, &copy, -beta, -alpha, height + 1);
+        let score = -quiescence_search(search_refs, &copy, -beta, -alpha, height + 1);
 
-        search_info.nodes += 1;
+        search_refs.nodes += 1;
 
-        if search_info.check_status() != SearchStatus::Continue {
+        if search_refs.check_status() != SearchStatus::Continue {
             return 0;
         }
 

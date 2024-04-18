@@ -114,8 +114,8 @@ pub struct Pv {
     first_empty: u8,
 }
 
-/// Information about a search.
-pub struct SearchInfo<'a> {
+/// Various items needed throughout during the search.
+pub struct SearchReferences<'a> {
     /// The moment the search started.
     start: Instant,
     /// The depth being searched.
@@ -371,8 +371,8 @@ impl Pv {
     }
 }
 
-impl<'a> SearchInfo<'a> {
-    /// Creates a new [`SearchInfo`], which includes but is not limited to the
+impl<'a> SearchReferences<'a> {
+    /// Creates a new [`SearchReferences`], which includes but is not limited to the
     /// given parameters.
     pub fn new(
         start: Instant,
@@ -503,12 +503,18 @@ impl<'a> SearchInfo<'a> {
 impl SearchReport {
     /// Creates a new [`SearchReport`] given the information of a completed
     /// search.
-    fn new(search_info: &SearchInfo<'_>, time: Duration, nps: u64, score: Eval, pv: Pv) -> Self {
+    fn new(
+        search_refs: &SearchReferences<'_>,
+        time: Duration,
+        nps: u64,
+        score: Eval,
+        pv: Pv,
+    ) -> Self {
         Self {
-            depth: search_info.depth,
-            seldepth: search_info.seldepth,
-            nodes: search_info.nodes,
-            hashfull: search_info.tt.estimate_hashfull(),
+            depth: search_refs.depth,
+            seldepth: search_refs.seldepth,
+            nodes: search_refs.nodes,
+            hashfull: search_refs.tt.estimate_hashfull(),
             time,
             nps,
             score,
@@ -528,18 +534,19 @@ pub fn iterative_deepening(
     tt: &TranspositionTable,
 ) -> SearchReport {
     let allocated = calculate_time_window(limits, start, options.move_overhead());
-    let mut search_info = SearchInfo::new(start, limits, allocated, uci_rx, past_zobrists, tt);
+    let mut search_refs =
+        SearchReferences::new(start, limits, allocated, uci_rx, past_zobrists, tt);
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;
 
     let report = 'iter_deep: loop {
-        search_info.depth = depth;
-        search_info.seldepth = 0;
-        search_info.status = SearchStatus::Continue;
+        search_refs.depth = depth;
+        search_refs.seldepth = 0;
+        search_refs.status = SearchStatus::Continue;
 
         let score = search::<RootNode>(
-            &mut search_info,
+            &mut search_refs,
             &mut pv,
             &board,
             -INF_EVAL,
@@ -550,13 +557,13 @@ pub fn iterative_deepening(
         // the root search guarantees that there will always be 1 valid move in
         // the PV
         best_move = pv.get(0);
-        let time = search_info.start.elapsed();
-        let nps = 1_000_000 * search_info.nodes / time.as_micros().max(1) as u64;
-        let report = SearchReport::new(&search_info, time, nps, score, pv.clone());
+        let time = search_refs.start.elapsed();
+        let nps = 1_000_000 * search_refs.nodes / time.as_micros().max(1) as u64;
+        let report = SearchReport::new(&search_refs, time, nps, score, pv.clone());
 
         println!("{report}");
 
-        if search_info.should_stop() {
+        if search_refs.should_stop() {
             break 'iter_deep report;
         }
 
@@ -566,7 +573,7 @@ pub fn iterative_deepening(
 
     println!("bestmove {best_move}");
 
-    if search_info.check_status() == SearchStatus::Quit {
+    if search_refs.check_status() == SearchStatus::Quit {
         exit(0);
     }
 
