@@ -36,6 +36,8 @@ use time::calculate_time_window;
 
 /// For carrying out the search.
 mod main_search;
+/// For selecting which order moves are searched in.
+mod movepick;
 /// Time management.
 mod time;
 
