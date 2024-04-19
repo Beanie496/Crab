@@ -39,7 +39,7 @@ pub enum Bound {
 ///
 /// It contains a key as a checksum and various other fields that are useful in
 /// future identical positions.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct TranspositionEntry {
     /// The lowest bits of the key, used as a checksum.
@@ -89,27 +89,27 @@ impl TranspositionEntry {
     }
 
     /// Checks if a given key matches the stored key.
-    const fn matches(&self, key: Key) -> bool {
+    const fn matches(self, key: Key) -> bool {
         self.key == key as u16
     }
 
     /// Returns the score.
-    pub const fn score(&self) -> Eval {
+    pub const fn score(self) -> Eval {
         self.score
     }
 
     /// Returns the best move.
-    pub const fn mv(&self) -> Move {
+    pub const fn mv(self) -> Move {
         self.mv
     }
 
     /// Returns the bound of the score.
-    pub const fn bound(&self) -> Bound {
+    pub const fn bound(self) -> Bound {
         self.bound
     }
 
     /// Returns the depth at which the score was obtained.
-    pub const fn depth(&self) -> Depth {
+    pub const fn depth(self) -> Depth {
         self.depth
     }
 }
