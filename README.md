@@ -3,6 +3,8 @@ This is a chess engine made in Rust. It was originally made for my Year 2 Comput
 Features:
 - Alpha-beta pruning
 - A transposition table
-- TT-only move ordering
+- Move ordering:
+  - TT-move
+  - MVV captures
 - Quiescence
 - Piece-square tables

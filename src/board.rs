@@ -599,7 +599,7 @@ impl Board {
     }
 
     /// Returns the piece on `square`.
-    fn piece_on(&self, square: Square) -> Piece {
+    pub fn piece_on(&self, square: Square) -> Piece {
         index_unchecked!(self.mailbox, square.to_index())
     }
 
