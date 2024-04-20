@@ -33,11 +33,10 @@ static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
 
 /// Runs a benchmark on all the positions in [`TEST_POSITIONS`].
 ///
-/// It treats the first 6 tokens as the FEN string and ignores the last token.
-/// If the 7th token is not the last, it will use that as the depth instead of
-/// the default.
+/// It treats the first 6 tokens as the FEN string and ignores the rest.
 pub fn bench() {
     let mut limits = Limits::default();
+    limits.set_depth(Some(8));
     let mut zobrists = ZobristStack::new();
     let (_tx, rx) = channel();
     let rx = Mutex::new(rx);
@@ -57,9 +56,6 @@ pub fn bench() {
             fen_str.push_str(token);
             fen_str.push(' ');
         }
-
-        let depth = tokens.next().and_then(|s| s.parse().ok()).unwrap_or(6);
-        limits.set_depth(Some(depth));
 
         let board = fen_str.parse::<Board>().expect("Malformed test position");
         fen_str.clear();
