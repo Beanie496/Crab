@@ -40,6 +40,7 @@ pub struct ScoredMove {
 }
 
 /// A scored stack of [`ScoredMove`]s.
+#[allow(clippy::missing_docs_in_private_items)]
 pub struct ScoredMoves {
     moves: Stack<ScoredMove, MAX_LEGAL_MOVES>,
 }
@@ -105,9 +106,7 @@ impl MovePicker {
     pub fn new<const MOVE_TYPE: u8>(board: &Board, tt_move: Move) -> Self {
         let mut moves = generate_moves::<MOVE_TYPE>(board).score(tt_move);
         moves.sort();
-        Self {
-            moves,
-        }
+        Self { moves }
     }
 }
 
@@ -132,10 +131,14 @@ impl ScoredMove {
 }
 
 impl ScoredMoves {
+    /// Sorts the scored moves.
     pub fn sort(&mut self) {
         self.moves.sort_by(Ord::cmp);
     }
 
+    /// Returns the last move.
+    ///
+    /// Assumes the moves have already been sorted.
     fn pop(&mut self) -> Option<ScoredMove> {
         self.moves.pop()
     }
