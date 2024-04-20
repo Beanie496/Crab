@@ -16,7 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{Depth, Node, OtherNode, Pv, SearchReferences, SearchStatus};
+use super::{movepick::MovePicker, Depth, Node, OtherNode, Pv, SearchReferences, SearchStatus};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -63,27 +63,31 @@ pub fn search<NodeType: Node>(
     }
 
     // load from tt
-    if let Some(entry) = search_refs.tt.load(board.zobrist()) {
-        if entry.depth() >= depth
-            && (entry.bound() == Bound::Exact
-                || entry.bound() == Bound::Lower && entry.score() >= beta
-                || entry.bound() == Bound::Upper && entry.score() <= alpha)
-            && !is_mate(entry.score())
+    let entry = search_refs.tt.load(board.zobrist());
+    if let Some(e) = entry {
+        if e.depth() >= depth
+            && (e.bound() == Bound::Exact
+                || e.bound() == Bound::Lower && e.score() >= beta
+                || e.bound() == Bound::Upper && e.score() <= alpha)
+            && !is_mate(e.score())
         {
             if NodeType::IS_ROOT {
-                pv.enqueue(entry.mv());
+                pv.enqueue(e.mv());
             }
-            return entry.score();
+            return e.score();
         }
     }
 
     let mut best_score = -INF_EVAL;
     let mut best_move = Move::null();
     let mut new_pv = Pv::new();
-    let moves = generate_moves::<{ MoveType::ALL }>(board);
+    let movepicker = MovePicker::new::<{ MoveType::ALL }>(
+        board,
+        entry.map_or(Move::null(), TranspositionEntry::mv),
+    );
 
     let mut total_moves = 0;
-    for mv in moves {
+    for mv in movepicker {
         let mut copy = *board;
         if !copy.make_move(mv) {
             continue;
