@@ -96,7 +96,7 @@ pub fn search<NodeType: Node>(
         total_moves += 1;
 
         // make sure we always have at least one legal move ready to play
-        if NodeType::IS_ROOT && total_moves == 0 {
+        if NodeType::IS_ROOT && total_moves == 1 {
             pv.enqueue(mv);
         }
 
