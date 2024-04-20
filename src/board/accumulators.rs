@@ -20,7 +20,7 @@ use super::{Board, CastlingRights, Key};
 use crate::{
     cfor,
     defs::{Piece, Square},
-    evaluation::{Phase, Score, PHASE_WEIGHTS, PIECE_SQUARE_TABLES},
+    evaluation::{piece_phase, piece_score, Phase, Score},
     index_unchecked, out_of_bounds_is_unreachable,
 };
 
@@ -92,12 +92,12 @@ impl Board {
 
     /// Adds the value of `piece` to the phase accumulator.
     fn add_piece_phase(&mut self, piece: Piece) {
-        self.phase += index_unchecked!(PHASE_WEIGHTS, piece.to_index());
+        self.phase += piece_phase(piece);
     }
 
     /// Removes the value of `piece` to the phase accumulator.
     fn remove_piece_phase(&mut self, piece: Piece) {
-        self.phase -= index_unchecked!(PHASE_WEIGHTS, piece.to_index());
+        self.phase -= piece_phase(piece);
     }
 
     /// Adds the value of `piece` to the score accumulator.
@@ -108,16 +108,12 @@ impl Board {
 
     /// Adds the value of `piece` to the score accumulator.
     fn add_piece_score(&mut self, square: Square, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
-        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
-        self.score += PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+        self.score += piece_score(square, piece);
     }
 
     /// Removes the value of `piece` to the score accumulator.
     fn remove_piece_score(&mut self, square: Square, piece: Piece) {
-        out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
-        out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
-        self.score -= PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()];
+        self.score -= piece_score(square, piece);
     }
 
     /// Removes the zobrist key of `piece` on `start` and adds it to `end`.

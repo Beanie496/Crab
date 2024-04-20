@@ -22,7 +22,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{bitboard::Bitboard, error::ParseError};
+use crate::{bitboard::Bitboard, error::ParseError, evaluation::Eval, index_unchecked};
 
 /// A cardinal direction.
 // it doesn't make sense to say a direction is 'less than' another
@@ -63,6 +63,12 @@ pub struct Side(pub u8);
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub struct Square(pub u8);
 
+/// Most Valuable Victim (MVV): a bonus to capturing a piece, with a higher
+/// bonus to move valuable pieces.
+///
+/// This should only be used for moves that are captures.
+// this can be tuned
+static MVV_BONUS: [Eval; PieceType::TOTAL - 1] = [0, 300, 300, 500, 900];
 /// An array of character constants associated with each piece on both sides,
 /// with the character '0' at the end to allow conversion from [`Piece::NONE`].
 ///
@@ -428,6 +434,11 @@ impl PieceType {
     /// Converts the piece type to a usize.
     pub const fn to_index(self) -> usize {
         self.0 as usize
+    }
+
+    /// Returns the MVV bonus of the piece type.
+    pub fn mvv_bonus(self) -> Eval {
+        index_unchecked!(MVV_BONUS, self.to_index())
     }
 }
 

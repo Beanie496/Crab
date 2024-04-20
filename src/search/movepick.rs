@@ -22,7 +22,6 @@ use crate::{
     board::Board,
     defs::{MoveType, PieceType},
     evaluation::{Eval, INF_EVAL},
-    index_unchecked,
     movegen::{generate_moves, Move, Moves, MAX_LEGAL_MOVES},
     util::Stack,
 };
@@ -47,12 +46,6 @@ pub struct ScoredMoves {
     moves: Stack<ScoredMove, MAX_LEGAL_MOVES>,
 }
 
-/// Most Valuable Victim (MVV): a bonus to capturing a piece, with a higher
-/// bonus to move valuable pieces.
-///
-/// This should only be used for moves that are captures.
-// this can be tuned
-static MVV_BONUS: [Eval; PieceType::TOTAL - 1] = [0, 300, 300, 500, 900];
 /// The score of a quiet move.
 const QUIET_SCORE: Eval = -INF_EVAL;
 /// The score of a move found in the transposition table.
@@ -182,5 +175,5 @@ pub fn capture_score(board: &Board, mv: Move) -> Eval {
         "How are you capturing a king?"
     );
 
-    index_unchecked!(MVV_BONUS, captured_piece.to_index())
+    captured_piece.mvv_bonus()
 }
