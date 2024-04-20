@@ -5,6 +5,6 @@ Features:
 - A transposition table
 - Move ordering:
   - TT-move
-  - MVV captures
+  - MVV + SEE captures
 - Quiescence
 - Piece-square tables

@@ -77,6 +77,9 @@ static MVV_BONUS: [Eval; PieceType::TOTAL - 1] = [0, 300, 300, 500, 900];
 static PIECE_CHARS: [char; Piece::TOTAL + 1] = [
     'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
 ];
+/// A bonus to a piece during SEE.
+// this can be tuned
+static SEE_VALUES: [Eval; PieceType::TOTAL] = [100, 300, 300, 500, 900, 0];
 
 /// Cardinal directions, according to little-endian rank-fink file mapping.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
@@ -439,6 +442,11 @@ impl PieceType {
     /// Returns the MVV bonus of the piece type.
     pub fn mvv_bonus(self) -> Eval {
         index_unchecked!(MVV_BONUS, self.to_index())
+    }
+
+    /// Returns the SEE bonus of the piece type.
+    pub fn see_bonus(self) -> Eval {
+        index_unchecked!(SEE_VALUES, self.to_index())
     }
 }
 
