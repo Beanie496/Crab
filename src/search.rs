@@ -420,6 +420,9 @@ impl<'a> SearchReferences<'a> {
                 self.status = SearchStatus::Quit;
                 return self.status;
             }
+            if token == "isready" {
+                println!("readyok");
+            }
         }
 
         // these are the only variants that can cause a search to exit early
