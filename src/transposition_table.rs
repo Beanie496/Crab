@@ -130,13 +130,13 @@ impl TranspositionTable {
 
     /// Resizes the the table to the given size in MiB and zeroes it.
     pub fn resize(&mut self, size_mib: usize) {
-        let size_bytes = size_mib * 1024 * 1024 / size_of::<TranspositionEntry>();
-        let layout = Layout::array::<AtomicU64>(size_bytes).expect("size of TT is too large");
+        let entries = size_mib * 1024 * 1024 / size_of::<TranspositionEntry>();
+        let layout = Layout::array::<AtomicU64>(entries).expect("size of TT is too large");
         // SAFETY: `layout` has a non-zero size
         let ptr = unsafe { alloc_zeroed(layout) }.cast();
         // SAFETY: the pointer is directly from an correct allocation, `size`
         // <= `size` and a too-large size would have caused a panic earlier
-        *self.tt_mut() = unsafe { Vec::from_raw_parts(ptr, size_bytes, size_bytes) };
+        *self.tt_mut() = unsafe { Vec::from_raw_parts(ptr, entries, entries) };
     }
 
     /// Zeroes the table.
