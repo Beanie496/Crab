@@ -31,7 +31,7 @@ pub enum Bound {
     Lower,
     /// An exact bound: `alpha < best_score < beta`.
     Exact,
-    /// A lower bound: `best_score <= alpha`
+    /// An upper bound: `best_score <= alpha`.
     Upper,
 }
 
