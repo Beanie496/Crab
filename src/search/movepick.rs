@@ -50,6 +50,8 @@ pub struct ScoredMoves {
 const QUIET_SCORE: Eval = -INF_EVAL;
 /// The score of a move found in the transposition table.
 const TT_SCORE: Eval = INF_EVAL;
+/// The score of a capture with a winning static exchange evaluation.
+const WINNING_CAPTURE_SCORE: Eval = 10_000;
 
 impl Iterator for MovePicker {
     type Item = Move;
@@ -175,5 +177,9 @@ pub fn capture_score(board: &Board, mv: Move) -> Eval {
         "How are you capturing a king?"
     );
 
-    captured_piece.mvv_bonus()
+    let mut score = captured_piece.mvv_bonus();
+    if board.is_winning_exchange(mv) {
+        score += WINNING_CAPTURE_SCORE;
+    }
+    score
 }

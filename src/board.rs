@@ -379,6 +379,11 @@ impl Board {
         self.pieces[PIECE]
     }
 
+    /// Returns the piece bitboard of the given piece type.
+    pub fn piece_any(&self, piece_type: PieceType) -> Bitboard {
+        index_unchecked!(self.pieces, piece_type.to_index())
+    }
+
     /// Returns the side bitboard according to `IS_WHITE`.
     pub const fn side<const IS_WHITE: bool>(&self) -> Bitboard {
         if IS_WHITE {
@@ -724,14 +729,12 @@ impl Board {
         )
     }
 
-    /// Tests if `square` is attacked by an enemy piece.
-    fn is_square_attacked(&self, square: Square) -> bool {
+    /// Returns all the attackers from the given side to move to the given
+    /// square.
+    fn square_attackers(&self, side_to_move: Side, square: Square) -> Bitboard {
         let occupancies = self.occupancies();
-        let us = self.side_to_move();
-        let them = us.flip();
-        let them_bb = self.side_any(them);
 
-        let pawn_attacks = LOOKUPS.pawn_attacks(us, square);
+        let pawn_attacks = LOOKUPS.pawn_attacks(side_to_move, square);
         let knight_attacks = LOOKUPS.knight_attacks(square);
         let diagonal_attacks = LOOKUPS.bishop_attacks(square, occupancies);
         let orthogonal_attacks = LOOKUPS.rook_attacks(square, occupancies);
@@ -744,19 +747,123 @@ impl Board {
         let queens = self.piece::<{ PieceType::QUEEN.to_index() }>();
         let kings = self.piece::<{ PieceType::KING.to_index() }>();
 
-        let is_attacked_by_pawns = pawn_attacks & pawns;
-        let is_attacked_by_knights = knight_attacks & knights;
-        let is_attacked_by_kings = king_attacks & kings;
-        let is_attacked_diagonally = diagonal_attacks & (bishops | queens);
-        let is_attacked_orthogonally = orthogonal_attacks & (rooks | queens);
+        pawn_attacks & pawns
+            | knight_attacks & knights
+            | king_attacks & kings
+            | diagonal_attacks & (bishops | queens)
+            | orthogonal_attacks & (rooks | queens)
+    }
 
-        !((is_attacked_by_pawns
-            | is_attacked_by_knights
-            | is_attacked_by_kings
-            | is_attacked_diagonally
-            | is_attacked_orthogonally)
-            & them_bb)
-            .is_empty()
+    /// Tests if `square` is attacked by an enemy piece.
+    fn is_square_attacked(&self, square: Square) -> bool {
+        let us = self.side_to_move();
+        let them = us.flip();
+        let them_bb = self.side_any(them);
+
+        !(self.square_attackers(us, square) & them_bb).is_empty()
+    }
+
+    /// Performs Static Exchange Evaluation (SEE) on the destination square of
+    /// the given move. Returns whether or not the resulting exchange is a net
+    /// material win.
+    pub fn is_winning_exchange(&self, mv: Move) -> bool {
+        let origin = mv.start();
+        let target = mv.end();
+        let mut us = self.side_to_move();
+
+        let mut see_value = if mv.is_en_passant() {
+            PieceType::PAWN
+        } else {
+            PieceType::from(self.piece_on(target))
+        }
+        .see_bonus();
+        if mv.is_promotion() {
+            // swap the pawn vaue with the promotion piece value
+            see_value += mv.promotion_piece().see_bonus() - PieceType::PAWN.see_bonus();
+        }
+
+        let mut attacker_type = if mv.is_promotion() {
+            mv.promotion_piece()
+        } else {
+            PieceType::from(self.piece_on(origin))
+        };
+        let mut attacker = Bitboard::empty();
+
+        see_value -= attacker_type.see_bonus();
+        // if we're up material even if they recapture
+        if see_value >= 0 {
+            return true;
+        }
+
+        // NOTE: the other engines I looked at `|` this with the bitboard of
+        // the target square (and then check if the move was an en passant to
+        // xor it). I can't see why this would make a difference (and it makes
+        // no difference to my bench) so I don't do it.
+        let mut occupancies = self.occupancies() ^ Bitboard::from(origin);
+        let mut attackers = self.square_attackers(us, target) & occupancies;
+        let diagonal_attackers = self.piece::<{ PieceType::BISHOP.to_index() }>()
+            | self.piece::<{ PieceType::QUEEN.to_index() }>();
+        let orthogonal_attackers = self.piece::<{ PieceType::ROOK.to_index() }>()
+            | self.piece::<{ PieceType::QUEEN.to_index() }>();
+
+        us = us.flip();
+
+        // recapturing make `see_value` positive (for the time being), so find
+        // the cheapest piece to recapture with
+        loop {
+            let our_attackers = attackers & self.side_any(us);
+            // if we don't have any pieces to recapture with
+            if our_attackers.is_empty() {
+                break;
+            }
+
+            for piece_type in 0..PieceType::TOTAL as u8 {
+                attacker_type = PieceType(piece_type);
+                attacker = self.piece_any(attacker_type) & our_attackers;
+                if !attacker.is_empty() {
+                    break;
+                }
+            }
+
+            let next_attacker = attacker.pop_lsb();
+            occupancies ^= next_attacker;
+
+            // if the attacker moves diagonally (pawn, bishop or queen), it can
+            // reveal diagonal sliders behind it
+            if attacker_type.0 & 1 == 0 {
+                attackers |= LOOKUPS.bishop_attacks(target, occupancies) & diagonal_attackers;
+            }
+            // if the attacker moves orthogonally (rook or queen), it can
+            // reveal orthogonal sliders behind it. The condition does include
+            // kings, but most of the time the king isn't involved, making the
+            // comparision a net speedup over checking the rook and queen
+            // separately.
+            if attacker_type.0 >= PieceType::ROOK.0 {
+                attackers |= LOOKUPS.rook_attacks(target, occupancies) & orthogonal_attackers;
+            }
+            attackers &= occupancies;
+
+            us = us.flip();
+            see_value += attacker_type.see_bonus();
+
+            // if we're down material even if we recapture
+            if see_value < 0 {
+                // Idea from Ethereal: if the last attacker was a king and the
+                // we side still have attackers remaining, we automatically win
+                // becuase their move was illegal
+                if attacker_type == PieceType::KING && !(attackers & self.side_any(us)).is_empty() {
+                    us = us.flip();
+                }
+                break;
+            }
+
+            // it's important to do `- 1` because 0 wouldn't be properly
+            // negated
+            see_value = -see_value - 1;
+        }
+
+        // return whether or not we're not the loser
+        self.side_to_move() != us
     }
 }
 
