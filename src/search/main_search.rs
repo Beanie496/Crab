@@ -105,6 +105,10 @@ pub fn search<NodeType: Node>(
             pv.enqueue(mv);
         }
 
+        if NodeType::IS_ROOT && search_refs.should_print() {
+            println!("info currmovenumber 1 move {mv}");
+        }
+
         // If we've already searched the first move, it's probably going to be
         // the best move. To prove this, we lower beta to alpha + 1 and do a
         // search (a zero-window search). If score <= alpha, it managed to
@@ -134,6 +138,10 @@ pub fn search<NodeType: Node>(
         // if the search was stopped early, we can't trust its results
         if search_refs.check_status() != SearchStatus::Continue {
             return if NodeType::IS_ROOT { alpha } else { 0 };
+        }
+
+        if NodeType::IS_ROOT && search_refs.should_print() {
+            println!("info currmovenumber 1 move {mv} score {score}");
         }
 
         best_score = best_score.max(score);

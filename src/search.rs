@@ -149,6 +149,9 @@ pub struct SearchReferences<'a> {
     past_zobrists: &'a mut ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
+    /// Whether or not the root node should print extra information (e.g.
+    /// current move being searched).
+    should_print: bool,
 }
 
 /// The final results of a search.
@@ -402,6 +405,7 @@ impl<'a> SearchReferences<'a> {
             uci_rx,
             past_zobrists,
             tt,
+            should_print: false,
         }
     }
 
@@ -484,6 +488,14 @@ impl<'a> SearchReferences<'a> {
         }
 
         self.status != SearchStatus::Continue
+    }
+
+    /// Returns if the root node should print extra information.
+    fn should_print(&mut self) -> bool {
+        if !self.should_print {
+            self.should_print = self.start.elapsed() > Duration::from_millis(3000);
+        }
+        self.should_print
     }
 
     /// Checks if the position is drawn, either because of repetition or
