@@ -22,7 +22,12 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use crate::{board::Key, evaluation::Eval, movegen::Move, search::Depth};
+use crate::{
+    board::Key,
+    evaluation::{Eval, MATE_BOUND},
+    movegen::Move,
+    search::Depth,
+};
 
 /// The bound of a score depending on how it was obtained.
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -44,6 +49,19 @@ pub enum Bound {
 pub struct TranspositionEntry {
     /// The lowest bits of the key, used as a checksum.
     key: u16,
+    /// The score of the position.
+    score: Eval,
+    /// The best move in the position.
+    mv: Move,
+    /// The depth at which the score was obtained.
+    depth: Depth,
+    /// The bound of the score.
+    bound: Bound,
+}
+
+/// The information from a successful transposition table lookup.
+#[derive(Clone, Copy)]
+pub struct TranspositionHit {
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
@@ -78,19 +96,31 @@ impl From<TranspositionEntry> for u64 {
 
 impl TranspositionEntry {
     /// Creates a new [`TranspositionEntry`] with the given attributes.
-    pub const fn new(key: Key, score: Eval, mv: Move, bound: Bound, depth: Depth) -> Self {
+    pub fn new(key: Key, score: Eval, mv: Move, depth: Depth, bound: Bound, height: Depth) -> Self {
         Self {
             key: key as u16,
-            score,
+            score: normalise(score, height),
             mv,
-            bound,
             depth,
+            bound,
         }
     }
 
     /// Checks if a given key matches the stored key.
     const fn matches(self, key: Key) -> bool {
         self.key == key as u16
+    }
+}
+
+impl TranspositionHit {
+    /// Creates a new [`TranspositionHit`].
+    fn new(score: Eval, mv: Move, depth: Depth, bound: Bound, height: Depth) -> Self {
+        Self {
+            score: denormalise(score, height),
+            mv,
+            depth,
+            bound,
+        }
     }
 
     /// Returns the score.
@@ -103,14 +133,14 @@ impl TranspositionEntry {
         self.mv
     }
 
-    /// Returns the bound of the score.
-    pub const fn bound(self) -> Bound {
-        self.bound
-    }
-
     /// Returns the depth at which the score was obtained.
     pub const fn depth(self) -> Depth {
         self.depth
+    }
+
+    /// Returns the bound of the score.
+    pub const fn bound(self) -> Bound {
+        self.bound
     }
 }
 
@@ -147,11 +177,17 @@ impl TranspositionTable {
     }
 
     /// Returns the entry with the given key, or [`None`] if it doesn't exist.
-    pub fn load(&self, key: Key) -> Option<TranspositionEntry> {
+    pub fn load(&self, key: Key, height: Depth) -> Option<TranspositionHit> {
         // SAFETY: `index()` is guaranteed to be a valid index
         let atomic_entry = unsafe { self.tt().get_unchecked(self.index(key)) };
         let entry = TranspositionEntry::from(atomic_entry.load(Ordering::Relaxed));
-        entry.matches(key).then_some(entry)
+        entry.matches(key).then_some(TranspositionHit::new(
+            entry.score,
+            entry.mv,
+            entry.depth,
+            entry.bound,
+            height,
+        ))
     }
 
     /// Stores an entry with the given key.
@@ -186,5 +222,29 @@ impl TranspositionTable {
     /// Returns a mutable reference to the internal vector of entries.
     fn tt_mut(&mut self) -> &mut Vec<AtomicU64> {
         &mut self.tt
+    }
+}
+
+/// If `score` is a mate score, assume it is a mate score relative to the root
+/// node and turn it in to a mate score relative to the current node.
+fn normalise(score: Eval, height: Depth) -> Eval {
+    if score <= -MATE_BOUND {
+        score - Eval::from(height)
+    } else if score >= MATE_BOUND {
+        score + Eval::from(height)
+    } else {
+        score
+    }
+}
+
+/// If `score` is a mate score, assume it is a mate score relative to the
+/// current node and turn it into a mate score relative to the root node.
+fn denormalise(score: Eval, height: Depth) -> Eval {
+    if score <= -MATE_BOUND {
+        score + Eval::from(height)
+    } else if score >= MATE_BOUND {
+        score - Eval::from(height)
+    } else {
+        score
     }
 }

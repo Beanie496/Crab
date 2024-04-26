@@ -22,9 +22,9 @@ use super::{
 use crate::{
     board::Board,
     defs::MoveType,
-    evaluation::{evaluate, is_mate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
+    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
     movegen::Move,
-    transposition_table::{Bound, TranspositionEntry},
+    transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
 /// Performs a search on `board`.
@@ -65,18 +65,17 @@ pub fn search<NodeType: Node>(
     }
 
     // load from tt
-    let entry = search_refs.tt.load(board.zobrist());
-    if let Some(e) = entry {
-        if e.depth() >= depth
-            && (e.bound() == Bound::Exact
-                || e.bound() == Bound::Lower && e.score() >= beta
-                || e.bound() == Bound::Upper && e.score() <= alpha)
-            && !is_mate(e.score())
+    let tt_hit = search_refs.tt.load(board.zobrist(), height);
+    if let Some(h) = tt_hit {
+        if h.depth() >= depth
+            && (h.bound() == Bound::Exact
+                || h.bound() == Bound::Lower && h.score() >= beta
+                || h.bound() == Bound::Upper && h.score() <= alpha)
         {
             if NodeType::IS_ROOT {
-                pv.enqueue(e.mv());
+                pv.enqueue(h.mv());
             }
-            return e.score();
+            return h.score();
         }
     }
 
@@ -85,7 +84,7 @@ pub fn search<NodeType: Node>(
     let mut new_pv = Pv::new();
     let movepicker = MovePicker::new::<{ MoveType::ALL }>(
         board,
-        entry.map_or(Move::null(), TranspositionEntry::mv),
+        tt_hit.map_or(Move::null(), TranspositionHit::mv),
     );
 
     let mut total_moves = 0;
@@ -183,7 +182,8 @@ pub fn search<NodeType: Node>(
     } else {
         Bound::Exact
     };
-    let tt_entry = TranspositionEntry::new(board.zobrist(), best_score, best_move, bound, depth);
+    let tt_entry =
+        TranspositionEntry::new(board.zobrist(), best_score, best_move, depth, bound, height);
     search_refs.tt.store(board.zobrist(), tt_entry);
 
     best_score
