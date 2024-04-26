@@ -16,7 +16,9 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{movepick::MovePicker, Depth, Node, OtherNode, Pv, SearchReferences, SearchStatus};
+use super::{
+    movepick::MovePicker, CutNode, Depth, Node, Pv, PvNode, SearchReferences, SearchStatus,
+};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -87,6 +89,10 @@ pub fn search<NodeType: Node>(
     );
 
     let mut total_moves = 0;
+    // this triggers because of setting `score` to 0 before the zero-window
+    // search, but attaching this to the `if` statement does nothing for some
+    // reason
+    #[allow(clippy::useless_let_if_seq)]
     for mv in movepicker {
         let mut copy = *board;
         if !copy.make_move(mv) {
@@ -100,10 +106,31 @@ pub fn search<NodeType: Node>(
             pv.enqueue(mv);
         }
 
-        let score = -search::<OtherNode>(search_refs, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+        // If we've already searched the first move, it's probably going to be
+        // the best move. To prove this, we lower beta to alpha + 1 and do a
+        // search (a zero-window search). If score <= alpha, it managed to
+        // exceed -alpha - 1, which means it would have exceeded the old beta
+        // too. If it does raise alpha, it must have failed to raise -alpha - 1
+        // but it could have raised -beta, so we must do a full research.
+        let mut score = 0;
+        if !NodeType::IS_PV || total_moves > 1 {
+            score = -search::<CutNode>(
+                search_refs,
+                &mut new_pv,
+                &copy,
+                -alpha - 1,
+                -alpha,
+                depth - 1,
+            );
+            search_refs.nodes += 1;
+        }
+
+        if NodeType::IS_PV && (score > alpha || total_moves == 1) {
+            score = -search::<PvNode>(search_refs, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+            search_refs.nodes += 1;
+        }
 
         search_refs.past_zobrists.pop();
-        search_refs.nodes += 1;
 
         // if the search was stopped early, we can't trust its results
         if search_refs.check_status() != SearchStatus::Continue {
@@ -113,8 +140,15 @@ pub fn search<NodeType: Node>(
         best_score = best_score.max(score);
         // the move is even better than what we originally had
         if score > alpha {
-            alpha = score;
             best_move = mv;
+
+            // if we're in a zero-window search, raising alpha will raise beta
+            // and we don't care about the PV
+            if !NodeType::IS_PV {
+                break;
+            }
+
+            alpha = score;
 
             pv.clear();
             pv.enqueue(mv);
