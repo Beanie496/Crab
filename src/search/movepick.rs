@@ -47,7 +47,7 @@ pub struct ScoredMoves {
 }
 
 /// The score of a quiet move.
-const QUIET_SCORE: Eval = -INF_EVAL;
+const QUIET_SCORE: Eval = 5_000;
 /// The score of a move found in the transposition table.
 const TT_SCORE: Eval = INF_EVAL;
 /// The score of a capture with a winning static exchange evaluation.
