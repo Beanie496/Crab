@@ -67,14 +67,12 @@ pub fn search<NodeType: Node>(
     // load from tt
     let tt_hit = search_refs.tt.load(board.zobrist(), height);
     if let Some(h) = tt_hit {
-        if h.depth() >= depth
+        if !NodeType::IS_PV
+            && h.depth() >= depth
             && (h.bound() == Bound::Exact
                 || h.bound() == Bound::Lower && h.score() >= beta
                 || h.bound() == Bound::Upper && h.score() <= alpha)
         {
-            if NodeType::IS_ROOT {
-                pv.enqueue(h.mv());
-            }
             return h.score();
         }
     }
