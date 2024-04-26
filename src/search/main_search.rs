@@ -21,7 +21,7 @@ use crate::{
     board::Board,
     defs::MoveType,
     evaluation::{evaluate, is_mate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
-    movegen::{generate_moves, Move},
+    movegen::Move,
     transposition_table::{Bound, TranspositionEntry},
 };
 
@@ -175,9 +175,9 @@ fn quiescence_search(
         return alpha;
     }
 
-    let moves = generate_moves::<{ MoveType::CAPTURES }>(board);
+    let movepicker = MovePicker::new::<{ MoveType::CAPTURES }>(board, Move::null());
 
-    for mv in moves {
+    for mv in movepicker {
         let mut copy = *board;
         if !copy.make_move(mv) {
             continue;
