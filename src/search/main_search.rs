@@ -106,7 +106,7 @@ pub fn search<NodeType: Node>(
         }
 
         if NodeType::IS_ROOT && search_refs.should_print() {
-            println!("info currmovenumber 1 move {mv}");
+            println!("info currmovenumber {total_moves} currmove {mv}");
         }
 
         // If we've already searched the first move, it's probably going to be
@@ -140,11 +140,12 @@ pub fn search<NodeType: Node>(
             return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 
+        best_score = best_score.max(score);
+
         if NodeType::IS_ROOT && search_refs.should_print() {
-            println!("info currmovenumber 1 move {mv} score {score}");
+            println!("info currmovenumber {total_moves} currmove {mv} currscore {score} bestscore {best_score}");
         }
 
-        best_score = best_score.max(score);
         // the move is even better than what we originally had
         if score > alpha {
             best_move = mv;
