@@ -53,14 +53,21 @@ trait Node {
     const IS_ROOT: bool;
 }
 
-/// A node that is not root.
-struct OtherNode;
+/// A node with a zero window: is expected not to be in the final PV.
+struct CutNode;
+/// A node that could be in the final PV.
+struct PvNode;
 /// The node from which the search starts.
 struct RootNode;
 
-impl Node for OtherNode {
+impl Node for CutNode {
     const IS_ROOT: bool = false;
     const IS_PV: bool = false;
+}
+
+impl Node for PvNode {
+    const IS_ROOT: bool = false;
+    const IS_PV: bool = true;
 }
 
 impl Node for RootNode {
