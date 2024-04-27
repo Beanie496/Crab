@@ -144,8 +144,10 @@ impl ScoredMove {
     /// Scores a [`Move`], assuming it's a capture.
     pub fn new_capture(board: &Board, mv: Move) -> Self {
         debug_assert!(
-            PieceType::from(board.piece_on(mv.end())) != PieceType::NONE,
-            "Quiet move being scored as a capture"
+            mv.is_en_passant()
+                ^ (PieceType::from(board.piece_on(mv.end())) != PieceType::NONE
+                    || mv.is_promotion()),
+            "Quiet move being scored as a capture: {board}, {mv}"
         );
         let score = capture_score(board, mv);
         Self { mv, score }
@@ -168,10 +170,17 @@ impl ScoredMoves {
 
 /// Gives a capturing move a score.
 pub fn capture_score(board: &Board, mv: Move) -> Eval {
-    let captured_piece = PieceType::from(board.piece_on(mv.end()));
+    let captured_piece = if mv.is_en_passant() {
+        PieceType::PAWN
+    } else if mv.is_promotion() {
+        PieceType(mv.promotion_piece().0 - PieceType::PAWN.0)
+    } else {
+        PieceType::from(board.piece_on(mv.end()))
+    };
     if captured_piece == PieceType::NONE {
         return QUIET_SCORE;
     }
+
     debug_assert!(
         captured_piece != PieceType::KING,
         "How are you capturing a king?"

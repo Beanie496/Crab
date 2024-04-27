@@ -44,7 +44,12 @@ macro_rules! cfor {
 #[macro_export]
 macro_rules! index_into_unchecked {
     ($array:expr, $index:expr, $item:expr) => {{
-        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
+        debug_assert!(
+            $index < $array.len(),
+            "Attempted to index out of bounds: {} >= {}",
+            $index,
+            $array.len()
+        );
         // SAFETY: we just checked `index` is valid
         unsafe { *$array.get_unchecked_mut($index) = $item }
     }};
@@ -56,7 +61,12 @@ macro_rules! index_into_unchecked {
 #[macro_export]
 macro_rules! index_unchecked {
     ($array:expr, $index:expr) => {{
-        debug_assert!($index < $array.len(), "Attempted to index out of bounds");
+        debug_assert!(
+            $index < $array.len(),
+            "Attempted to index out of bounds: {} >= {}",
+            $index,
+            $array.len()
+        );
         // SAFETY: we just checked `index` is valid
         unsafe { *$array.get_unchecked($index) }
     }};

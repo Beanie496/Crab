@@ -79,7 +79,7 @@ static PIECE_CHARS: [char; Piece::TOTAL + 1] = [
 ];
 /// A bonus to a piece during SEE.
 // this can be tuned
-static SEE_VALUES: [Eval; PieceType::TOTAL] = [100, 300, 300, 500, 900, 0];
+static SEE_VALUES: [Eval; PieceType::TOTAL + 1] = [100, 300, 300, 500, 900, 0, 0];
 
 /// Cardinal directions, according to little-endian rank-fink file mapping.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
