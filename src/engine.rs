@@ -245,6 +245,7 @@ impl Engine {
 
         *self.board_mut() = board;
         *self.past_zobrists_mut() = zobrists;
+        self.tt_mut().clear();
     }
 
     /// Sets a UCI option from a `setoption` command.
