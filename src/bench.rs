@@ -41,7 +41,7 @@ pub fn bench() {
     let (_tx, rx) = channel();
     let rx = Mutex::new(rx);
     let options = UciOptions::default();
-    let mut tt = TranspositionTable::with_capacity(options.hash());
+    let tt = TranspositionTable::with_capacity(options.hash());
 
     let mut fen_str = String::new();
     let mut total_time = Duration::ZERO;
@@ -62,7 +62,6 @@ pub fn bench() {
 
         let start = Instant::now();
         let report = iterative_deepening(board, options, &rx, &mut zobrists, limits, start, &tt);
-        tt.clear();
 
         total_time += report.time;
         total_nodes += report.nodes;
