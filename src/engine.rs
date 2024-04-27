@@ -108,34 +108,22 @@ impl Engine {
 
             match token {
                 "wtime" if self.board().side_to_move() == Side::WHITE => {
-                    let time = parse_into_nonzero_option(next)
-                        .map(Duration::from_millis)
-                        .map(|d| d.saturating_sub(self.options().move_overhead()));
-                    limits.set_time(time);
+                    limits.set_time(parse_time(next));
                 }
                 "btime" if self.board().side_to_move() == Side::BLACK => {
-                    let time = parse_into_nonzero_option(next)
-                        .map(Duration::from_millis)
-                        .map(|d| d.saturating_sub(self.options().move_overhead()));
-                    limits.set_time(time);
+                    limits.set_time(parse_time(next));
                 }
                 "winc" if self.board().side_to_move() == Side::WHITE => {
-                    let time = parse_into_nonzero_option(next)
-                        .map(Duration::from_millis)
-                        .map(|d| d.saturating_sub(self.options().move_overhead()));
-                    limits.set_inc(time);
+                    limits.set_inc(parse_time(next));
                 }
                 "binc" if self.board().side_to_move() == Side::BLACK => {
-                    let time = parse_into_nonzero_option(next)
-                        .map(Duration::from_millis)
-                        .map(|d| d.saturating_sub(self.options().move_overhead()));
-                    limits.set_inc(time);
+                    limits.set_inc(parse_time(next));
                 }
                 "movestogo" => limits.set_moves_to_go(parse_into_nonzero_option(next)),
                 "depth" => limits.set_depth(parse_into_nonzero_option(next)),
                 "nodes" => limits.set_nodes(parse_into_nonzero_option(next)),
                 "movetime" => {
-                    limits.set_movetime(parse_into_nonzero_option(next).map(Duration::from_millis));
+                    limits.set_movetime(parse_time(next));
                 }
                 // if depth is specified and then `infinite` is give, the
                 // latter should override the former
@@ -386,4 +374,21 @@ fn parse_option<T: FromStr>(num: Option<&str>) -> Option<T> {
 /// Returns [`None`] if the result of the parse is 0 or an `Err`.
 fn parse_into_nonzero_option<T: FromStr + PartialEq<T> + From<u8>>(num: Option<&str>) -> Option<T> {
     parse_option(num).and_then(|t| if t == T::from(0) { None } else { Some(t) })
+}
+
+/// Parses an `Option<&str>` into an `Option<Duration>`, where the string is
+/// some kind of length of time.
+///
+/// Returns `None` if `num` cannot be parsed. If `num` can be parsed but is
+/// negative, it will return [`Some`] with a small amount of time to account
+/// for CCRL.
+fn parse_time(num: Option<&str>) -> Option<Duration> {
+    parse_option::<i32>(num)
+        // pre-emptive CCRL fix from Alexandria: if the GUI gives us a negative
+        // time, take advantage of the 5-second grace period and assume we do
+        // actually have a little time
+        .map(|t| if t < 0 { 1000 } else { t })
+        // SAFETY: we just made sure `t` is positive
+        .map(|t| unsafe { u64::try_from(t).unwrap_unchecked()})
+        .map(Duration::from_millis)
 }
