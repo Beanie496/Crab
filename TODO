@@ -10,7 +10,6 @@
 - counter move history
 - followup move history
 - qs see
-- pvs see (captures and quiets)
 - qs delta pruning
 - history pruning
 - capture history
