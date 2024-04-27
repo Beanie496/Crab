@@ -17,7 +17,7 @@
  */
 
 use super::{
-    movepick::MovePicker, CutNode, Depth, Node, Pv, PvNode, SearchReferences, SearchStatus,
+    movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchReferences, SearchStatus,
 };
 use crate::{
     board::Board,
@@ -117,7 +117,7 @@ pub fn search<NodeType: Node>(
         // but it could have raised -beta, so we must do a full research.
         let mut score = 0;
         if !NodeType::IS_PV || total_moves > 1 {
-            score = -search::<CutNode>(
+            score = -search::<NonPvNode>(
                 search_refs,
                 &mut new_pv,
                 &copy,

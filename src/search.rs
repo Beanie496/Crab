@@ -54,13 +54,13 @@ trait Node {
 }
 
 /// A node with a zero window: is expected not to be in the final PV.
-struct CutNode;
+struct NonPvNode;
 /// A node that could be in the final PV.
 struct PvNode;
 /// The node from which the search starts.
 struct RootNode;
 
-impl Node for CutNode {
+impl Node for NonPvNode {
     const IS_ROOT: bool = false;
     const IS_PV: bool = false;
 }
