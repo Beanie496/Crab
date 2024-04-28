@@ -634,12 +634,15 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
         }
     }
 
-    let kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
-    for king in kings {
-        let targets = LOOKUPS.king_attacks(king) & target_squares;
-        for target in targets {
-            moves.push(Move::new(king, target));
-        }
+    let mut kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
+    debug_assert!(
+        kings.0.count_ones() == 1,
+        "more than one king per side on the board"
+    );
+    let king = kings.pop_next_square();
+    let targets = LOOKUPS.king_attacks(king) & target_squares;
+    for target in targets {
+        moves.push(Move::new(king, target));
     }
 }
 
