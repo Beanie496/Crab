@@ -149,10 +149,10 @@ impl ZobristKeys {
     /// Generates new pseudo-random zobrist keys.
     const fn new() -> Self {
         // arbitrary 8 bytes from /dev/random
-        let mut seed = 0xc815_1848_573b_e077u64;
-        let mut piece_and_side = [[0u64; Piece::TOTAL + 1]; Square::TOTAL];
-        let mut castling_rights = [0u64; 16];
-        let mut ep = [0u64; Square::TOTAL + 1];
+        let mut seed = 0xc815_1848_573b_e077_u64;
+        let mut piece_and_side = [[0_u64; Piece::TOTAL + 1]; Square::TOTAL];
+        let mut castling_rights = [0_u64; 16];
+        let mut ep = [0_u64; Square::TOTAL + 1];
 
         cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             cfor!(let mut piece = 0; piece < Piece::TOTAL; piece += 1; {

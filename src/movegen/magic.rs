@@ -235,7 +235,7 @@ pub fn find_magics<const PIECE: u8>() {
     // this is used to check if any collisions are destructive
     let mut lookup_table = [Bitboard::empty(); MAX_BLOCKERS];
     // this is used to store the latest iteration of each index
-    let mut epoch = [0u32; MAX_BLOCKERS];
+    let mut epoch = [0_u32; MAX_BLOCKERS];
     let mut rand_gen = Rand64::new(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -248,7 +248,7 @@ pub fn find_magics<const PIECE: u8>() {
         let edges = Bitboard::edges_without(square);
         let mask = sliding_attacks::<PIECE>(square, Bitboard::empty()) & !edges;
         let mask_bits = mask.0.count_ones();
-        let perms = 2usize.pow(mask_bits);
+        let perms = 2_usize.pow(mask_bits);
         let shift = 64 - mask_bits;
         gen_all_sliding_attacks::<PIECE>(square, &mut attacks);
 

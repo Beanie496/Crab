@@ -238,8 +238,8 @@ impl Lookup {
                 sliding_attacks::<{ PieceType::ROOK.0 }>(square, Bitboard::empty()).0 & !edges;
             let b_mask_bits = b_mask.count_ones();
             let r_mask_bits = r_mask.count_ones();
-            let b_perms = 2usize.pow(b_mask_bits);
-            let r_perms = 2usize.pow(r_mask_bits);
+            let b_perms = 2_usize.pow(b_mask_bits);
+            let r_perms = 2_usize.pow(r_mask_bits);
 
             let b_magic = Magic::new(
                 BISHOP_MAGICS[square.to_index()],

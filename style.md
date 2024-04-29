@@ -17,7 +17,6 @@ The order for each file should be as shown:
 - Impls
 - Functions definitions
 
-Don't use the old file path style. This means you should never make a file called `mod.rs`.
 Unit tests should usually be inline modules. All other modules should be in external files.
 
 ### 2. Imports
@@ -85,10 +84,6 @@ impl B {
 ```
 Functions and methods should be ordered in whatever order seems logical.
 
-### 7. Comments
-
-Don't overuse them, but ensure they're there when needed.
-
-### 8. Assembly
+### 7. Assembly
 
 Don't use it.
