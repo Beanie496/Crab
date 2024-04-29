@@ -492,9 +492,7 @@ impl<'a> SearchReferences<'a> {
 
     /// Returns if the root node should print extra information.
     fn should_print(&mut self) -> bool {
-        if !self.should_print {
-            self.should_print = self.start.elapsed() > Duration::from_millis(3000);
-        }
+        self.should_print |= self.start.elapsed() > Duration::from_millis(3000);
         self.should_print
     }
 
