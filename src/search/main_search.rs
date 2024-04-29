@@ -44,6 +44,8 @@ pub fn search<NodeType: Node>(
         return quiescence_search(search_refs, board, alpha, beta, search_refs.depth);
     }
 
+    search_refs.nodes += 1;
+
     let height = search_refs.depth - depth;
 
     if !NodeType::IS_ROOT {
@@ -125,12 +127,10 @@ pub fn search<NodeType: Node>(
                 -alpha,
                 depth - 1,
             );
-            search_refs.nodes += 1;
         }
 
         if NodeType::IS_PV && (score > alpha || total_moves == 1) {
             score = -search::<PvNode>(search_refs, &mut new_pv, &copy, -beta, -alpha, depth - 1);
-            search_refs.nodes += 1;
         }
 
         search_refs.past_zobrists.pop();
@@ -210,6 +210,7 @@ fn quiescence_search(
     height: Depth,
 ) -> Eval {
     search_refs.seldepth = search_refs.seldepth.max(height);
+    search_refs.nodes += 1;
 
     let mut best_score = evaluate(board);
 
@@ -227,8 +228,6 @@ fn quiescence_search(
         }
 
         let score = -quiescence_search(search_refs, &copy, -beta, -alpha, height + 1);
-
-        search_refs.nodes += 1;
 
         if search_refs.check_status() != SearchStatus::Continue {
             return 0;
