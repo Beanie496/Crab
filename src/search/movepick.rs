@@ -117,39 +117,45 @@ impl Moves {
     /// Scores the moves in `moves`, given the information in `search_info` and
     /// the current height.
     pub fn score<const MOVE_TYPE: u8>(self, board: &Board, tt_move: Move) -> ScoredMoves {
-        self.map(|mv| {
-            if MOVE_TYPE == MoveType::ALL {
-                ScoredMove::new(board, mv, tt_move)
-            } else if MOVE_TYPE == MoveType::CAPTURES {
-                ScoredMove::new_capture(board, mv)
-            } else {
-                panic!("Unknown move type: {MOVE_TYPE}")
-            }
-        })
-        .collect()
+        self.map(|mv| ScoredMove::new::<MOVE_TYPE>(board, mv, tt_move))
+            .collect()
     }
 }
 
 impl ScoredMove {
     /// Scores a [`Move`].
-    pub fn new(board: &Board, mv: Move, tt_move: Move) -> Self {
-        let score = if mv == tt_move {
-            TT_SCORE
-        } else {
-            capture_score(board, mv)
-        };
-        Self { mv, score }
-    }
+    pub fn new<const MOVE_TYPE: u8>(board: &Board, mv: Move, tt_move: Move) -> Self {
+        if MOVE_TYPE != MoveType::CAPTURES && mv == tt_move {
+            return Self {
+                mv,
+                score: TT_SCORE,
+            };
+        }
 
-    /// Scores a [`Move`], assuming it's a capture.
-    pub fn new_capture(board: &Board, mv: Move) -> Self {
+        let captured_piece = if mv.is_en_passant() {
+            PieceType::PAWN
+        } else if mv.is_promotion() {
+            PieceType(mv.promotion_piece().0 - PieceType::PAWN.0)
+        } else {
+            PieceType::from(board.piece_on(mv.end()))
+        };
+
+        if captured_piece == PieceType::NONE {
+            return Self {
+                mv,
+                score: QUIET_SCORE,
+            };
+        }
+
         debug_assert!(
-            mv.is_en_passant()
-                ^ (PieceType::from(board.piece_on(mv.end())) != PieceType::NONE
-                    || mv.is_promotion()),
-            "Quiet move being scored as a capture: {board}, {mv}"
+            captured_piece != PieceType::KING,
+            "How are you capturing a king?"
         );
-        let score = capture_score(board, mv);
+
+        let mut score = captured_piece.mvv_bonus();
+        if board.is_winning_exchange(mv) {
+            score += WINNING_CAPTURE_SCORE;
+        }
         Self { mv, score }
     }
 }
@@ -166,29 +172,4 @@ impl ScoredMoves {
     fn pop(&mut self) -> Option<ScoredMove> {
         self.moves.pop()
     }
-}
-
-/// Gives a capturing move a score.
-pub fn capture_score(board: &Board, mv: Move) -> Eval {
-    let captured_piece = if mv.is_en_passant() {
-        PieceType::PAWN
-    } else if mv.is_promotion() {
-        PieceType(mv.promotion_piece().0 - PieceType::PAWN.0)
-    } else {
-        PieceType::from(board.piece_on(mv.end()))
-    };
-    if captured_piece == PieceType::NONE {
-        return QUIET_SCORE;
-    }
-
-    debug_assert!(
-        captured_piece != PieceType::KING,
-        "How are you capturing a king?"
-    );
-
-    let mut score = captured_piece.mvv_bonus();
-    if board.is_winning_exchange(mv) {
-        score += WINNING_CAPTURE_SCORE;
-    }
-    score
 }
