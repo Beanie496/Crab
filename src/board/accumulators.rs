@@ -44,7 +44,7 @@ struct ZobristKeys {
     /// Since the first and last 8 indicies of the pawn table are never used,
     /// they can be reused. I'm using the A1 square of the Black pawn table
     /// for the side to move key.
-    piece_and_side: [[Key; Piece::TOTAL + 1]; Square::TOTAL],
+    piece_and_side: [[Key; Square::TOTAL]; Piece::TOTAL + 1],
     /// The castling rights keys. One for each combination for fast lookup.
     castling_rights: [Key; 16],
     /// The en passant keys. 65 for fast lookup.
@@ -150,13 +150,13 @@ impl ZobristKeys {
     const fn new() -> Self {
         // arbitrary 8 bytes from /dev/random
         let mut seed = 0xc815_1848_573b_e077_u64;
-        let mut piece_and_side = [[0_u64; Piece::TOTAL + 1]; Square::TOTAL];
+        let mut piece_and_side = [[0_u64; Square::TOTAL]; Piece::TOTAL + 1];
         let mut castling_rights = [0_u64; 16];
         let mut ep = [0_u64; Square::TOTAL + 1];
 
         cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             cfor!(let mut piece = 0; piece < Piece::TOTAL; piece += 1; {
-                piece_and_side[square][piece] = rand!(seed);
+                piece_and_side[piece][square] = rand!(seed);
             });
         });
 
@@ -180,14 +180,14 @@ impl ZobristKeys {
 
     /// Calculates the key of the given piece on the given square.
     fn piece_key(&self, square: Square, piece: Piece) -> Key {
-        out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side.len());
-        out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side[0].len());
-        self.piece_and_side[square.to_index()][piece.to_index()]
+        out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side.len());
+        out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side[0].len());
+        self.piece_and_side[piece.to_index()][square.to_index()]
     }
 
     /// Calculates the side to move key.
     const fn side_key(&self) -> Key {
-        self.piece_and_side[Square::A1.to_index()][Piece::BPAWN.to_index()]
+        self.piece_and_side[Piece::BPAWN.to_index()][Square::A1.to_index()]
     }
 
     /// Calculates the key of the given castling rights.
