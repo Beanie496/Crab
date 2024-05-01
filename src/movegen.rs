@@ -523,7 +523,7 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     let promotion_pawns = pawns & penultimate_rank;
 
     // regular pushes
-    if MOVE_TYPE != MoveType::CAPTURES {
+    if MOVE_TYPE == MoveType::ALL {
         let single_push = normal_pawns.pawn_push::<IS_WHITE>() & empty;
         let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
@@ -582,13 +582,15 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
 
     for dest_pawn in single_push {
         let origin = dest_pawn - forward;
-        if MOVE_TYPE != MoveType::CAPTURES {
+        if MOVE_TYPE == MoveType::ALL {
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
         }
         // count queen promotions as captures
-        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+        if MOVE_TYPE == MoveType::ALL || MOVE_TYPE == MoveType::CAPTURES {
+            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+        }
     }
     for dest_pawn in right_captures {
         let origin = dest_pawn - forward_right;
@@ -613,22 +615,28 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     moves: &mut Moves,
 ) {
     let us_bb = board.side::<IS_WHITE>();
-    let target_squares = if MOVE_TYPE == MoveType::CAPTURES {
-        // all squares that are occupied by them
-        // oh how I wish Rust allowed operations on consts generics
-        if IS_WHITE {
-            board.side::<false>()
-        } else {
-            board.side::<true>()
+    let knight_target_squares = match MOVE_TYPE {
+        MoveType::ALL => !us_bb,
+        MoveType::CAPTURES | MoveType::EVASIONS => {
+            // all squares that are occupied by them
+            // oh how I wish Rust allowed operations on consts generics
+            if IS_WHITE {
+                board.side::<false>()
+            } else {
+                board.side::<true>()
+            }
         }
-    } else {
-        // all squares that aren't occupied by us
+        _ => unreachable!(),
+    };
+    let king_target_squares = if MOVE_TYPE == MoveType::EVASIONS {
         !us_bb
+    } else {
+        knight_target_squares
     };
 
     let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
     for knight in knights {
-        let targets = LOOKUPS.knight_attacks(knight) & target_squares;
+        let targets = LOOKUPS.knight_attacks(knight) & knight_target_squares;
         for target in targets {
             moves.push(Move::new(knight, target));
         }
@@ -640,7 +648,7 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
         "more than one king per side on the board"
     );
     let king = kings.pop_next_square();
-    let targets = LOOKUPS.king_attacks(king) & target_squares;
+    let targets = LOOKUPS.king_attacks(king) & king_target_squares;
     for target in targets {
         moves.push(Move::new(king, target));
     }

@@ -114,6 +114,8 @@ impl MoveType {
     pub const ALL: u8 = 0;
     /// Captures only.
     pub const CAPTURES: u8 = 1;
+    /// Check evasions: king moves and/or captures of checkers.
+    pub const EVASIONS: u8 = 2;
 }
 
 /// Piece enumerations for White and Black.

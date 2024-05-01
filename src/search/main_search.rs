@@ -212,14 +212,23 @@ fn quiescence_search(
     search_refs.seldepth = search_refs.seldepth.max(height);
     search_refs.nodes += 1;
 
-    let mut best_score = evaluate(board);
+    let is_in_check = board.is_in_check();
+    let mut best_score = if is_in_check {
+        -INF_EVAL
+    } else {
+        evaluate(board)
+    };
 
     alpha = alpha.max(best_score);
     if alpha >= beta {
         return alpha;
     }
 
-    let movepicker = MovePicker::new::<{ MoveType::CAPTURES }>(board, Move::null());
+    let movepicker = if is_in_check {
+        MovePicker::new::<{ MoveType::EVASIONS }>(board, Move::null())
+    } else {
+        MovePicker::new::<{ MoveType::CAPTURES }>(board, Move::null())
+    };
 
     for mv in movepicker {
         let mut copy = *board;
