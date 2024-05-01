@@ -39,14 +39,14 @@ pub fn search<NodeType: Node>(
     mut alpha: Eval,
     mut beta: Eval,
     depth: Depth,
+    height: Depth,
 ) -> Eval {
     if depth == 0 {
-        return quiescence_search(search_refs, board, alpha, beta, search_refs.depth);
+        return quiescence_search(search_refs, board, alpha, beta, height);
     }
 
+    let is_in_check = board.is_in_check();
     search_refs.nodes += 1;
-
-    let height = search_refs.depth - depth;
 
     if !NodeType::IS_ROOT {
         // mate distance pruning
@@ -111,6 +111,14 @@ pub fn search<NodeType: Node>(
             println!("info currmovenumber {total_moves} currmove {mv}");
         }
 
+        let mut extension = 0;
+
+        if is_in_check {
+            extension += 1;
+        }
+
+        let new_depth = depth + extension - 1;
+
         // If we've already searched the first move, it's probably going to be
         // the best move. To prove this, we lower beta to alpha + 1 and do a
         // search (a zero-window search). If score <= alpha, it managed to
@@ -125,12 +133,21 @@ pub fn search<NodeType: Node>(
                 &copy,
                 -alpha - 1,
                 -alpha,
-                depth - 1,
+                new_depth,
+                height + 1,
             );
         }
 
         if NodeType::IS_PV && (score > alpha || total_moves == 1) {
-            score = -search::<PvNode>(search_refs, &mut new_pv, &copy, -beta, -alpha, depth - 1);
+            score = -search::<PvNode>(
+                search_refs,
+                &mut new_pv,
+                &copy,
+                -beta,
+                -alpha,
+                new_depth,
+                height + 1,
+            );
         }
 
         search_refs.past_zobrists.pop();

@@ -7,6 +7,8 @@ Features:
 - Magic bitboards
 - UCI compatibility
 - Principle variation search
+- Extensions:
+  - Check extensions
 - A transposition table
 - Move ordering:
   - TT-move
