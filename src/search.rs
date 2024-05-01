@@ -414,9 +414,9 @@ impl<'a> SearchReferences<'a> {
     /// This will check the UCI receiver to see if the GUI has told us to stop,
     /// then check to see if we're exceeding the limits of the search.
     fn check_status(&mut self) -> SearchStatus {
-        // only check every 2048 nodes, and don't bother wasting more time if
+        // only check every 2048 nodes and don't bother wasting more time if
         // we've already stopped
-        if self.nodes & 2047 != 0 || self.status != SearchStatus::Continue {
+        if self.nodes % 2048 != 0 || self.status != SearchStatus::Continue {
             return self.status;
         }
 
