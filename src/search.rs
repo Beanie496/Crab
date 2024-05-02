@@ -629,7 +629,7 @@ pub fn base_reductions() -> BaseReductions {
         for (depth, depth_entry) in depth_table.iter_mut().enumerate() {
             let ln_depth = f32::ln(depth as f32);
             let ln_move_idx = f32::ln(move_idx as f32);
-            *depth_entry = (ln_depth * ln_move_idx / 2.0) as Depth;
+            *depth_entry = (1.0 + ln_depth * ln_move_idx / 2.0) as Depth;
         }
     }
     ret
