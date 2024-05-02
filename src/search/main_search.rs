@@ -90,11 +90,7 @@ pub fn search<NodeType: Node>(
         tt_hit.map_or(Move::null(), TranspositionHit::mv),
     );
 
-    let mut total_moves = 0;
-    // this triggers because of setting `score` to 0 before the zero-window
-    // search, but attaching this to the `if` statement does nothing for some
-    // reason
-    #[allow(clippy::useless_let_if_seq)]
+    let mut total_moves: u8 = 0;
     for mv in movepicker {
         let mut copy = *board;
         if !copy.make_move(mv) {
@@ -112,32 +108,46 @@ pub fn search<NodeType: Node>(
             println!("info currmovenumber {total_moves} currmove {mv}");
         }
 
-        let mut extension = 0;
-
-        if is_in_check {
-            extension += 1;
-        }
+        let extension = extension(is_in_check);
 
         let new_depth = depth + extension - 1;
 
-        // If we've already searched the first move, it's probably going to be
-        // the best move. To prove this, we lower beta to alpha + 1 and do a
-        // search (a zero-window search). If score <= alpha, it managed to
-        // exceed -alpha - 1, which means it would have exceeded the old beta
-        // too. If it does raise alpha, it must have failed to raise -alpha - 1
-        // but it could have raised -beta, so we must do a full research.
+        // Principle variation search (PVS) + late move reduction (LMR)
+        // The first searched move is probably going to be the best because of
+        // move ordering. To prove this, on the searches of subsequent moves,
+        // we lower beta to alpha + 1 (a zero window) and reduce the new depth
+        // depending on some heuristics. If the search then raises alpha, we do
+        // a research without reducing in case the lower depth was missing
+        // something. If _that_ search still raises alpha, it must have failed
+        // to exceed -alpha - 1, but could have exceeded the old beta, so we
+        // must do a research without reducing and with a full window. (If that
+        // then exceeds alpha, then great: we've found a better move.)
         let mut score = 0;
         if !NodeType::IS_PV || total_moves > 1 {
+            let reduction = reduction(search_refs, depth, total_moves);
+
             score = -search::<NonPvNode>(
                 search_refs,
                 &mut new_pv,
                 &copy,
                 -alpha - 1,
                 -alpha,
-                new_depth,
+                new_depth.saturating_sub(reduction),
                 height + 1,
             );
-        }
+
+            if score > alpha && reduction > 0 {
+                score = -search::<NonPvNode>(
+                    search_refs,
+                    &mut new_pv,
+                    &copy,
+                    -alpha - 1,
+                    -alpha,
+                    new_depth,
+                    height + 1,
+                );
+            }
+        };
 
         if NodeType::IS_PV && (score > alpha || total_moves == 1) {
             score = -search::<PvNode>(
@@ -268,4 +278,23 @@ fn quiescence_search(
     }
 
     best_score
+}
+
+/// Calculates how much to extend the search by.
+const fn extension(is_in_check: bool) -> Depth {
+    // more to come of course...
+    let mut extension = 0;
+    if is_in_check {
+        extension += 1;
+    }
+    extension
+}
+
+/// Calculates how much to reduce the search by during late move reductions.
+fn reduction(search_refs: &SearchReferences<'_>, depth: Depth, total_moves: u8) -> Depth {
+    if depth >= 3 && total_moves >= 3 {
+        search_refs.base_reductions[usize::from(total_moves)][usize::from(depth)]
+    } else {
+        0
+    }
 }
