@@ -17,7 +17,6 @@
  */
 
 use std::{
-    alloc::{alloc_zeroed, Layout},
     mem::{size_of, transmute},
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -161,12 +160,10 @@ impl TranspositionTable {
     /// Resizes the the table to the given size in MiB and zeroes it.
     pub fn resize(&mut self, size_mib: usize) {
         let entries = size_mib * 1024 * 1024 / size_of::<TranspositionEntry>();
-        let layout = Layout::array::<AtomicU64>(entries).expect("size of TT is too large");
-        // SAFETY: `layout` has a non-zero size
-        let ptr = unsafe { alloc_zeroed(layout) }.cast();
-        // SAFETY: the pointer is directly from an correct allocation, `size`
-        // <= `size` and a too-large size would have caused a panic earlier
-        *self.tt_mut() = unsafe { Vec::from_raw_parts(ptr, entries, entries) };
+        *self.tt_mut() = Vec::with_capacity(entries);
+        for _ in 0..entries {
+            self.tt_mut().push(AtomicU64::new(0));
+        }
     }
 
     /// Zeroes the table.
