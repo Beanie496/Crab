@@ -46,6 +46,7 @@ pub fn search<NodeType: Node>(
     }
 
     let is_in_check = board.is_in_check();
+    search_refs.seldepth = search_refs.seldepth.max(height);
     search_refs.nodes += 1;
 
     if !NodeType::IS_ROOT {
