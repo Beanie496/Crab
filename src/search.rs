@@ -548,11 +548,11 @@ impl SearchReport {
 /// Performs iterative deepening on the given board.
 pub fn iterative_deepening(
     board: Board,
-    options: UciOptions,
+    start: Instant,
+    limits: Limits,
     uci_rx: &Mutex<Receiver<String>>,
     past_zobrists: &mut ZobristStack,
-    limits: Limits,
-    start: Instant,
+    options: UciOptions,
     tt: &TranspositionTable,
 ) -> SearchReport {
     let allocated = calculate_time_window(limits, start, options.move_overhead());

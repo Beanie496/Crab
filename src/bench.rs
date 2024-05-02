@@ -61,7 +61,7 @@ pub fn bench() {
         fen_str.clear();
 
         let start = Instant::now();
-        let report = iterative_deepening(board, options, &rx, &mut zobrists, limits, start, &tt);
+        let report = iterative_deepening(board, start, limits, &rx, &mut zobrists, options, &tt);
 
         total_time += report.time;
         total_nodes += report.nodes;

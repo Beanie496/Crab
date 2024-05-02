@@ -146,11 +146,11 @@ impl Engine {
 
         iterative_deepening(
             board,
-            options,
+            start,
+            limits,
             uci_rx,
             &mut past_zobrists,
-            limits,
-            start,
+            options,
             tt,
         );
     }
