@@ -574,6 +574,7 @@ pub fn iterative_deepening(
             -INF_EVAL,
             INF_EVAL,
             depth,
+            0,
         );
 
         // the root search guarantees that there will always be 1 valid move in
