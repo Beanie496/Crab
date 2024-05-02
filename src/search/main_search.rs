@@ -293,7 +293,7 @@ const fn extension(is_in_check: bool) -> Depth {
 /// Calculates how much to reduce the search by during late move reductions.
 fn reduction(search_refs: &SearchReferences<'_>, depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
-        search_refs.base_reductions[usize::from(depth)][usize::from(total_moves)]
+        search_refs.base_reductions[usize::from(total_moves)][usize::from(depth)]
     } else {
         0
     }
