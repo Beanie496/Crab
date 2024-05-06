@@ -240,7 +240,7 @@ fn quiescence_search(
 
     let is_in_check = board.is_in_check();
     let mut best_score = if is_in_check {
-        -INF_EVAL
+        mated_in(height)
     } else {
         evaluate(board)
     };
