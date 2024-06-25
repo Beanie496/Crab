@@ -91,20 +91,21 @@ impl BitXorAssign for Bitboard {
 }
 
 impl Display for Bitboard {
+    /// Displays the bits of a bitboard in little-endian rank-file mapping.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret = String::with_capacity(121);
-        let mut bb = Self::from(Square::H7);
+        let mut bb = Self::from(Square::A8);
 
         for _ in 0..Rank::TOTAL {
             for _ in 0..File::TOTAL {
-                bb <<= 1;
                 if (*self & bb).is_empty() {
                     ret.push_str("0 ");
                 } else {
                     ret.push_str("1 ");
                 }
+                bb.0 = bb.0.rotate_left(1);
             }
-            bb >>= 16;
+            bb.0 = bb.0.rotate_right(16);
             ret.pop();
             ret.push('\n');
         }
@@ -115,6 +116,7 @@ impl Display for Bitboard {
 }
 
 impl From<Square> for Bitboard {
+    /// Converts a square into a bit on a bitboard.
     fn from(square: Square) -> Self {
         Self(1 << square.0)
     }
@@ -242,11 +244,13 @@ impl Bitboard {
         Self(excluded_ranks_bb | excluded_files_bb)
     }
 
-    /// Returns the bits between the starting position of the king and the
-    /// rook, given `IS_WHITE` and `IS_KINGSIDE`.
-    pub const fn castling_space<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
+    /// Calculates if there are no blocking pieces between the king and rook,
+    /// given the side to move and castling direction.
+    pub fn is_clear_to_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>(
+        occupancies: Self,
+    ) -> bool {
         #[allow(clippy::collapsible_else_if)]
-        if IS_WHITE {
+        let castling_space = if IS_WHITE {
             if IS_KINGSIDE {
                 Self::CASTLING_SPACE_WK
             } else {
@@ -258,7 +262,8 @@ impl Bitboard {
             } else {
                 Self::CASTLING_SPACE_BQ
             }
-        }
+        };
+        (occupancies & castling_space).is_empty()
     }
 
     /// Returns an empty bitboard.

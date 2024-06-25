@@ -21,8 +21,8 @@ use std::ops::{Add, AddAssign, Neg, SubAssign};
 use crate::{
     board::Board,
     defs::{Piece, Side, Square},
-    index_unchecked, out_of_bounds_is_unreachable,
     search::Depth,
+    util::get_unchecked,
 };
 
 use values::create_piece_square_tables;
@@ -157,14 +157,13 @@ pub const fn moves_to_mate(score: Eval) -> i16 {
 /// The piece can be any type (even [`Piece::NONE`]) but the square must be
 /// valid.
 pub fn piece_score(square: Square, piece: Piece) -> Score {
-    out_of_bounds_is_unreachable!(piece.to_index(), PIECE_SQUARE_TABLES.len());
-    out_of_bounds_is_unreachable!(square.to_index(), PIECE_SQUARE_TABLES[0].len());
-    PIECE_SQUARE_TABLES[piece.to_index()][square.to_index()]
+    let piece_table = get_unchecked(&PIECE_SQUARE_TABLES, piece.to_index());
+    *get_unchecked(piece_table, square.to_index())
 }
 
 /// Returns the phase of the given piece.
 ///
 /// The piece can be any type (even [`Piece::NONE`]).
 pub fn piece_phase(piece: Piece) -> Phase {
-    index_unchecked!(PHASE_WEIGHTS, piece.to_index())
+    *get_unchecked(&PHASE_WEIGHTS, piece.to_index())
 }

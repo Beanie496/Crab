@@ -27,9 +27,9 @@ use crate::{
     board::Board,
     engine::{uci::UciOptions, ZobristStack},
     evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
-    index_into_unchecked, index_unchecked,
     movegen::{Move, MAX_LEGAL_MOVES},
     transposition_table::TranspositionTable,
+    util::{get_unchecked, insert_unchecked},
 };
 use main_search::search;
 use time::calculate_time_window;
@@ -48,7 +48,6 @@ pub type Depth = u8;
 pub type BaseReductions = [[Depth; Depth::MAX as usize + 1]; MAX_LEGAL_MOVES + 1];
 
 /// A marker for a type of node to allow searches with generic node types.
-// Idea is taken from viridithas.
 #[allow(clippy::missing_docs_in_private_items)]
 trait Node {
     const IS_PV: bool;
@@ -153,9 +152,6 @@ pub struct SearchReferences<'a> {
     tt: &'a TranspositionTable,
     /// A pre-calculated table of base late move reductions.
     base_reductions: &'a BaseReductions,
-    /// Whether or not the root node should print extra information (e.g.
-    /// current move being searched).
-    should_print: bool,
 }
 
 /// The final results of a search.
@@ -188,8 +184,7 @@ impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
         for mv in self.moves() {
-            ret_str.push_str(&mv.to_string());
-            ret_str.push(' ');
+            write!(ret_str, "{mv} ")?;
         }
         ret_str.pop();
         write!(f, "{ret_str}")
@@ -206,25 +201,23 @@ impl Iterator for Pv {
 
 impl Display for SearchReport {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut ret = format!("info depth {} seldepth {}", self.depth, self.seldepth);
+        write!(f, "info depth {} seldepth {}", self.depth, self.seldepth)?;
 
         if is_mate(self.score) {
-            write!(&mut ret, " score mate {}", moves_to_mate(self.score))?;
+            write!(f, " score mate {}", moves_to_mate(self.score))?;
         } else {
-            write!(&mut ret, " score cp {}", self.score)?;
+            write!(f, " score cp {}", self.score)?;
         }
 
         write!(
-            &mut ret,
+            f,
             " hashfull {} nodes {} time {} nps {} pv {}",
             self.hashfull,
             self.nodes,
             self.time.as_millis(),
             self.nps,
             self.pv,
-        )?;
-
-        f.write_str(&ret)
+        )
     }
 }
 
@@ -352,14 +345,14 @@ impl Pv {
 
     /// Adds a [`Move`] to the back of the queue.
     fn enqueue(&mut self, mv: Move) {
-        index_into_unchecked!(self.moves, self.first_empty as usize, mv);
+        insert_unchecked(&mut self.moves, self.first_empty as usize, mv);
         self.first_empty += 1;
     }
 
     /// Removes a [`Move`] from the front of the queue.
     fn dequeue(&mut self) -> Option<Move> {
         (self.first_item < self.first_empty).then(|| {
-            let mv = index_unchecked!(self.moves, self.first_item as usize);
+            let mv = *get_unchecked(&self.moves, self.first_item as usize);
             self.first_item += 1;
             mv
         })
@@ -378,7 +371,7 @@ impl Pv {
 
     /// Gets the [`Move`] at the given index.
     fn get(&self, index: usize) -> Move {
-        index_unchecked!(self.moves, index)
+        *get_unchecked(&self.moves, index)
     }
 
     /// Calculates the length of the queue.
@@ -411,7 +404,6 @@ impl<'a> SearchReferences<'a> {
             past_zobrists,
             tt,
             base_reductions,
-            should_print: false,
         }
     }
 
@@ -498,8 +490,7 @@ impl<'a> SearchReferences<'a> {
 
     /// Returns if the root node should print extra information.
     fn should_print(&mut self) -> bool {
-        self.should_print |= self.start.elapsed() > Duration::from_millis(3000);
-        self.should_print
+        self.start.elapsed() > Duration::from_millis(3000)
     }
 
     /// Checks if the position is drawn, either because of repetition or
@@ -515,9 +506,9 @@ impl<'a> SearchReferences<'a> {
         // check if any past position's key is the same as the current key
         self.past_zobrists
             .iter()
-            // start at the most recent position
+            // most recent position is last
             .rev()
-            // skip very recent positions
+            // it is impossible to get a repetition within the past 4 halfmoves
             .skip(4)
             // stop after an irreversible position, or stop immediately for
             // halfmoves < 4

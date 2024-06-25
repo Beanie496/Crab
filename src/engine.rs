@@ -30,9 +30,9 @@ use std::{
 use crate::{
     board::{Board, Key},
     defs::{MoveType, PieceType, Side, Square},
-    movegen::{generate_moves, MAX_LEGAL_MOVES},
+    movegen::generate_moves,
     perft::perft,
-    search::{base_reductions, iterative_deepening, Depth, Limits},
+    search::{base_reductions, iterative_deepening, BaseReductions, Depth, Limits},
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -65,7 +65,7 @@ pub struct Engine {
     /// A pre-calculated table of base late move reductions.
     ///
     /// Indexed by `base_reductions[current_depth][current_move_index]`.
-    base_reductions: [[Depth; Depth::MAX as usize + 1]; MAX_LEGAL_MOVES + 1],
+    base_reductions: BaseReductions,
 }
 
 impl Engine {
@@ -99,17 +99,15 @@ impl Engine {
     }
 
     /// Interprets and executes the `go` command.
-    pub fn go(&mut self, line: &str) {
+    pub fn go<'a, T>(&mut self, mut options: T)
+    where
+        T: Iterator<Item = &'a str>,
+    {
         let start = Instant::now();
-        let mut tokens = line.split_whitespace();
         let mut limits = Limits::default();
 
-        if tokens.next() != Some("go") {
-            return;
-        }
-
-        while let Some(token) = tokens.next() {
-            let next = tokens.next();
+        while let Some(token) = options.next() {
+            let next = options.next();
 
             match token {
                 "wtime" if self.board().side_to_move() == Side::WHITE => {
@@ -127,11 +125,7 @@ impl Engine {
                 "movestogo" => limits.set_moves_to_go(parse_into_nonzero_option(next)),
                 "depth" => limits.set_depth(parse_into_nonzero_option(next)),
                 "nodes" => limits.set_nodes(parse_into_nonzero_option(next)),
-                "movetime" => {
-                    limits.set_movetime(parse_time(next));
-                }
-                // if depth is specified and then `infinite` is give, the
-                // latter should override the former
+                "movetime" => limits.set_movetime(parse_time(next)),
                 "infinite" => limits.set_infinite(),
                 "perft" => {
                     if let Some(depth) = parse_into_nonzero_option(next) {
@@ -166,14 +160,12 @@ impl Engine {
     ///
     /// Will not change anything if the command fails to get parsed
     /// successfully.
-    pub fn set_position(&mut self, line: &str) {
+    pub fn set_position<'a, T>(&mut self, mut tokens: T)
+    where
+        T: Iterator<Item = &'a str>,
+    {
         let mut board = Board::new();
         let mut zobrists = Stack::new();
-        let mut tokens = line.split_whitespace();
-
-        if Some("position") != tokens.next() {
-            return;
-        }
 
         match tokens.next() {
             Some("startpos") => board.set_startpos(),
@@ -211,22 +203,27 @@ impl Engine {
         zobrists.push(board.zobrist());
 
         // if there are no moves to begin with, this loop will just be skipped
-        // lint allowed because I would rather panic than deal with non-ASCII
-        #[allow(clippy::string_slice)]
         for mv in tokens {
             let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
 
-            let Ok(start) = Square::from_str(&mv[0..=1]) else {
+            let Some(start) = mv.get(0..=1) else {
                 return;
             };
-            let Ok(end) = Square::from_str(&mv[2..=3]) else {
+            let Ok(start) = Square::from_str(start) else {
+                return;
+            };
+            let Some(end) = mv.get(2..=3) else {
+                return;
+            };
+            let Ok(end) = Square::from_str(end) else {
                 return;
             };
 
             // Each move should be exactly 4 characters; if it's a promotion,
             // the last char will be the promotion char.
             let Some(mv) = (if mv.len() == 5 {
-                // SAFETY: `mv` has 5 chars so `next_back()` must return `Some`
+                // SAFETY: `mv` has a non-zero length so `chars()` must return
+                // something
                 let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
                 let Ok(piece_type) = PieceType::try_from(promotion_char) else {
                     return;
@@ -255,22 +252,16 @@ impl Engine {
     }
 
     /// Sets a UCI option from a `setoption` command.
-    pub fn set_option(&mut self, line: &str) {
-        let mut tokens = line.split_whitespace();
-
-        if tokens.next() != Some("setoption") {
-            return;
-        }
+    pub fn set_option<'a, T>(&mut self, mut tokens: T)
+    where
+        T: Iterator<Item = &'a str>,
+    {
         if tokens.next() != Some("name") {
             return;
         }
 
-        let Some(token) = tokens.next() else {
-            return;
-        };
-
-        match token {
-            "Move" => {
+        match tokens.next() {
+            Some("Move") => {
                 if tokens.next() != Some("Overhead") {
                     return;
                 }
@@ -282,7 +273,7 @@ impl Engine {
                     self.options_mut().set_move_overhead(d);
                 }
             }
-            "Threads" => {
+            Some("Threads") => {
                 if tokens.next() != Some("value") {
                     return;
                 }
@@ -291,7 +282,7 @@ impl Engine {
                     self.options_mut().set_threads(t);
                 }
             }
-            "Hash" => {
+            Some("Hash") => {
                 if tokens.next() != Some("value") {
                     return;
                 }
@@ -301,7 +292,7 @@ impl Engine {
                     self.tt_mut().resize(h);
                 }
             }
-            "Clear" => {
+            Some("Clear") => {
                 if tokens.next() != Some("Hash") {
                     return;
                 }
@@ -360,9 +351,7 @@ impl Engine {
 
     /// Returns a reference to a table of base late move reductions, as
     /// pre-calculated by [`base_reductions()`].
-    pub const fn base_reductions(
-        &self,
-    ) -> &[[Depth; Depth::MAX as usize + 1]; MAX_LEGAL_MOVES + 1] {
+    pub const fn base_reductions(&self) -> &BaseReductions {
         &self.base_reductions
     }
 

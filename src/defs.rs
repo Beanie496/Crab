@@ -22,7 +22,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{bitboard::Bitboard, error::ParseError, evaluation::Eval, index_unchecked};
+use crate::{bitboard::Bitboard, error::ParseError, evaluation::Eval, util::get_unchecked};
 
 /// A cardinal direction.
 // it doesn't make sense to say a direction is 'less than' another
@@ -75,7 +75,7 @@ static MVV_BONUS: [Eval; PieceType::TOTAL - 1] = [0, 300, 300, 500, 900];
 /// e.g. `PIECE_CHARS[Piece::WKNIGHT] == 'N'`; `PIECE_CHARS[Piece::BKING] ==
 /// 'k'`; `PIECE_CHARS[Piece::NONE] == '0'`.
 static PIECE_CHARS: [char; Piece::TOTAL + 1] = [
-    'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '0',
+    'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '-',
 ];
 /// A bonus to a piece during SEE.
 // this can be tuned
@@ -277,9 +277,13 @@ impl From<Rank> for char {
 impl From<Side> for char {
     /// Converts a side into a char, assuming the side is White or Black.
     ///
-    /// 'w' if White and 'b' if Black; undefined otherwise.
+    /// 'w' if White, 'b' if Black and '-' otherwise.
     fn from(side: Side) -> Self {
-        (b'b' + side.0 * 21) as Self
+        match side {
+            Side::WHITE => 'w',
+            Side::BLACK => 'b',
+            _ => '-',
+        }
     }
 }
 
@@ -295,21 +299,21 @@ impl TryFrom<char> for Piece {
 
     /// Converts a piece character specified by FEN into an actual piece.
     fn try_from(piece: char) -> Result<Self, Self::Error> {
-        Ok(match piece {
-            'P' => Self::WPAWN,
-            'N' => Self::WKNIGHT,
-            'B' => Self::WBISHOP,
-            'R' => Self::WROOK,
-            'Q' => Self::WQUEEN,
-            'K' => Self::WKING,
-            'p' => Self::BPAWN,
-            'n' => Self::BKNIGHT,
-            'b' => Self::BBISHOP,
-            'r' => Self::BROOK,
-            'q' => Self::BQUEEN,
-            'k' => Self::BKING,
-            _ => return Err(ParseError::InvalidToken),
-        })
+        match piece {
+            'P' => Ok(Self::WPAWN),
+            'N' => Ok(Self::WKNIGHT),
+            'B' => Ok(Self::WBISHOP),
+            'R' => Ok(Self::WROOK),
+            'Q' => Ok(Self::WQUEEN),
+            'K' => Ok(Self::WKING),
+            'p' => Ok(Self::BPAWN),
+            'n' => Ok(Self::BKNIGHT),
+            'b' => Ok(Self::BBISHOP),
+            'r' => Ok(Self::BROOK),
+            'q' => Ok(Self::BQUEEN),
+            'k' => Ok(Self::BKING),
+            _ => Err(ParseError),
+        }
     }
 }
 
@@ -320,15 +324,15 @@ impl TryFrom<char> for PieceType {
     /// piece.
     fn try_from(piece: char) -> Result<Self, Self::Error> {
         let piece = piece.to_ascii_lowercase();
-        Ok(match piece {
-            'p' => Self::PAWN,
-            'n' => Self::KNIGHT,
-            'b' => Self::BISHOP,
-            'r' => Self::ROOK,
-            'q' => Self::QUEEN,
-            'k' => Self::KING,
-            _ => return Err(ParseError::InvalidToken),
-        })
+        match piece {
+            'p' => Ok(Self::PAWN),
+            'n' => Ok(Self::KNIGHT),
+            'b' => Ok(Self::BISHOP),
+            'r' => Ok(Self::ROOK),
+            'q' => Ok(Self::QUEEN),
+            'k' => Ok(Self::KING),
+            _ => Err(ParseError),
+        }
     }
 }
 
@@ -353,6 +357,20 @@ impl From<Piece> for Side {
     }
 }
 
+impl FromStr for Side {
+    type Err = ParseError;
+
+    /// Converts a side string into a [`Side`]: "w" for [`Side::WHITE`] and "b"
+    /// for [`Side::BLACK`].
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match string {
+            "w" => Ok(Self::WHITE),
+            "b" => Ok(Self::BLACK),
+            _ => Err(ParseError),
+        }
+    }
+}
+
 impl Add<Direction> for Square {
     type Output = Self;
 
@@ -364,14 +382,13 @@ impl Add<Direction> for Square {
 impl Display for Square {
     /// Converts a square into its string representation: the square if `self`
     /// isn't [`NONE`](Self::NONE) (e.g. "b3") or "-" otherwise.
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        let mut ret_str = String::new();
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if *self == Self::NONE {
-            fmt.write_str("-")
+            f.write_str("-")
         } else {
-            ret_str.push(char::from(File::from(*self)));
-            ret_str.push(char::from(Rank::from(*self)));
-            fmt.write_str(&ret_str)
+            let file = char::from(File::from(*self));
+            let rank = char::from(Rank::from(*self));
+            write!(f, "{file}{rank}")
         }
     }
 }
@@ -397,18 +414,18 @@ impl FromStr for Square {
         let mut square = 0;
         let mut iter = string.as_bytes().iter();
 
-        let file = iter.next().ok_or(ParseError::ExpectedToken)?;
+        let file = iter.next().ok_or(ParseError)?;
         if (b'a'..=b'h').contains(file) {
             square += file - b'a';
         } else {
-            return Err(ParseError::ErroneousToken);
+            return Err(ParseError);
         }
 
-        let rank = iter.next().ok_or(ParseError::ExpectedToken)?;
+        let rank = iter.next().ok_or(ParseError)?;
         if (b'1'..=b'8').contains(rank) {
             square += (rank - b'1') * 8;
         } else {
-            return Err(ParseError::ErroneousToken);
+            return Err(ParseError);
         }
 
         Ok(Self(square))
@@ -443,12 +460,12 @@ impl PieceType {
 
     /// Returns the MVV bonus of the piece type.
     pub fn mvv_bonus(self) -> Eval {
-        index_unchecked!(MVV_BONUS, self.to_index())
+        *get_unchecked(&MVV_BONUS, self.to_index())
     }
 
     /// Returns the SEE bonus of the piece type.
     pub fn see_bonus(self) -> Eval {
-        index_unchecked!(SEE_VALUES, self.to_index())
+        *get_unchecked(&SEE_VALUES, self.to_index())
     }
 }
 

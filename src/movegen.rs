@@ -23,8 +23,7 @@ use crate::{
     board::Board,
     cfor,
     defs::{Direction, MoveType, PieceType, Rank, Side, Square},
-    index_unchecked, out_of_bounds_is_unreachable,
-    util::Stack,
+    util::{get_unchecked, Stack},
 };
 use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
 use util::{bitboard_from_square, east, north, sliding_attacks, south, west};
@@ -128,9 +127,10 @@ impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let start = self.start();
         let end = self.end();
+        let promotion_piece = char::from(self.promotion_piece());
         if self.is_promotion() {
             // we want the lowercase letter here
-            write!(f, "{start}{end}{}", char::from(self.promotion_piece()))
+            write!(f, "{start}{end}{promotion_piece}")
         } else if *self == Self::null() {
             // UCI specifies a null move should look like this. A null move
             // should never be sent, but just in case.
@@ -278,32 +278,30 @@ impl Lookup {
 
     /// Finds the pawn attacks from `square`.
     pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        out_of_bounds_is_unreachable!(side.to_index(), self.pawn_attacks.len());
-        out_of_bounds_is_unreachable!(square.to_index(), self.pawn_attacks[0].len());
-        self.pawn_attacks[side.to_index()][square.to_index()]
+        let side_table = get_unchecked(&self.pawn_attacks, side.to_index());
+        *get_unchecked(side_table, square.to_index())
     }
 
     /// Finds the knight attacks from `square`.
     pub fn knight_attacks(&self, square: Square) -> Bitboard {
-        index_unchecked!(self.knight_attacks, square.to_index())
+        *get_unchecked(&self.knight_attacks, square.to_index())
     }
 
     /// Finds the king attacks from `square`.
     pub fn king_attacks(&self, square: Square) -> Bitboard {
-        index_unchecked!(self.king_attacks, square.to_index())
+        *get_unchecked(&self.king_attacks, square.to_index())
     }
 
     /// Finds the bishop attacks from `square` with the given blockers.
     pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        let index =
-            index_unchecked!(self.bishop_magics, square.to_index()).get_table_index(blockers);
-        index_unchecked!(self.magic_table, index)
+        let index = get_unchecked(&self.bishop_magics, square.to_index()).get_table_index(blockers);
+        *get_unchecked(&self.magic_table, index)
     }
 
     /// Finds the rook attacks from `square` with the given blockers.
     pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        let index = index_unchecked!(self.rook_magics, square.to_index()).get_table_index(blockers);
-        index_unchecked!(self.magic_table, index)
+        let index = get_unchecked(&self.rook_magics, square.to_index()).get_table_index(blockers);
+        *get_unchecked(&self.magic_table, index)
     }
 
     /// Finds the queen attacks from `square` with the given blockers.
@@ -645,7 +643,7 @@ fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     let mut kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
     debug_assert!(
         kings.0.count_ones() == 1,
-        "more than one king per side on the board"
+        "Number of kings is not equal to one"
     );
     let king = kings.pop_next_square();
     let targets = LOOKUPS.king_attacks(king) & king_target_squares;
@@ -699,12 +697,12 @@ fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
     let occupancies = board.occupancies();
 
     if board.castling_rights().can_castle_kingside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, true>()).is_empty()
+        && Bitboard::is_clear_to_castle::<IS_WHITE, true>(occupancies)
     {
         moves.push(Move::new_castle::<IS_WHITE, true>());
     }
     if board.castling_rights().can_castle_queenside::<IS_WHITE>()
-        && (occupancies & Bitboard::castling_space::<IS_WHITE, false>()).is_empty()
+        && Bitboard::is_clear_to_castle::<IS_WHITE, false>(occupancies)
     {
         moves.push(Move::new_castle::<IS_WHITE, false>());
     }

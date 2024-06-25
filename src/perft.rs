@@ -24,15 +24,15 @@ use crate::{board::Board, defs::MoveType, movegen::generate_moves};
 ///
 /// If `IS_TIMED`, it will also output the time taken and the average NPS.
 pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, depth: u8) -> u64 {
+    #![allow(clippy::similar_names)]
     if IS_TIMED {
         let time = Instant::now();
         let result = perft::<SHOULD_PRINT, false>(board, depth);
+        // for more precision
         let elapsed_us = time.elapsed().as_micros() as u64;
-        println!(
-            "Time taken: {} ms; NPS: {}",
-            elapsed_us / 1_000,
-            1_000_000 * result / elapsed_us
-        );
+        let elapsed_ms = elapsed_us / 1_000;
+        let nps = 1_000_000 * result / elapsed_us;
+        println!("Time taken: {elapsed_ms} ms; NPS: {nps}",);
         return result;
     }
 

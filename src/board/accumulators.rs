@@ -21,7 +21,7 @@ use crate::{
     cfor,
     defs::{Piece, Square},
     evaluation::{piece_phase, piece_score, Phase, Score},
-    index_unchecked, out_of_bounds_is_unreachable,
+    util::get_unchecked,
 };
 
 #[allow(clippy::doc_markdown)]
@@ -160,8 +160,32 @@ impl ZobristKeys {
             });
         });
 
-        cfor!(let mut i = 0; i < castling_rights.len(); i += 1; {
-            castling_rights[i] = rand!(seed);
+        #[allow(non_snake_case)]
+        let right_K = CastlingRights::K.0 as usize;
+        #[allow(non_snake_case)]
+        let right_Q = CastlingRights::Q.0 as usize;
+        let right_k = CastlingRights::k.0 as usize;
+        let right_q = CastlingRights::q.0 as usize;
+        cfor!(let mut i = 1; i < castling_rights.len(); i += 1; {
+           // if it's a base castling right
+           if i.count_ones() == 1 {
+               castling_rights[i] = rand!(seed);
+               i += 1;
+               continue;
+           }
+
+           if i & right_K == right_K {
+              castling_rights[i] ^= castling_rights[right_K];
+           }
+           if i & right_Q == right_Q {
+               castling_rights[i] ^= castling_rights[right_Q];
+           }
+           if i & right_k == right_k {
+               castling_rights[i] ^= castling_rights[right_k];
+           }
+           if i & right_q == right_q {
+               castling_rights[i] ^= castling_rights[right_q];
+           }
         });
 
         cfor!(let mut square = Square::A3.0; square <= Square::H3.0; square += 1; {
@@ -180,9 +204,8 @@ impl ZobristKeys {
 
     /// Calculates the key of the given piece on the given square.
     fn piece_key(&self, square: Square, piece: Piece) -> Key {
-        out_of_bounds_is_unreachable!(piece.to_index(), self.piece_and_side.len());
-        out_of_bounds_is_unreachable!(square.to_index(), self.piece_and_side[0].len());
-        self.piece_and_side[piece.to_index()][square.to_index()]
+        let piece_table = get_unchecked(&self.piece_and_side, piece.to_index());
+        *get_unchecked(piece_table, square.to_index())
     }
 
     /// Calculates the side to move key.
@@ -192,11 +215,11 @@ impl ZobristKeys {
 
     /// Calculates the key of the given castling rights.
     fn castling_rights_key(&self, rights: CastlingRights) -> Key {
-        index_unchecked!(self.castling_rights, rights.0 as usize)
+        *get_unchecked(&self.castling_rights, rights.0 as usize)
     }
 
     /// Calculates the key of the given square.
     fn ep_square_key(&self, square: Square) -> Key {
-        index_unchecked!(self.ep, square.to_index())
+        *get_unchecked(&self.ep, square.to_index())
     }
 }

@@ -33,7 +33,7 @@ pub struct UciOptions {
 }
 
 /// The name of the author of this engine.
-const ID_AUTHOR: &str = "Beanie";
+const ID_AUTHOR: &str = "Jasper Shovelton";
 /// The name of this engine.
 const ID_NAME: &str = "Crab";
 /// The version of this engine.
@@ -46,8 +46,8 @@ impl UciOptions {
     /// The range that the number of threads can take.
     pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
     /// The range that the hash size can take.
-    // cutechess can't handle anything bigger than a C int
-    pub const HASH_RANGE: RangeInclusive<usize> = (1..=i32::MAX as usize);
+    // hardware limit: 48-bit pointers
+    pub const HASH_RANGE: RangeInclusive<usize> = (1..=2_usize.pow(48) / (1024 * 1024));
 }
 
 impl Default for UciOptions {
@@ -150,45 +150,44 @@ impl Engine {
     }
 
     /// Interprets the command given by `line`.
-    fn handle_command(&mut self, line: &str) {
-        let Some(command) = line.split_whitespace().next() else {
-            return;
-        };
+    fn handle_command(&mut self, command: &str) {
+        let mut tokens = command.split_whitespace();
 
-        match command {
-            "bench" => bench(),
-            "f" => {
+        match tokens.next() {
+            Some("bench") => bench(tokens),
+            Some("f") => {
                 find_magics::<{ PieceType::BISHOP.0 }>();
                 find_magics::<{ PieceType::ROOK.0 }>();
             }
-            "go" => {
-                self.go(line);
+            Some("go") => {
+                self.go(tokens);
             }
-            "isready" => {
+            Some("isready") => {
                 println!("readyok");
             }
-            "p" => {
+            Some("p") => {
                 self.board().pretty_print();
             }
-            "position" => {
-                self.set_position(line);
+            Some("position") => {
+                self.set_position(tokens);
             }
-            "setoption" => {
-                self.set_option(line);
+            Some("setoption") => {
+                self.set_option(tokens);
             }
-            "uci" => {
+            Some("uci") => {
                 UciOptions::print();
                 println!("uciok");
             }
-            "ucinewgame" => {
+            Some("ucinewgame") => {
                 self.reset();
             }
-            "quit" => {
+            Some("quit") => {
                 exit(0);
             }
-            other => {
+            Some(other) => {
                 println!("info string Unrecognised command \"{other}\".");
             }
+            _ => (),
         }
     }
 }

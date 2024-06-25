@@ -18,7 +18,6 @@
 
 use std::{
     fmt::{self, Display, Formatter},
-    num::ParseIntError,
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
     str::FromStr,
 };
@@ -28,9 +27,8 @@ use crate::{
     defs::{File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
     evaluation::{Phase, Score},
-    index_into_unchecked, index_unchecked,
     movegen::{Move, LOOKUPS},
-    util::is_double_pawn_push,
+    util::{get_unchecked, insert_unchecked, is_double_pawn_push},
 };
 
 /// Accumulated, incrementally-updated fields.
@@ -38,16 +36,6 @@ mod accumulators;
 
 /// The type of a zobrist key.
 pub type Key = u64;
-
-/// All the errors that can occur while parsing a `position` command into a
-/// [`Board`].
-#[derive(Debug)]
-pub enum BoardParseError {
-    /// A generic parsing error occured.
-    ParseError(ParseError),
-    /// An integer couldn't be parsed.
-    ParseIntError(ParseIntError),
-}
 
 /// A chessboard.
 ///
@@ -99,8 +87,6 @@ pub struct Board {
 ///
 /// Encoded as `KQkq`, with one bit for each right.  E.g. `0b1101` would be
 /// castling rights `KQq`.
-// It makes sense to test if flags are equal but it makes no sense to test if
-// one flag is greater in value than another
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct CastlingRights(u8);
@@ -184,7 +170,7 @@ impl Display for Board {
 }
 
 impl FromStr for Board {
-    type Err = BoardParseError;
+    type Err = ParseError;
 
     /// Parses a full `position` command.
     ///
@@ -195,12 +181,12 @@ impl FromStr for Board {
         let mut board = Self::new();
         let mut tokens = string.split_whitespace();
 
-        let board_str = tokens.next().ok_or(ParseError::ExpectedToken)?;
-        let side_to_move = tokens.next().ok_or(ParseError::ExpectedToken)?;
-        let castling_rights = tokens.next().ok_or(ParseError::ExpectedToken)?;
-        let ep_square = tokens.next().ok_or(ParseError::ExpectedToken)?;
-        let halfmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
-        let fullmoves = tokens.next().ok_or(ParseError::ExpectedToken)?;
+        let board_str = tokens.next().ok_or(ParseError)?;
+        let side_to_move = tokens.next().ok_or(ParseError)?;
+        let castling_rights = tokens.next().ok_or(ParseError)?;
+        let ep_square = tokens.next().ok_or(ParseError)?;
+        let halfmoves = tokens.next().ok_or(ParseError)?;
+        let fullmoves = tokens.next().ok_or(ParseError)?;
 
         // 1. the board itself
         let mut square = 56;
@@ -220,29 +206,23 @@ impl FromStr for Board {
         }
 
         // 2. side to move
-        if side_to_move == "w" {
-            board.set_side_to_move(Side::WHITE);
-        } else {
-            board.set_side_to_move(Side::BLACK);
-            board.toggle_side_zobrist();
-        }
+        let side_to_move = side_to_move.parse()?;
+        board.set_side_to_move(side_to_move);
 
         // 3. castling rights
         for right in castling_rights.chars() {
             match right {
-                'K' => board.castling_rights_mut().add_right(CastlingRights::K),
-                'Q' => board.castling_rights_mut().add_right(CastlingRights::Q),
-                'k' => board.castling_rights_mut().add_right(CastlingRights::k),
-                'q' => board.castling_rights_mut().add_right(CastlingRights::q),
+                'K' => board.add_castling_rights(CastlingRights::K),
+                'Q' => board.add_castling_rights(CastlingRights::Q),
+                'k' => board.add_castling_rights(CastlingRights::k),
+                'q' => board.add_castling_rights(CastlingRights::q),
                 _ => (),
             }
         }
-        board.toggle_castling_rights_zobrist(board.castling_rights());
 
         // 4. en passant
         let ep_square = ep_square.parse::<Square>()?;
         board.set_ep_square(ep_square);
-        board.toggle_ep_square_zobrist(ep_square);
 
         // 5. halfmoves
         let halfmoves = halfmoves.parse::<u8>()?;
@@ -253,18 +233,6 @@ impl FromStr for Board {
         board.set_fullmoves(fullmoves);
 
         Ok(board)
-    }
-}
-
-impl From<ParseError> for BoardParseError {
-    fn from(parse_error: ParseError) -> Self {
-        Self::ParseError(parse_error)
-    }
-}
-
-impl From<ParseIntError> for BoardParseError {
-    fn from(parse_int_error: ParseIntError) -> Self {
-        Self::ParseIntError(parse_int_error)
     }
 }
 
@@ -296,29 +264,29 @@ impl BitOrAssign for CastlingRights {
     }
 }
 
-/// Converts the current castling rights into their string representation.
-///
-/// E.g. `KQq` if the White king can castle both ways and the Black king
-/// can only castle queenside.
 impl Display for CastlingRights {
+    /// Converts the current castling rights into their string representation.
+    ///
+    /// E.g. `KQq` if the White king can castle both ways and the Black king
+    /// can only castle queenside.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut ret_str = String::new();
+        if *self == Self::NONE {
+            return f.write_str("-");
+        }
+
         if self.can_castle_kingside::<true>() {
-            ret_str.push('K');
+            f.write_str("K")?;
         }
         if self.can_castle_queenside::<true>() {
-            ret_str.push('Q');
+            f.write_str("Q")?;
         }
         if self.can_castle_kingside::<false>() {
-            ret_str.push('k');
+            f.write_str("k")?;
         }
         if self.can_castle_queenside::<false>() {
-            ret_str.push('q');
+            f.write_str("q")?;
         }
-        if ret_str.is_empty() {
-            ret_str.push('-');
-        }
-        f.write_str(&ret_str)
+        Ok(())
     }
 }
 
@@ -381,7 +349,7 @@ impl Board {
 
     /// Returns the piece bitboard of the given piece type.
     pub fn piece_any(&self, piece_type: PieceType) -> Bitboard {
-        index_unchecked!(self.pieces, piece_type.to_index())
+        *get_unchecked(&self.pieces, piece_type.to_index())
     }
 
     /// Returns the side bitboard according to `IS_WHITE`.
@@ -395,7 +363,7 @@ impl Board {
 
     /// Returns the side bitboard of the given side.
     pub fn side_any(&self, side: Side) -> Bitboard {
-        index_unchecked!(self.sides, side.to_index())
+        *get_unchecked(&self.sides, side.to_index())
     }
 
     /// Calculates the bitboard with all occupancies set.
@@ -411,11 +379,6 @@ impl Board {
     /// Returns the castling rights.
     pub const fn castling_rights(&self) -> CastlingRights {
         self.castling_rights
-    }
-
-    /// Returns a mutable reference to the castling rights.
-    pub fn castling_rights_mut(&mut self) -> &mut CastlingRights {
-        &mut self.castling_rights
     }
 
     /// Returns the en passant square, which might be [`Square::NONE`].
@@ -465,7 +428,6 @@ impl Board {
             self.reset_halfmoves();
         }
 
-        self.toggle_ep_square_zobrist(self.ep_square());
         // it's easiest just to unset them now and then re-set them later
         // rather than doing additional checks
         self.toggle_castling_rights_zobrist(self.castling_rights());
@@ -482,16 +444,16 @@ impl Board {
             if captured_type == PieceType::ROOK {
                 match end {
                     Square::A1 => {
-                        self.castling_rights_mut().remove_right(CastlingRights::Q);
+                        self.remove_castling_rights(CastlingRights::Q);
                     }
                     Square::H1 => {
-                        self.castling_rights_mut().remove_right(CastlingRights::K);
+                        self.remove_castling_rights(CastlingRights::K);
                     }
                     Square::A8 => {
-                        self.castling_rights_mut().remove_right(CastlingRights::q);
+                        self.remove_castling_rights(CastlingRights::q);
                     }
                     Square::H8 => {
-                        self.castling_rights_mut().remove_right(CastlingRights::k);
+                        self.remove_castling_rights(CastlingRights::k);
                     }
                     _ => (),
                 }
@@ -523,11 +485,10 @@ impl Board {
                 us,
             );
 
-            self.castling_rights_mut().clear_side(us);
+            self.clear_castling_rights_for(us);
         } else if is_double_pawn_push(start, end, piece_type) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
-            self.toggle_ep_square_zobrist(ep_square);
         } else if is_en_passant {
             let dest = Square(if us == Side::WHITE {
                 end.0 - 8
@@ -559,22 +520,22 @@ impl Board {
         if piece_type == PieceType::ROOK {
             match start {
                 Square::A1 => {
-                    self.castling_rights_mut().remove_right(CastlingRights::Q);
+                    self.remove_castling_rights(CastlingRights::Q);
                 }
                 Square::H1 => {
-                    self.castling_rights_mut().remove_right(CastlingRights::K);
+                    self.remove_castling_rights(CastlingRights::K);
                 }
                 Square::A8 => {
-                    self.castling_rights_mut().remove_right(CastlingRights::q);
+                    self.remove_castling_rights(CastlingRights::q);
                 }
                 Square::H8 => {
-                    self.castling_rights_mut().remove_right(CastlingRights::k);
+                    self.remove_castling_rights(CastlingRights::k);
                 }
                 _ => (),
             }
         }
         if piece_type == PieceType::KING {
-            self.castling_rights_mut().clear_side(us);
+            self.clear_castling_rights_for(us);
         }
 
         self.toggle_castling_rights_zobrist(self.castling_rights());
@@ -605,7 +566,7 @@ impl Board {
 
     /// Returns the piece on `square`.
     pub fn piece_on(&self, square: Square) -> Piece {
-        index_unchecked!(self.mailbox, square.to_index())
+        *get_unchecked(&self.mailbox, square.to_index())
     }
 
     /// Adds a piece to square `square` for side `side`.
@@ -644,12 +605,12 @@ impl Board {
 
     /// Sets the piece on `square` in the mailbox to `piece`.
     fn set_mailbox_piece(&mut self, square: Square, piece: Piece) {
-        index_into_unchecked!(self.mailbox, square.to_index(), piece);
+        insert_unchecked(&mut self.mailbox, square.to_index(), piece);
     }
 
     /// Sets the piece on `square` in the mailbox to [`Square::NONE`].
     fn unset_mailbox_piece(&mut self, square: Square) {
-        index_into_unchecked!(self.mailbox, square.to_index(), Piece::NONE);
+        insert_unchecked(&mut self.mailbox, square.to_index(), Piece::NONE);
     }
 
     /// Toggles the bits set in `bb` for the piece bitboard of `piece_type` and
@@ -661,18 +622,21 @@ impl Board {
 
     /// Toggles the bits set in `bb` of the bitboard of `piece`.
     fn toggle_piece_bb(&mut self, piece: PieceType, bb: Bitboard) {
-        let old_bb = index_unchecked!(self.pieces, piece.to_index());
-        index_into_unchecked!(self.pieces, piece.to_index(), old_bb ^ bb);
+        let old_bb = *get_unchecked(&self.pieces, piece.to_index());
+        insert_unchecked(&mut self.pieces, piece.to_index(), old_bb ^ bb);
     }
 
     /// Toggles the bits set in `bb` of the bitboard of `side`.
     fn toggle_side_bb(&mut self, side: Side, bb: Bitboard) {
-        let old_bb = index_unchecked!(self.sides, side.to_index());
-        index_into_unchecked!(self.sides, side.to_index(), old_bb ^ bb);
+        let old_bb = *get_unchecked(&self.sides, side.to_index());
+        insert_unchecked(&mut self.sides, side.to_index(), old_bb ^ bb);
     }
 
     /// Sets side to move to `side`.
     fn set_side_to_move(&mut self, side: Side) {
+        if side == Side::BLACK {
+            self.toggle_side_zobrist();
+        }
         self.side_to_move = side;
     }
 
@@ -684,12 +648,49 @@ impl Board {
 
     /// Sets the en passant square to `square`.
     fn set_ep_square(&mut self, square: Square) {
+        self.toggle_ep_square_zobrist(square);
         self.ep_square = square;
     }
 
     /// Sets the en passant square to [`Square::NONE`].
     fn clear_ep_square(&mut self) {
+        self.toggle_ep_square_zobrist(self.ep_square());
         self.ep_square = Square::NONE;
+    }
+
+    /// Adds the given castling rights, assuming none of the rights already
+    /// exist, and updates the zobrist key.
+    ///
+    /// Will panic in debug if any of the rights already exist.
+    fn add_castling_rights(&mut self, rights: CastlingRights) {
+        debug_assert!(
+            self.castling_rights() & rights == CastlingRights::NONE,
+            "Adding rights that already exist"
+        );
+        self.castling_rights.add_rights(rights);
+        self.toggle_castling_rights_zobrist(rights);
+    }
+
+    /// Removes all of the given rights, whether or not they already exist.
+    /// Does not update the zobrist key.
+    fn remove_castling_rights(&mut self, rights: CastlingRights) {
+        self.castling_rights.remove_rights(rights);
+    }
+
+    /// Clears the castlign rights for the given side, whether or not they
+    /// already exist. Does not update the zobrist key.
+    fn clear_castling_rights_for(&mut self, side: Side) {
+        let rights = if side == Side::WHITE {
+            CastlingRights::K | CastlingRights::Q
+        } else {
+            debug_assert!(
+                side == Side::BLACK,
+                "Side is not White or Black: \"{}\"",
+                char::from(side),
+            );
+            CastlingRights::k | CastlingRights::q
+        };
+        self.remove_castling_rights(rights);
     }
 
     /// Increments the halfmove counter.
@@ -891,26 +892,17 @@ impl CastlingRights {
         }
     }
 
-    /// Adds the given right to the castling rights.
-    fn add_right(&mut self, right: Self) {
+    /// Adds the given rights to the castling rights.
+    ///
+    /// If the rights already exist, nothing will happen.
+    fn add_rights(&mut self, right: Self) {
         *self |= right;
     }
 
-    /// Removes the given right from the castling rights.
-    fn remove_right(&mut self, right: Self) {
-        debug_assert!(
-            right.0.count_ones() == 1,
-            "`right` contains multiple rights"
-        );
+    /// Removes the given rights from the castling rights.
+    ///
+    /// If the rights do not already exist, nothing will happen.
+    fn remove_rights(&mut self, right: Self) {
         *self &= !right;
-    }
-
-    /// Clears the rights of the given side.
-    fn clear_side(&mut self, side: Side) {
-        if side == Side::WHITE {
-            *self &= Self::k | Self::q;
-        } else {
-            *self &= Self::K | Self::Q;
-        }
     }
 }

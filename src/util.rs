@@ -38,61 +38,6 @@ macro_rules! cfor {
     }}
 }
 
-/// Inserts `item` at `index` into `array` without bounds checking.
-///
-/// In debug mode, it will assert that `index` is within `array`.
-#[macro_export]
-macro_rules! index_into_unchecked {
-    ($array:expr, $index:expr, $item:expr) => {{
-        debug_assert!(
-            $index < $array.len(),
-            "Attempted to index out of bounds: {} >= {}",
-            $index,
-            $array.len()
-        );
-        // SAFETY: we just checked `index` is valid
-        unsafe { *$array.get_unchecked_mut($index) = $item }
-    }};
-}
-
-/// Gets the item at `index` in `array` without bounds checking.
-///
-/// In debug mode, it will assert that `index` is within `array`.
-#[macro_export]
-macro_rules! index_unchecked {
-    ($array:expr, $index:expr) => {{
-        debug_assert!(
-            $index < $array.len(),
-            "Attempted to index out of bounds: {} >= {}",
-            $index,
-            $array.len()
-        );
-        // SAFETY: we just checked `index` is valid
-        unsafe { *$array.get_unchecked($index) }
-    }};
-}
-
-/// Tells the compiler that `index` cannot match or exceed `bound`.
-///
-/// In debug mode, it will assert that `index` is within `bound`.
-#[macro_export]
-macro_rules! out_of_bounds_is_unreachable {
-    ($index: expr, $bound: expr) => {{
-        if $index >= $bound {
-            #[cfg(debug_assertions)]
-            panic!(
-                "Unreachable code reached: index {} out of bound {}",
-                $index, $bound
-            );
-            #[allow(unreachable_code)]
-            // SAFETY: If it does get reached, it will panic in debug.
-            unsafe {
-                std::hint::unreachable_unchecked()
-            }
-        }
-    }};
-}
-
 /// An iterator over the elements of a [`Stack`].
 pub struct Iter<'a, T: Copy, const SIZE: usize> {
     /// The stack being iterated over.
@@ -183,7 +128,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
 
     /// Pushes an item onto the stack.
     pub fn push(&mut self, item: T) {
-        index_into_unchecked!(self.stack, self.first_empty, MaybeUninit::new(item));
+        insert_unchecked(&mut self.stack, self.first_empty, MaybeUninit::new(item));
         self.first_empty += 1;
     }
 
@@ -192,7 +137,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     pub fn pop(&mut self) -> Option<T> {
         (self.first_empty > 0).then(|| {
             self.first_empty -= 1;
-            let item = index_unchecked!(self.stack, self.first_empty);
+            let item = *get_unchecked(&self.stack, self.first_empty);
             // SAFETY: It is not possible for `first_empty` to index into
             // uninitialised memory
             unsafe { item.assume_init_read() }
@@ -203,8 +148,8 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     ///
     /// Assumes that there is at least one item in the stack.
     pub fn peek(&self) -> T {
-        let item = index_unchecked!(self.stack, self.first_empty - 1);
-        // SAFETY: `index_unchecked` makes sure that the index is to within the
+        let item = *get_unchecked(&self.stack, self.first_empty - 1);
+        // SAFETY: `get_unchecked()` makes sure that the index is to within the
         // stack (i.e. initialised memory)
         unsafe { item.assume_init_read() }
     }
@@ -213,8 +158,8 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     ///
     /// Will panic in debug if the index is invalid.
     fn get(&self, index: usize) -> T {
-        let item = index_unchecked!(self.stack, index);
-        // SAFETY: `index_unchecked` makes sure that the index is to within the
+        let item = *get_unchecked(&self.stack, index);
+        // SAFETY: `get_unchecked()` makes sure that the index is to within the
         // stack (i.e. initialised memory)
         unsafe { item.assume_init_read() }
     }
@@ -246,6 +191,37 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     pub const fn iter(&self) -> Iter<'_, T, SIZE> {
         Iter::new(self)
     }
+}
+
+/// A wrapper over [`get_unchecked()`], but asserts in debug mode that `index`
+/// is within `array`.
+#[allow(clippy::inline_always)]
+#[inline(always)]
+pub fn get_unchecked<T>(array: &[T], index: usize) -> &T {
+    debug_assert!(
+        index < array.len(),
+        "Attempted to index out of bounds: {} >= {}",
+        index,
+        array.len()
+    );
+    // SAFETY: we just checked `index` is valid
+    unsafe { array.get_unchecked(index) }
+}
+
+/// Inserts `item` at `index` into `array` without bounds checking.
+///
+/// In debug mode, it will assert that `index` is within `array`.
+#[allow(clippy::inline_always)]
+#[inline(always)]
+pub fn insert_unchecked<T>(array: &mut [T], index: usize, item: T) {
+    debug_assert!(
+        index < array.len(),
+        "Attempted to index out of bounds: {} >= {}",
+        index,
+        array.len()
+    );
+    // SAFETY: we just checked `index` is valid
+    unsafe { *array.get_unchecked_mut(index) = item }
 }
 
 /// Checks if the given piece type moving from the given start square to the
