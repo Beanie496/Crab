@@ -59,6 +59,8 @@ mod engine;
 mod error;
 /// Items related to evaluation.
 mod evaluation;
+/// Static lookup items.
+mod lookups;
 /// Items related to move generation.
 mod movegen;
 /// Perft: see <https://www.chessprogramming.org/Perft>.
