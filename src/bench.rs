@@ -24,7 +24,7 @@ use std::{
 use crate::{
     board::Board,
     engine::{uci::UciOptions, ZobristStack},
-    search::{base_reductions, iterative_deepening, Limits},
+    search::{iterative_deepening, Limits},
     transposition_table::TranspositionTable,
 };
 
@@ -71,7 +71,6 @@ where
     let (_tx, rx) = channel();
     let rx = Mutex::new(rx);
     let options = UciOptions::default();
-    let base_reductions = base_reductions();
     let mut tt = TranspositionTable::with_capacity(tt_size);
 
     let mut fen_str = String::new();
@@ -93,16 +92,7 @@ where
         fen_str.clear();
 
         let start = Instant::now();
-        let report = iterative_deepening(
-            board,
-            start,
-            limits,
-            &rx,
-            &mut zobrists,
-            options,
-            &base_reductions,
-            &tt,
-        );
+        let report = iterative_deepening(board, start, limits, &rx, &mut zobrists, options, &tt);
 
         tt.clear();
         total_time += report.time;

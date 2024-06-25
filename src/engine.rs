@@ -32,7 +32,7 @@ use crate::{
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{base_reductions, iterative_deepening, BaseReductions, Depth, Limits},
+    search::{iterative_deepening, Depth, Limits},
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -62,10 +62,6 @@ pub struct Engine {
     past_zobrists: ZobristStack,
     /// A hash table of previously-encountered positions.
     tt: TranspositionTable,
-    /// A pre-calculated table of base late move reductions.
-    ///
-    /// Indexed by `base_reductions[current_depth][current_move_index]`.
-    base_reductions: BaseReductions,
 }
 
 impl Engine {
@@ -94,7 +90,6 @@ impl Engine {
             uci_rx: Mutex::new(rx),
             past_zobrists: Stack::new(),
             tt: TranspositionTable::with_capacity(options.hash()),
-            base_reductions: base_reductions(),
         }
     }
 
@@ -141,7 +136,6 @@ impl Engine {
         let options = *self.options();
         let uci_rx = self.uci_rx();
         let mut past_zobrists = self.past_zobrists().clone();
-        let base_reductions = self.base_reductions();
         let tt = self.tt();
 
         iterative_deepening(
@@ -151,7 +145,6 @@ impl Engine {
             uci_rx,
             &mut past_zobrists,
             options,
-            base_reductions,
             tt,
         );
     }
@@ -347,12 +340,6 @@ impl Engine {
     /// board states.
     pub fn past_zobrists_mut(&mut self) -> &mut ZobristStack {
         &mut self.past_zobrists
-    }
-
-    /// Returns a reference to a table of base late move reductions, as
-    /// pre-calculated by [`base_reductions()`].
-    pub const fn base_reductions(&self) -> &BaseReductions {
-        &self.base_reductions
     }
 
     /// Returns a reference to the transposition table.

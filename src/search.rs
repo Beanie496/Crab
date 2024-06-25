@@ -27,7 +27,7 @@ use crate::{
     board::Board,
     engine::{uci::UciOptions, ZobristStack},
     evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
-    movegen::{Move, MAX_LEGAL_MOVES},
+    movegen::Move,
     transposition_table::TranspositionTable,
     util::{get_unchecked, insert_unchecked},
 };
@@ -44,8 +44,6 @@ mod time;
 /// The difference between the root or leaf node (for height or depth
 /// respectively) and the current node.
 pub type Depth = u8;
-/// A table of base late move reductions.
-pub type BaseReductions = [[Depth; Depth::MAX as usize + 1]; MAX_LEGAL_MOVES + 1];
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -150,8 +148,6 @@ pub struct SearchReferences<'a> {
     past_zobrists: &'a mut ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
-    /// A pre-calculated table of base late move reductions.
-    base_reductions: &'a BaseReductions,
 }
 
 /// The final results of a search.
@@ -389,7 +385,6 @@ impl<'a> SearchReferences<'a> {
         allocated: Duration,
         uci_rx: &'a Mutex<Receiver<String>>,
         past_zobrists: &'a mut ZobristStack,
-        base_reductions: &'a BaseReductions,
         tt: &'a TranspositionTable,
     ) -> Self {
         Self {
@@ -403,7 +398,6 @@ impl<'a> SearchReferences<'a> {
             uci_rx,
             past_zobrists,
             tt,
-            base_reductions,
         }
     }
 
@@ -552,19 +546,11 @@ pub fn iterative_deepening(
     uci_rx: &Mutex<Receiver<String>>,
     past_zobrists: &mut ZobristStack,
     options: UciOptions,
-    base_reductions: &BaseReductions,
     tt: &TranspositionTable,
 ) -> SearchReport {
     let allocated = calculate_time_window(limits, start, options.move_overhead());
-    let mut search_refs = SearchReferences::new(
-        start,
-        limits,
-        allocated,
-        uci_rx,
-        past_zobrists,
-        base_reductions,
-        tt,
-    );
+    let mut search_refs =
+        SearchReferences::new(start, limits, allocated, uci_rx, past_zobrists, tt);
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;
@@ -608,20 +594,4 @@ pub fn iterative_deepening(
     }
 
     report
-}
-
-/// Computes a table of base late move reductions.
-///
-/// There is one reduction for every combination of depth and legal move index
-/// in the range `0..=Depth::MAX` and `0..=MAX_LEGAL_MOVES` respectively.
-pub fn base_reductions() -> BaseReductions {
-    let mut ret: BaseReductions = [[0; Depth::MAX as usize + 1]; MAX_LEGAL_MOVES + 1];
-    for (move_idx, depth_table) in ret.iter_mut().enumerate() {
-        for (depth, depth_entry) in depth_table.iter_mut().enumerate() {
-            let ln_depth = f32::ln(depth as f32);
-            let ln_move_idx = f32::ln(move_idx as f32);
-            *depth_entry = (ln_depth * ln_move_idx / 2.0) as Depth;
-        }
-    }
-    ret
 }

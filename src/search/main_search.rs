@@ -23,6 +23,7 @@ use crate::{
     board::Board,
     defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
+    lookups::base_reductions,
     movegen::Move,
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
@@ -122,7 +123,7 @@ pub fn search<NodeType: Node>(
         // then exceeds alpha, then great: we've found a better move.)
         let mut score = 0;
         if !NodeType::IS_PV || total_moves > 1 {
-            let reduction = reduction(search_refs, depth, total_moves);
+            let reduction = reduction(depth, total_moves);
 
             score = -search::<NonPvNode>(
                 search_refs,
@@ -289,9 +290,9 @@ const fn extension(is_in_check: bool) -> Depth {
 }
 
 /// Calculates how much to reduce the search by during late move reductions.
-fn reduction(search_refs: &SearchReferences<'_>, depth: Depth, total_moves: u8) -> Depth {
+fn reduction(depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
-        search_refs.base_reductions[usize::from(total_moves)][usize::from(depth)]
+        base_reductions(depth, total_moves)
     } else {
         0
     }
