@@ -461,7 +461,6 @@ impl<'a> SearchReferences<'a> {
         match self.limits {
             Limits::Depth(d) => {
                 if self.depth >= d {
-                    self.should_stop.store(true, Ordering::Relaxed);
                     return true;
                 }
             }
@@ -469,7 +468,6 @@ impl<'a> SearchReferences<'a> {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
                 if self.start.elapsed() > self.allocated.mul_f32(0.4) {
-                    self.should_stop.store(true, Ordering::Relaxed);
                     return true;
                 }
             }
