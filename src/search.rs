@@ -19,27 +19,30 @@
 use std::{
     fmt::{self, Display, Formatter, Write},
     process::exit,
-    sync::{mpsc::Receiver, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc::Receiver,
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 
 use crate::{
     board::Board,
-    engine::{uci::UciOptions, ZobristStack},
+    engine::ZobristStack,
     evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
     movegen::Move,
     transposition_table::TranspositionTable,
-    util::{get_unchecked, insert_unchecked},
+    util::{get_unchecked, insert_unchecked, BufferedAtomicU64Counter},
 };
 use main_search::search;
-use time::calculate_time_window;
 
 /// For carrying out the search.
 mod main_search;
 /// For selecting which order moves are searched in.
 mod movepick;
 /// Time management.
-mod time;
+pub mod time;
 
 /// The difference between the root or leaf node (for height or depth
 /// respectively) and the current node.
@@ -98,17 +101,6 @@ pub enum Limits {
     Infinite,
 }
 
-/// The current status of the search.
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum SearchStatus {
-    /// Do nothing: continue the search as normal.
-    Continue,
-    /// Stop the search.
-    Stop,
-    /// Stop the search and then exit the process.
-    Quit,
-}
-
 /// The principle variation: the current best sequence of moves for both sides.
 #[derive(Clone)]
 pub struct Pv {
@@ -131,9 +123,9 @@ pub struct SearchReferences<'a> {
     /// The maximum depth reached.
     seldepth: Depth,
     /// How many positions have been searched.
-    nodes: u64,
-    /// The status of the search: continue, stop or quit?
-    status: SearchStatus,
+    nodes: BufferedAtomicU64Counter<'a>,
+    /// If the search should stop.
+    should_stop: &'a AtomicBool,
     /// The limits of the search.
     limits: Limits,
     /// How much time we're allocated.
@@ -145,7 +137,7 @@ pub struct SearchReferences<'a> {
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
-    past_zobrists: &'a mut ZobristStack,
+    past_zobrists: ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
 }
@@ -379,20 +371,23 @@ impl Pv {
 impl<'a> SearchReferences<'a> {
     /// Creates a new [`SearchReferences`], which includes but is not limited to the
     /// given parameters.
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new(
         start: Instant,
+        nodes: &'a AtomicU64,
+        should_stop: &'a AtomicBool,
         limits: Limits,
         allocated: Duration,
         uci_rx: &'a Mutex<Receiver<String>>,
-        past_zobrists: &'a mut ZobristStack,
+        past_zobrists: ZobristStack,
         tt: &'a TranspositionTable,
     ) -> Self {
         Self {
             start,
             depth: 0,
             seldepth: 0,
-            nodes: 0,
-            status: SearchStatus::Continue,
+            nodes: BufferedAtomicU64Counter::new(nodes),
+            should_stop,
             limits,
             allocated,
             uci_rx,
@@ -401,29 +396,26 @@ impl<'a> SearchReferences<'a> {
         }
     }
 
-    /// Check the status of the search.
-    ///
-    /// This will check the UCI receiver to see if the GUI has told us to stop,
-    /// then check to see if we're exceeding the limits of the search.
-    fn check_status(&mut self) -> SearchStatus {
-        // only check every 2048 nodes and don't bother wasting more time if
+    /// Checks if the limits of the search are being exceeded.
+    fn should_stop_search(&mut self) -> bool {
+        // only check every so often and don't bother wasting more time if
         // we've already stopped
-        if self.nodes % 2048 != 0 || self.status != SearchStatus::Continue {
-            return self.status;
+        if !self.nodes.is_full() || self.should_stop.load(Ordering::Relaxed) {
+            return self.should_stop.load(Ordering::Relaxed);
         }
 
         #[allow(clippy::unwrap_used)]
-        if let Ok(token) = self.uci_rx.lock().unwrap().try_recv() {
-            let token = token.trim();
-            if token == "stop" {
-                self.status = SearchStatus::Stop;
-                return self.status;
+        if let Ok(line) = self.uci_rx.lock().unwrap().try_recv() {
+            let command = line.trim();
+
+            if command == "stop" {
+                self.should_stop.store(true, Ordering::Relaxed);
+                return true;
             }
-            if token == "quit" {
-                self.status = SearchStatus::Quit;
-                return self.status;
+            if command == "quit" {
+                exit(0);
             }
-            if token == "isready" {
+            if command == "isready" {
                 println!("readyok");
             }
         }
@@ -432,33 +424,36 @@ impl<'a> SearchReferences<'a> {
         #[allow(clippy::wildcard_enum_match_arm)]
         match self.limits {
             Limits::Nodes(n) => {
-                if self.nodes >= n {
-                    self.status = SearchStatus::Stop;
+                if self.nodes.load() >= n {
+                    self.should_stop.store(true, Ordering::Relaxed);
+                    return true;
                 }
             }
             Limits::Movetime(m) => {
                 if self.start.elapsed() >= m {
-                    self.status = SearchStatus::Stop;
+                    self.should_stop.store(true, Ordering::Relaxed);
+                    return true;
                 }
             }
             Limits::Timed { time, .. } => {
                 // if we're about to pass our total amount of time (which
                 // includes the move overhead), stop the search
                 if self.start.elapsed() + Duration::from_millis(1) > time {
-                    self.status = SearchStatus::Stop;
+                    self.should_stop.store(true, Ordering::Relaxed);
+                    return true;
                 }
             }
             _ => (),
         };
 
-        self.status
+        false
     }
 
     /// Calculates if the iterative deepening loop should be exited.
     ///
     /// Assumes that this is being called at the end of the loop.
     fn should_stop(&mut self) -> bool {
-        if self.check_status() != SearchStatus::Continue || self.depth == Depth::MAX {
+        if self.should_stop_search() || self.depth == Depth::MAX {
             return true;
         }
 
@@ -466,20 +461,22 @@ impl<'a> SearchReferences<'a> {
         match self.limits {
             Limits::Depth(d) => {
                 if self.depth >= d {
-                    self.status = SearchStatus::Stop;
+                    self.should_stop.store(true, Ordering::Relaxed);
+                    return true;
                 }
             }
             Limits::Timed { .. } => {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
                 if self.start.elapsed() > self.allocated.mul_f32(0.4) {
-                    self.status = SearchStatus::Stop;
+                    self.should_stop.store(true, Ordering::Relaxed);
+                    return true;
                 }
             }
             _ => (),
         }
 
-        self.status != SearchStatus::Continue
+        false
     }
 
     /// Returns if the root node should print extra information.
@@ -526,7 +523,7 @@ impl SearchReport {
         Self {
             depth: search_refs.depth,
             seldepth: search_refs.seldepth,
-            nodes: search_refs.nodes,
+            nodes: search_refs.nodes.load(),
             hashfull: search_refs.tt.estimate_hashfull(),
             time,
             nps,
@@ -534,31 +531,24 @@ impl SearchReport {
             pv,
         }
     }
+
+    /// Returns the best move of the search.
+    pub fn best_move(&self) -> Move {
+        self.pv.get(0)
+    }
 }
 
 /// Performs iterative deepening on the given board.
-// might move `SearchReferences` out later, but this is fine for now
-#[allow(clippy::too_many_arguments)]
-pub fn iterative_deepening(
+pub fn iterative_deepening<const IS_MAIN_THREAD: bool>(
+    mut search_refs: SearchReferences<'_>,
     board: Board,
-    start: Instant,
-    limits: Limits,
-    uci_rx: &Mutex<Receiver<String>>,
-    past_zobrists: &mut ZobristStack,
-    options: UciOptions,
-    tt: &TranspositionTable,
 ) -> SearchReport {
-    let allocated = calculate_time_window(limits, start, options.move_overhead());
-    let mut search_refs =
-        SearchReferences::new(start, limits, allocated, uci_rx, past_zobrists, tt);
     let mut pv = Pv::new();
-    let mut best_move;
     let mut depth = 1;
 
-    let report = 'iter_deep: loop {
+    'iter_deep: loop {
         search_refs.depth = depth;
         search_refs.seldepth = 0;
-        search_refs.status = SearchStatus::Continue;
 
         let score = search::<RootNode>(
             &mut search_refs,
@@ -570,14 +560,14 @@ pub fn iterative_deepening(
             0,
         );
 
-        // the root search guarantees that there will always be 1 valid move in
-        // the PV
-        best_move = pv.get(0);
+        let nodes = search_refs.nodes.flush();
         let time = search_refs.start.elapsed();
-        let nps = 1_000_000 * search_refs.nodes / time.as_micros().max(1) as u64;
+        let nps = 1_000_000 * nodes / time.as_micros().max(1) as u64;
         let report = SearchReport::new(&search_refs, time, nps, score, pv.clone());
 
-        println!("{report}");
+        if IS_MAIN_THREAD {
+            println!("{report}");
+        }
 
         if search_refs.should_stop() {
             break 'iter_deep report;
@@ -585,13 +575,5 @@ pub fn iterative_deepening(
 
         pv.clear();
         depth += 1;
-    };
-
-    println!("bestmove {best_move}");
-
-    if search_refs.check_status() == SearchStatus::Quit {
-        exit(0);
     }
-
-    report
 }

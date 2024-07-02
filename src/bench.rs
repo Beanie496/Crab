@@ -17,14 +17,18 @@
  */
 
 use std::{
-    sync::{mpsc::channel, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicU64},
+        mpsc::channel,
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 
 use crate::{
     board::Board,
-    engine::{uci::UciOptions, ZobristStack},
-    search::{iterative_deepening, Limits},
+    engine::ZobristStack,
+    search::{iterative_deepening, Limits, SearchReferences},
     transposition_table::TranspositionTable,
 };
 
@@ -67,10 +71,7 @@ where
         "movetime" => limits.set_movetime(Some(Duration::from_millis(limit))),
         _ => return,
     }
-    let mut zobrists = ZobristStack::new();
-    let (_tx, rx) = channel();
-    let rx = Mutex::new(rx);
-    let options = UciOptions::default();
+    let rx = Mutex::new(channel().1);
     let mut tt = TranspositionTable::with_capacity(tt_size);
 
     let mut fen_str = String::new();
@@ -91,8 +92,19 @@ where
         let board = fen_str.parse::<Board>().expect("Malformed test position");
         fen_str.clear();
 
-        let start = Instant::now();
-        let report = iterative_deepening(board, start, limits, &rx, &mut zobrists, options, &tt);
+        let nodes = AtomicU64::new(0);
+        let should_stop = AtomicBool::new(false);
+        let search_refs = SearchReferences::new(
+            Instant::now(),
+            &nodes,
+            &should_stop,
+            limits,
+            Duration::MAX,
+            &rx,
+            ZobristStack::new(),
+            &tt,
+        );
+        let report = iterative_deepening::<true>(search_refs, board);
 
         tt.clear();
         total_time += report.time;

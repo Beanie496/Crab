@@ -18,7 +18,11 @@
 
 #![allow(dead_code)]
 
-use std::{cmp::Ordering, mem::MaybeUninit};
+use std::{
+    cmp,
+    mem::MaybeUninit,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::{
     bitboard::Bitboard,
@@ -36,6 +40,17 @@ macro_rules! cfor {
             $expr;
         }
     }}
+}
+
+/// A buffered atomic counter.
+///
+/// Will only update the internal atomic counter if the internal buffer reaches
+/// some value.
+pub struct BufferedAtomicU64Counter<'a> {
+    /// Where the increments are stored before being flushed to the counter.
+    buffer: u64,
+    /// The atomic counter.
+    counter: &'a AtomicU64,
 }
 
 /// An iterator over the elements of a [`Stack`].
@@ -63,6 +78,11 @@ pub struct Stack<T: Copy, const SIZE: usize> {
     stack: [MaybeUninit<T>; SIZE],
     /// The first index that can be written to.
     first_empty: usize,
+}
+
+impl BufferedAtomicU64Counter<'_> {
+    /// How large the buffer can be before it writes to the atomic counter.
+    const BUFFER_SIZE: u64 = 2048;
 }
 
 impl<T: Copy, const SIZE: usize> DoubleEndedIterator for Iter<'_, T, SIZE> {
@@ -103,6 +123,41 @@ impl<T: Copy, const SIZE: usize> Iterator for Stack<T, SIZE> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop()
+    }
+}
+
+impl<'a> BufferedAtomicU64Counter<'a> {
+    /// Creates a new [`BufferedAtomicU64Counter`].
+    pub const fn new(counter: &'a AtomicU64) -> Self {
+        Self { buffer: 0, counter }
+    }
+
+    /// Increments the buffer, flushing it to the atomic counter if it's too
+    /// large.
+    pub fn increment(&mut self) {
+        self.buffer += 1;
+        if self.buffer > Self::BUFFER_SIZE {
+            self.flush();
+        }
+    }
+
+    /// Unconditionally flushes the buffer to the atomic counter.
+    pub fn flush(&mut self) -> u64 {
+        let counter = self.counter.fetch_add(self.buffer, Ordering::Relaxed);
+        self.buffer = 0;
+        counter
+    }
+
+    /// Returns the value stores in the atomic counter.
+    ///
+    /// Ignores the value in the buffer.
+    pub fn load(&self) -> u64 {
+        self.counter.load(Ordering::Relaxed)
+    }
+
+    /// Checks if the buffer is at its maximum size.
+    pub const fn is_full(&self) -> bool {
+        self.buffer == Self::BUFFER_SIZE
     }
 }
 
@@ -177,7 +232,7 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
     /// Sorts the items in the stack with the comparator function, `cmp`.
     pub fn sort_by<F>(&mut self, mut cmp: F)
     where
-        F: FnMut(&T, &T) -> Ordering,
+        F: FnMut(&T, &T) -> cmp::Ordering,
     {
         self.stack[0..self.first_empty].sort_by(|a, b| {
             // SAFETY: only the initialised items are sorted

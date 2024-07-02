@@ -16,9 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{
-    movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchReferences, SearchStatus,
-};
+use super::{movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchReferences};
 use crate::{
     board::Board,
     defs::MoveType,
@@ -48,7 +46,7 @@ pub fn search<NodeType: Node>(
 
     let is_in_check = board.is_in_check();
     search_refs.seldepth = search_refs.seldepth.max(height);
-    search_refs.nodes += 1;
+    search_refs.nodes.increment();
 
     if !NodeType::IS_ROOT {
         // mate distance pruning
@@ -163,7 +161,7 @@ pub fn search<NodeType: Node>(
         search_refs.past_zobrists.pop();
 
         // if the search was stopped early, we can't trust its results
-        if search_refs.check_status() != SearchStatus::Continue {
+        if search_refs.should_stop_search() {
             return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 
@@ -237,7 +235,7 @@ fn quiescence_search(
     height: Depth,
 ) -> Eval {
     search_refs.seldepth = search_refs.seldepth.max(height);
-    search_refs.nodes += 1;
+    search_refs.nodes.increment();
 
     let is_in_check = board.is_in_check();
     let mut best_score = if is_in_check {
@@ -265,7 +263,7 @@ fn quiescence_search(
 
         let score = -quiescence_search(search_refs, &copy, -beta, -alpha, height + 1);
 
-        if search_refs.check_status() != SearchStatus::Continue {
+        if search_refs.should_stop_search() {
             return 0;
         }
 

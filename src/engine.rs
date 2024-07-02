@@ -20,10 +20,11 @@ use std::{
     io::stdin,
     str::FromStr,
     sync::{
+        atomic::{AtomicBool, AtomicU64},
         mpsc::{channel, Receiver},
         Mutex,
     },
-    thread::spawn,
+    thread::{scope, spawn},
     time::{Duration, Instant},
 };
 
@@ -32,7 +33,7 @@ use crate::{
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{iterative_deepening, Depth, Limits},
+    search::{iterative_deepening, time::calculate_time_window, Depth, Limits, SearchReferences},
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -132,21 +133,45 @@ impl Engine {
             }
         }
 
-        let board = *self.board();
-        let options = *self.options();
-        let uci_rx = self.uci_rx();
-        let mut past_zobrists = self.past_zobrists().clone();
-        let tt = self.tt();
+        let allocated = calculate_time_window(limits, start, self.options().move_overhead());
+        let nodes = AtomicU64::new(0);
+        let should_stop = AtomicBool::new(false);
 
-        iterative_deepening(
-            board,
-            start,
-            limits,
-            uci_rx,
-            &mut past_zobrists,
-            options,
-            tt,
-        );
+        scope(|s| {
+            let search_refs = SearchReferences::new(
+                start,
+                &nodes,
+                &should_stop,
+                limits,
+                allocated,
+                self.uci_rx(),
+                self.past_zobrists().clone(),
+                self.tt(),
+            );
+            let main_handle = s.spawn(|| iterative_deepening::<true>(search_refs, *self.board()));
+
+            for _ in 1..self.options().threads() {
+                // yes yes, duplication. this will be eliminated with thread
+                // voting though. probably.
+                let search_refs = SearchReferences::new(
+                    start,
+                    &nodes,
+                    &should_stop,
+                    limits,
+                    allocated,
+                    self.uci_rx(),
+                    self.past_zobrists().clone(),
+                    self.tt(),
+                );
+                s.spawn(|| iterative_deepening::<false>(search_refs, *self.board()));
+            }
+
+            let best_move = main_handle
+                .join()
+                .expect("main thread panicked during the search")
+                .best_move();
+            println!("bestmove {best_move}");
+        });
     }
 
     /// Sets the board to a position specified by the `position` command.
