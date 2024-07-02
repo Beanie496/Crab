@@ -31,9 +31,13 @@ use std::{
 use crate::{
     board::{Board, Key},
     defs::{MoveType, PieceType, Side, Square},
-    movegen::generate_moves,
+    evaluation::MATE_BOUND,
+    movegen::{generate_moves, Move},
     perft::perft,
-    search::{iterative_deepening, time::calculate_time_window, Depth, Limits, SearchReferences},
+    search::{
+        iterative_deepening, time::calculate_time_window, Depth, Limits, SearchReferences,
+        SearchReport,
+    },
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -138,22 +142,9 @@ impl Engine {
         let should_stop = AtomicBool::new(false);
 
         scope(|s| {
-            let search_refs = SearchReferences::new(
-                start,
-                &nodes,
-                &should_stop,
-                limits,
-                allocated,
-                self.uci_rx(),
-                self.past_zobrists().clone(),
-                self.tt(),
-                0,
-            );
-            let main_handle = s.spawn(|| iterative_deepening(search_refs, *self.board()));
+            let mut handles = Vec::with_capacity(self.options().threads());
 
-            for thread in 1..self.options().threads() {
-                // yes yes, duplication. this will be eliminated with thread
-                // voting though. probably.
+            for thread in 0..self.options().threads() {
                 let search_refs = SearchReferences::new(
                     start,
                     &nodes,
@@ -165,13 +156,14 @@ impl Engine {
                     self.tt(),
                     thread,
                 );
-                s.spawn(|| iterative_deepening(search_refs, *self.board()));
+                handles.push(s.spawn(|| iterative_deepening(search_refs, *self.board())));
             }
 
-            let best_move = main_handle
-                .join()
-                .expect("main thread panicked during the search")
-                .best_move();
+            let reports = handles
+                .into_iter()
+                .map(|handle| handle.join().expect("a thread panicked during the search"))
+                .collect::<Vec<_>>();
+            let best_move = best_move_of(&reports);
             println!("bestmove {best_move}");
         });
     }
@@ -378,6 +370,33 @@ impl Engine {
     pub fn tt_mut(&mut self) -> &mut TranspositionTable {
         &mut self.tt
     }
+}
+
+/// Given an array of [`SearchReport`]s, select the best move of the best
+/// report.
+fn best_move_of(search_reports: &[SearchReport]) -> Move {
+    let (mut best_report, other_reports) =
+        search_reports.split_first().expect("No reports to select");
+
+    for report in other_reports {
+        let best_depth = best_report.depth;
+        let best_score = best_report.score;
+        let depth = report.depth;
+        let score = report.score;
+
+        // if the depth is higher, the score will be more accurate (even if
+        // it's lower). The exception is if the lower depth obtained a mate
+        // score which the higher depth missed.
+        if depth > best_depth && (best_score < MATE_BOUND || score > best_score) {
+            best_report = report;
+        }
+        // Use the faster of the two mates (if the score is a mate) or the
+        // better score if the two depths are the same.
+        if (depth == best_depth || score >= MATE_BOUND) && score > best_score {
+            best_report = report;
+        }
+    }
+    best_report.best_move()
 }
 
 /// Parses an `Option<&str>` into an `Option<T>`.
