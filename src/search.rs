@@ -548,7 +548,10 @@ impl SearchReport {
 /// Performs iterative deepening on the given board.
 pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
     let mut pv = Pv::new();
-    let mut depth = 1;
+    // the starting depths are staggered, with each thread having a different
+    // starting depth (up to a maximum of 8) to make the threads search
+    // different parts of the tree more quickly
+    let mut depth = (search_refs.thread_id % 8) as u8 + 1;
 
     'iter_deep: loop {
         search_refs.depth = depth;
