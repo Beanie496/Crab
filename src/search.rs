@@ -140,6 +140,8 @@ pub struct SearchReferences<'a> {
     past_zobrists: ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
+    /// The ID of the current thread, starting from 0 for the main thread.
+    thread_id: usize,
 }
 
 /// The final results of a search.
@@ -381,6 +383,7 @@ impl<'a> SearchReferences<'a> {
         uci_rx: &'a Mutex<Receiver<String>>,
         past_zobrists: ZobristStack,
         tt: &'a TranspositionTable,
+        thread_id: usize,
     ) -> Self {
         Self {
             start,
@@ -393,6 +396,7 @@ impl<'a> SearchReferences<'a> {
             uci_rx,
             past_zobrists,
             tt,
+            thread_id,
         }
     }
 
@@ -479,7 +483,7 @@ impl<'a> SearchReferences<'a> {
 
     /// Returns if the root node should print extra information.
     fn should_print(&mut self) -> bool {
-        self.start.elapsed() > Duration::from_millis(3000)
+        self.start.elapsed() > Duration::from_millis(3000) && self.is_main_thread()
     }
 
     /// Checks if the position is drawn, either because of repetition or
@@ -505,6 +509,11 @@ impl<'a> SearchReferences<'a> {
             // skip positions with the wrong stm
             .step_by(2)
             .any(|key| key == current_key)
+    }
+
+    /// Checks if the current thread is the main one.
+    const fn is_main_thread(&self) -> bool {
+        self.thread_id == 0
     }
 }
 
@@ -537,10 +546,7 @@ impl SearchReport {
 }
 
 /// Performs iterative deepening on the given board.
-pub fn iterative_deepening<const IS_MAIN_THREAD: bool>(
-    mut search_refs: SearchReferences<'_>,
-    board: Board,
-) -> SearchReport {
+pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
     let mut pv = Pv::new();
     let mut depth = 1;
 
@@ -563,7 +569,7 @@ pub fn iterative_deepening<const IS_MAIN_THREAD: bool>(
         let nps = 1_000_000 * nodes / time.as_micros().max(1) as u64;
         let report = SearchReport::new(&search_refs, time, nps, score, pv.clone());
 
-        if IS_MAIN_THREAD {
+        if search_refs.is_main_thread() {
             println!("{report}");
         }
 

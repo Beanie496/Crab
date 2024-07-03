@@ -147,10 +147,11 @@ impl Engine {
                 self.uci_rx(),
                 self.past_zobrists().clone(),
                 self.tt(),
+                0,
             );
-            let main_handle = s.spawn(|| iterative_deepening::<true>(search_refs, *self.board()));
+            let main_handle = s.spawn(|| iterative_deepening(search_refs, *self.board()));
 
-            for _ in 1..self.options().threads() {
+            for thread in 1..self.options().threads() {
                 // yes yes, duplication. this will be eliminated with thread
                 // voting though. probably.
                 let search_refs = SearchReferences::new(
@@ -162,8 +163,9 @@ impl Engine {
                     self.uci_rx(),
                     self.past_zobrists().clone(),
                     self.tt(),
+                    thread,
                 );
-                s.spawn(|| iterative_deepening::<false>(search_refs, *self.board()));
+                s.spawn(|| iterative_deepening(search_refs, *self.board()));
             }
 
             let best_move = main_handle

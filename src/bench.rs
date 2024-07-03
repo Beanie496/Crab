@@ -103,8 +103,9 @@ where
             &rx,
             ZobristStack::new(),
             &tt,
+            0,
         );
-        let report = iterative_deepening::<true>(search_refs, board);
+        let report = iterative_deepening(search_refs, board);
 
         tt.clear();
         total_time += report.time;
