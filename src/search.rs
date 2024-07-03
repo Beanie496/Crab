@@ -400,7 +400,7 @@ impl<'a> SearchReferences<'a> {
     fn should_stop_search(&mut self) -> bool {
         // only check every so often and don't bother wasting more time if
         // we've already stopped
-        if !self.nodes.is_full() || self.should_stop.load(Ordering::Relaxed) {
+        if !self.nodes.has_empty_buffer() || self.should_stop.load(Ordering::Relaxed) {
             return self.should_stop.load(Ordering::Relaxed);
         }
 

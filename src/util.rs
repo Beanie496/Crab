@@ -156,8 +156,8 @@ impl<'a> BufferedAtomicU64Counter<'a> {
     }
 
     /// Checks if the buffer is at its maximum size.
-    pub const fn is_full(&self) -> bool {
-        self.buffer == Self::BUFFER_SIZE
+    pub const fn has_empty_buffer(&self) -> bool {
+        self.buffer == 0
     }
 }
 
