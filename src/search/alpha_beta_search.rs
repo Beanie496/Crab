@@ -98,11 +98,6 @@ pub fn search<NodeType: Node>(
         search_refs.past_zobrists.push(copy.zobrist());
         total_moves += 1;
 
-        // make sure we always have at least one legal move ready to play
-        if NodeType::IS_ROOT && total_moves == 1 {
-            pv.enqueue(mv);
-        }
-
         if NodeType::IS_ROOT && search_refs.should_print() {
             println!("info currmovenumber {total_moves} currmove {mv}");
         }
@@ -164,6 +159,12 @@ pub fn search<NodeType: Node>(
 
         // if the search was stopped early, we can't trust its results
         if search_refs.check_status() != SearchStatus::Continue {
+            // in the (admittedly never observed before) scenario where the
+            // search was terminated during depth 1 and the PV was never
+            // updated, just add whatever move the search is currently on
+            if NodeType::IS_ROOT && pv.get(0) == Move::null() {
+                pv.enqueue(mv);
+            }
             return if NodeType::IS_ROOT { alpha } else { 0 };
         }
 

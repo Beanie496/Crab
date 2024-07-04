@@ -19,47 +19,33 @@
 use std::process::exit;
 
 use super::{
-    alpha_beta_search::search, print_report, Pv, RootNode, SearchReferences, SearchStatus,
+    aspiration::{aspiration_loop, AspirationWindow},
+    Pv, SearchReferences, SearchStatus,
 };
-use crate::{board::Board, evaluation::INF_EVAL, movegen::Move};
+use crate::board::Board;
 
 /// Performs iterative deepening on the given board.
 ///
 /// Returns the number of positions searched.
 pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> u64 {
+    let mut asp_window = AspirationWindow::new();
     let mut pv = Pv::new();
-    let mut best_move = Move::null();
 
     for depth in 1_u8.. {
         search_refs.depth = depth;
         search_refs.seldepth = 0;
         search_refs.status = SearchStatus::Continue;
 
-        let score = search::<RootNode>(
-            &mut search_refs,
-            &mut pv,
-            &board,
-            -INF_EVAL,
-            INF_EVAL,
-            depth,
-            0,
-        );
-
-        // the root search guarantees that there will always be 1 valid move in
-        // the PV
-        best_move = pv.get(0);
-        let time = search_refs.start.elapsed();
-
-        print_report(&search_refs, time, score, &pv);
+        let score = aspiration_loop(&mut search_refs, &mut pv, &board, &mut asp_window);
 
         if search_refs.should_stop() {
             break;
         }
 
-        pv.clear();
+        asp_window.adjust_around(score, depth);
     }
 
-    println!("bestmove {best_move}");
+    println!("bestmove {}", pv.get(0));
 
     if search_refs.check_status() == SearchStatus::Quit {
         exit(0);

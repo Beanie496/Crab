@@ -30,8 +30,10 @@ use crate::{
     util::{get_unchecked, insert_unchecked},
 };
 
-/// For running the main alpha-beta search within the iterative deepening loop.
+/// For running the main alpha-beta search within the aspiration loop.
 mod alpha_beta_search;
+/// For running the aspiration loop within the iterative deepening loop.
+mod aspiration;
 /// For running the iterative deepening loop.
 pub mod iterative_deepening;
 /// For selecting which order moves are searched in.
