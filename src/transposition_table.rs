@@ -46,8 +46,8 @@ pub enum Bound {
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct TranspositionEntry {
-    /// The lowest bits of the key, used as a checksum.
-    key: u16,
+    /// The key, used as a checksum.
+    key: Key,
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
@@ -56,6 +56,9 @@ pub struct TranspositionEntry {
     depth: Depth,
     /// The bound of the score.
     bound: Bound,
+    /// The compiler would do this anyway but I want the location to be
+    /// explicit.
+    _padding: u16,
 }
 
 /// The information from a successful transposition table lookup.
@@ -75,18 +78,18 @@ pub struct TranspositionHit {
 /// about each position.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct TranspositionTable {
-    tt: Vec<AtomicU64>,
+    tt: Vec<[AtomicU64; 2]>,
 }
 
-impl From<u64> for TranspositionEntry {
-    fn from(raw_entry: u64) -> Self {
-        // SAFETY: there is no `u64` that is an invalid `TranspositionEntry`,
-        // even if the entry doesn't make much sense
-        unsafe { transmute::<u64, Self>(raw_entry) }
+impl From<[u64; 2]> for TranspositionEntry {
+    fn from(raw_entry: [u64; 2]) -> Self {
+        // SAFETY: there is no `[u64; 2]` that is an invalid
+        // `TranspositionEntry`, even if the entry doesn't make much sense
+        unsafe { transmute::<[u64; 2], Self>(raw_entry) }
     }
 }
 
-impl From<TranspositionEntry> for u64 {
+impl From<TranspositionEntry> for [u64; 2] {
     fn from(entry: TranspositionEntry) -> Self {
         // SAFETY: all fields are integral types
         unsafe { transmute::<TranspositionEntry, Self>(entry) }
@@ -97,17 +100,18 @@ impl TranspositionEntry {
     /// Creates a new [`TranspositionEntry`] with the given attributes.
     pub fn new(key: Key, score: Eval, mv: Move, depth: Depth, bound: Bound, height: Depth) -> Self {
         Self {
-            key: key as u16,
+            key,
             score: normalise(score, height),
             mv,
             depth,
             bound,
+            _padding: 0,
         }
     }
 
     /// Checks if a given key matches the stored key.
     const fn matches(self, key: Key) -> bool {
-        self.key == key as u16
+        self.key == key
     }
 }
 
@@ -162,14 +166,15 @@ impl TranspositionTable {
         let entries = size_mib * 1024 * 1024 / size_of::<TranspositionEntry>();
         *self.tt_mut() = Vec::with_capacity(entries);
         for _ in 0..entries {
-            self.tt_mut().push(AtomicU64::new(0));
+            self.tt_mut().push([AtomicU64::new(0), AtomicU64::new(0)]);
         }
     }
 
     /// Zeroes the table.
     pub fn clear(&mut self) {
         for entry in self.tt_mut() {
-            *entry.get_mut() = 0;
+            *entry[0].get_mut() = 0;
+            *entry[1].get_mut() = 0;
         }
     }
 
@@ -177,7 +182,11 @@ impl TranspositionTable {
     pub fn load(&self, key: Key, height: Depth) -> Option<TranspositionHit> {
         // SAFETY: `index()` is guaranteed to be a valid index
         let atomic_entry = unsafe { self.tt().get_unchecked(self.index(key)) };
-        let entry = TranspositionEntry::from(atomic_entry.load(Ordering::Relaxed));
+        let upper_bits = atomic_entry[0].load(Ordering::Relaxed);
+        let lower_bits = atomic_entry[1].load(Ordering::Relaxed);
+        // XOR trick again - see comments in `Self::store()`
+        let entry = TranspositionEntry::from([upper_bits ^ lower_bits, lower_bits]);
+
         entry.matches(key).then_some(TranspositionHit::new(
             entry.score,
             entry.mv,
@@ -188,11 +197,19 @@ impl TranspositionTable {
     }
 
     /// Stores an entry with the given key.
+    ///
+    /// It uses the 'always-replace' strategy.
     pub fn store(&self, key: Key, entry: TranspositionEntry) {
         // SAFETY: `index()` is guaranteed to be a valid index
         let atomic_entry = unsafe { self.tt().get_unchecked(self.index(key)) };
-        // this follows the 'always-replace' strategy
-        atomic_entry.store(u64::from(entry), Ordering::Relaxed);
+        let bits: [u64; 2] = entry.into();
+        let upper_bits = bits[0];
+        let lower_bits = bits[1];
+
+        // This uses the XOR trick to avoid hits on corrupted entries:
+        // https://web.archive.org/web/20201106232343/https://www.craftychess.com/hyatt/hashing.html
+        atomic_entry[0].store(upper_bits ^ lower_bits, Ordering::Relaxed);
+        atomic_entry[1].store(lower_bits, Ordering::Relaxed);
     }
 
     /// Estimates how full the hash is, per mille.
@@ -200,7 +217,11 @@ impl TranspositionTable {
         self.tt()
             .iter()
             .take(1000)
-            .filter(|entry| entry.load(Ordering::Relaxed) != 0)
+            // the non-key information in an entry is never 0: if the move is
+            // `Move::null()`, the bound must be `Bound::Upper` which is > 0,
+            // and if the bound is `Bound::Lower` (0), the move cannot be
+            // `Move::null()`
+            .filter(|entry| entry[1].load(Ordering::Relaxed) != 0)
             .count()
     }
 
@@ -212,12 +233,12 @@ impl TranspositionTable {
     }
 
     /// Returns a reference to the internal vector of entries.
-    const fn tt(&self) -> &Vec<AtomicU64> {
+    const fn tt(&self) -> &Vec<[AtomicU64; 2]> {
         &self.tt
     }
 
     /// Returns a mutable reference to the internal vector of entries.
-    fn tt_mut(&mut self) -> &mut Vec<AtomicU64> {
+    fn tt_mut(&mut self) -> &mut Vec<[AtomicU64; 2]> {
         &mut self.tt
     }
 }
