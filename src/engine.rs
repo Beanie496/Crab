@@ -137,7 +137,10 @@ impl Engine {
         let nodes = AtomicU64::new(0);
         let should_stop = AtomicBool::new(false);
 
-        scope(|s| {
+        // The best move cannot be printed from within the scope as the other
+        // thread might still be running when the gui sends a `position` and
+        // `go` command. This is rare but still happens.
+        let best_move = scope(|s| {
             let search_refs = SearchReferences::new(
                 start,
                 &nodes,
@@ -168,12 +171,12 @@ impl Engine {
                 s.spawn(|| iterative_deepening(search_refs, *self.board()));
             }
 
-            let best_move = main_handle
+            main_handle
                 .join()
                 .expect("main thread panicked during the search")
-                .best_move();
-            println!("bestmove {best_move}");
+                .best_move()
         });
+        println!("bestmove {best_move}");
     }
 
     /// Sets the board to a position specified by the `position` command.

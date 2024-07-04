@@ -465,6 +465,14 @@ impl<'a> SearchReferences<'a> {
         match self.limits {
             Limits::Depth(d) => {
                 if self.depth >= d {
+                    // the other threads can stop as early as they like but the
+                    // main thread stopping must force the other threads to
+                    // stop as otherwise the GUI might send the next `position`
+                    // and `go` commands while the other threads are still
+                    // searching
+                    if self.is_main_thread() {
+                        self.should_stop.store(true, Ordering::Relaxed);
+                    }
                     return true;
                 }
             }
@@ -472,6 +480,9 @@ impl<'a> SearchReferences<'a> {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
                 if self.start.elapsed() > self.allocated.mul_f32(0.4) {
+                    if self.is_main_thread() {
+                        self.should_stop.store(true, Ordering::Relaxed);
+                    }
                     return true;
                 }
             }
