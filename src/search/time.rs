@@ -31,7 +31,7 @@ impl Limits {
 
 /// Calculates the maximum window of time that should be used for the next
 /// iterative deepening loop.
-pub fn calculate_time_window(limits: Limits, start: Instant, move_overhead: Duration) -> Duration {
+pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Duration) -> Duration {
     if let Limits::Timed {
         time,
         inc,

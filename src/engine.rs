@@ -32,7 +32,10 @@ use crate::{
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{iterative_deepening, time::calculate_time_window, Depth, Limits, SearchReferences},
+    search::{
+        iterative_deepening::iterative_deepening, time::calculate_time_window, Depth, Limits,
+        SearchReferences,
+    },
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -132,7 +135,7 @@ impl Engine {
             }
         }
 
-        let allocated = calculate_time_window(limits, start, self.options().move_overhead());
+        let allocated = calculate_time_window(start, limits, self.options().move_overhead());
         let search_refs = SearchReferences::new(
             start,
             limits,

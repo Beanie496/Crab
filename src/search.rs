@@ -18,23 +18,22 @@
 
 use std::{
     fmt::{self, Display, Formatter, Write},
-    process::exit,
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
 
 use crate::{
-    board::Board,
     engine::ZobristStack,
-    evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
+    evaluation::{is_mate, moves_to_mate, Eval},
     movegen::Move,
     transposition_table::TranspositionTable,
     util::{get_unchecked, insert_unchecked},
 };
-use main_search::search;
 
-/// For carrying out the search.
-mod main_search;
+/// For running the main alpha-beta search within the iterative deepening loop.
+mod alpha_beta_search;
+/// For running the iterative deepening loop.
+pub mod iterative_deepening;
 /// For selecting which order moves are searched in.
 mod movepick;
 /// Time management.
@@ -149,26 +148,6 @@ pub struct SearchReferences<'a> {
     tt: &'a TranspositionTable,
 }
 
-/// The final results of a search.
-pub struct SearchReport {
-    /// The maximum depth searched.
-    pub depth: Depth,
-    /// The maximum depth reached.
-    pub seldepth: Depth,
-    /// How many positions were searched.
-    pub nodes: u64,
-    /// The proportion of the transposition table used, per mille.
-    pub hashfull: usize,
-    /// How long the search took.
-    pub time: Duration,
-    /// The average number of nodes searches per second.
-    pub nps: u64,
-    /// The final score.
-    pub score: Eval,
-    /// The principle variation.
-    pub pv: Pv,
-}
-
 impl Default for Limits {
     fn default() -> Self {
         Self::Infinite
@@ -191,28 +170,6 @@ impl Iterator for Pv {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
-    }
-}
-
-impl Display for SearchReport {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "info depth {} seldepth {}", self.depth, self.seldepth)?;
-
-        if is_mate(self.score) {
-            write!(f, " score mate {}", moves_to_mate(self.score))?;
-        } else {
-            write!(f, " score cp {}", self.score)?;
-        }
-
-        write!(
-            f,
-            " hashfull {} nodes {} time {} nps {} pv {}",
-            self.hashfull,
-            self.nodes,
-            self.time.as_millis(),
-            self.nps,
-            self.pv,
-        )
     }
 }
 
@@ -512,72 +469,29 @@ impl<'a> SearchReferences<'a> {
     }
 }
 
-impl SearchReport {
-    /// Creates a new [`SearchReport`] given the information of a completed
-    /// search.
-    fn new(
-        search_refs: &SearchReferences<'_>,
-        time: Duration,
-        nps: u64,
-        score: Eval,
-        pv: Pv,
-    ) -> Self {
-        Self {
-            depth: search_refs.depth,
-            seldepth: search_refs.seldepth,
-            nodes: search_refs.nodes,
-            hashfull: search_refs.tt.estimate_hashfull(),
-            time,
-            nps,
-            score,
-            pv,
-        }
+/// Prints information about a completed search iteration.
+fn print_report(search_refs: &SearchReferences<'_>, time: Duration, score: Eval, pv: &Pv) {
+    let mut print_str = format!(
+        "info depth {} seldepth {}",
+        search_refs.depth, search_refs.seldepth
+    );
+
+    #[allow(clippy::unwrap_used)]
+    if is_mate(score) {
+        write!(&mut print_str, " score mate {}", moves_to_mate(score))
+    } else {
+        write!(&mut print_str, " score cp {score}")
     }
-}
+    .unwrap();
 
-/// Performs iterative deepening on the given board.
-pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
-    let mut pv = Pv::new();
-    let mut best_move;
-    let mut depth = 1;
+    let nps = 1_000_000 * search_refs.nodes / time.as_micros().max(1) as u64;
 
-    let report = 'iter_deep: loop {
-        search_refs.depth = depth;
-        search_refs.seldepth = 0;
-        search_refs.status = SearchStatus::Continue;
-
-        let score = search::<RootNode>(
-            &mut search_refs,
-            &mut pv,
-            &board,
-            -INF_EVAL,
-            INF_EVAL,
-            depth,
-            0,
-        );
-
-        // the root search guarantees that there will always be 1 valid move in
-        // the PV
-        best_move = pv.get(0);
-        let time = search_refs.start.elapsed();
-        let nps = 1_000_000 * search_refs.nodes / time.as_micros().max(1) as u64;
-        let report = SearchReport::new(&search_refs, time, nps, score, pv.clone());
-
-        println!("{report}");
-
-        if search_refs.should_stop() {
-            break 'iter_deep report;
-        }
-
-        pv.clear();
-        depth += 1;
-    };
-
-    println!("bestmove {best_move}");
-
-    if search_refs.check_status() == SearchStatus::Quit {
-        exit(0);
-    }
-
-    report
+    println!(
+        "{print_str} hashfull {} nodes {} time {} nps {} pv {}",
+        search_refs.tt.estimate_hashfull(),
+        search_refs.nodes,
+        time.as_millis(),
+        nps,
+        pv,
+    );
 }

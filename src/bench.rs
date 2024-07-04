@@ -24,7 +24,7 @@ use std::{
 use crate::{
     board::Board,
     engine::ZobristStack,
-    search::{iterative_deepening, Limits, SearchReferences},
+    search::{iterative_deepening::iterative_deepening, Limits, SearchReferences},
     transposition_table::TranspositionTable,
 };
 
@@ -92,14 +92,14 @@ where
         let start = Instant::now();
         let search_refs =
             SearchReferences::new(start, limits, Duration::MAX, &rx, ZobristStack::new(), &tt);
-        let report = iterative_deepening(search_refs, board);
+        let nodes = iterative_deepening(search_refs, board);
+        let elapsed = start.elapsed();
 
+        total_nodes += nodes;
+        total_time += elapsed;
         tt.clear();
-        total_time += report.time;
-        total_nodes += report.nodes;
     }
 
-    // I can't just do `start.elapsed()` because that includes the boilerplate
     let total_time = total_time.as_millis();
     let nps = (total_nodes * 1000) / total_time.max(1) as u64;
     println!("{total_nodes} nodes {nps} nps {total_time} ms");
