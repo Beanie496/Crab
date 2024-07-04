@@ -6,6 +6,7 @@ Features:
 - Bitboard-based representation and move generation (with a redundant mailbox)
 - Magic bitboards
 - UCI compatibility
+- Aspiration windows
 - Principle variation search
 - A transposition table
 - Move ordering:
