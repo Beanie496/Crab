@@ -25,21 +25,20 @@ use std::{
 
 use crate::{
     board::Board,
-    engine::{uci::UciOptions, ZobristStack},
+    engine::ZobristStack,
     evaluation::{is_mate, moves_to_mate, Eval, INF_EVAL},
     movegen::Move,
     transposition_table::TranspositionTable,
     util::{get_unchecked, insert_unchecked},
 };
 use main_search::search;
-use time::calculate_time_window;
 
 /// For carrying out the search.
 mod main_search;
 /// For selecting which order moves are searched in.
 mod movepick;
 /// Time management.
-mod time;
+pub mod time;
 
 /// The difference between the root or leaf node (for height or depth
 /// respectively) and the current node.
@@ -145,7 +144,7 @@ pub struct SearchReferences<'a> {
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
-    past_zobrists: &'a mut ZobristStack,
+    past_zobrists: ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
 }
@@ -379,12 +378,12 @@ impl Pv {
 impl<'a> SearchReferences<'a> {
     /// Creates a new [`SearchReferences`], which includes but is not limited to the
     /// given parameters.
-    pub fn new(
+    pub const fn new(
         start: Instant,
         limits: Limits,
         allocated: Duration,
         uci_rx: &'a Mutex<Receiver<String>>,
-        past_zobrists: &'a mut ZobristStack,
+        past_zobrists: ZobristStack,
         tt: &'a TranspositionTable,
     ) -> Self {
         Self {
@@ -537,20 +536,7 @@ impl SearchReport {
 }
 
 /// Performs iterative deepening on the given board.
-// might move `SearchReferences` out later, but this is fine for now
-#[allow(clippy::too_many_arguments)]
-pub fn iterative_deepening(
-    board: Board,
-    start: Instant,
-    limits: Limits,
-    uci_rx: &Mutex<Receiver<String>>,
-    past_zobrists: &mut ZobristStack,
-    options: UciOptions,
-    tt: &TranspositionTable,
-) -> SearchReport {
-    let allocated = calculate_time_window(limits, start, options.move_overhead());
-    let mut search_refs =
-        SearchReferences::new(start, limits, allocated, uci_rx, past_zobrists, tt);
+pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
     let mut pv = Pv::new();
     let mut best_move;
     let mut depth = 1;

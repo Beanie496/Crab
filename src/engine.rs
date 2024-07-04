@@ -32,7 +32,7 @@ use crate::{
     defs::{MoveType, PieceType, Side, Square},
     movegen::generate_moves,
     perft::perft,
-    search::{iterative_deepening, Depth, Limits},
+    search::{iterative_deepening, time::calculate_time_window, Depth, Limits, SearchReferences},
     transposition_table::TranspositionTable,
     util::Stack,
 };
@@ -132,21 +132,17 @@ impl Engine {
             }
         }
 
-        let board = *self.board();
-        let options = *self.options();
-        let uci_rx = self.uci_rx();
-        let mut past_zobrists = self.past_zobrists().clone();
-        let tt = self.tt();
-
-        iterative_deepening(
-            board,
+        let allocated = calculate_time_window(limits, start, self.options().move_overhead());
+        let search_refs = SearchReferences::new(
             start,
             limits,
-            uci_rx,
-            &mut past_zobrists,
-            options,
-            tt,
+            allocated,
+            self.uci_rx(),
+            self.past_zobrists().clone(),
+            self.tt(),
         );
+
+        iterative_deepening(search_refs, *self.board());
     }
 
     /// Sets the board to a position specified by the `position` command.
