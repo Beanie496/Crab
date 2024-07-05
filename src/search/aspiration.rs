@@ -22,7 +22,10 @@ use super::{
     alpha_beta_search::search, print_report, Depth, Eval, Pv, RootNode, SearchReferences,
     SearchStatus,
 };
-use crate::{board::Board, evaluation::INF_EVAL};
+use crate::{
+    board::Board,
+    evaluation::{is_mate, INF_EVAL},
+};
 
 /// An aspiration window: a set of bounds used for [`search()`] and updated if
 /// the returned score fails high or low.
@@ -124,7 +127,7 @@ pub fn aspiration_loop(
     pv: &mut Pv,
     board: &Board,
     asp_window: &mut AspirationWindow,
-    depth: Depth,
+    mut depth: Depth,
 ) -> Eval {
     loop {
         let score = search::<RootNode>(
@@ -153,6 +156,13 @@ pub fn aspiration_loop(
         // fail-high
         if score >= asp_window.beta() && asp_window.can_widen_up() {
             asp_window.widen_up(score);
+            // If the score is good, we will want to finish this search faster
+            // so we can get on to the next iteration of the iterative
+            // deepening loop more quickly. The exception is if the score is a
+            // mate as a lower depth might miss it.
+            if !is_mate(score) {
+                depth = (depth - 1).max(1);
+            }
             continue;
         }
 
