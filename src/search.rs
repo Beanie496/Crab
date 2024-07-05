@@ -126,8 +126,6 @@ pub struct Pv {
 pub struct SearchReferences<'a> {
     /// The moment the search started.
     start: Instant,
-    /// The depth being searched.
-    depth: Depth,
     /// The maximum depth reached.
     seldepth: Depth,
     /// How many positions have been searched.
@@ -347,7 +345,6 @@ impl<'a> SearchReferences<'a> {
     ) -> Self {
         Self {
             start,
-            depth: 0,
             seldepth: 0,
             nodes: 0,
             status: SearchStatus::Continue,
@@ -415,15 +412,15 @@ impl<'a> SearchReferences<'a> {
     /// Calculates if the iterative deepening loop should be exited.
     ///
     /// Assumes that this is being called at the end of the loop.
-    fn should_stop(&mut self) -> bool {
-        if self.check_status() != SearchStatus::Continue || self.depth == Depth::MAX {
+    fn should_stop(&mut self, depth: Depth) -> bool {
+        if self.check_status() != SearchStatus::Continue {
             return true;
         }
 
         #[allow(clippy::wildcard_enum_match_arm)]
         match self.limits {
             Limits::Depth(d) => {
-                if self.depth >= d {
+                if depth >= d {
                     self.status = SearchStatus::Stop;
                 }
             }
@@ -472,11 +469,14 @@ impl<'a> SearchReferences<'a> {
 }
 
 /// Prints information about a completed search iteration.
-fn print_report(search_refs: &SearchReferences<'_>, time: Duration, score: Eval, pv: &Pv) {
-    let mut print_str = format!(
-        "info depth {} seldepth {}",
-        search_refs.depth, search_refs.seldepth
-    );
+fn print_report(
+    search_refs: &SearchReferences<'_>,
+    time: Duration,
+    score: Eval,
+    pv: &Pv,
+    depth: Depth,
+) {
+    let mut print_str = format!("info depth {} seldepth {}", depth, search_refs.seldepth);
 
     #[allow(clippy::unwrap_used)]
     if is_mate(score) {

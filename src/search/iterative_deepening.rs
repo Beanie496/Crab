@@ -20,7 +20,7 @@ use std::process::exit;
 
 use super::{
     aspiration::{aspiration_loop, AspirationWindow},
-    Pv, SearchReferences, SearchStatus,
+    Depth, Pv, SearchReferences, SearchStatus,
 };
 use crate::board::Board;
 
@@ -31,14 +31,13 @@ pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) 
     let mut asp_window = AspirationWindow::new();
     let mut pv = Pv::new();
 
-    for depth in 1_u8.. {
-        search_refs.depth = depth;
+    for depth in 1..Depth::MAX {
         search_refs.seldepth = 0;
         search_refs.status = SearchStatus::Continue;
 
-        let score = aspiration_loop(&mut search_refs, &mut pv, &board, &mut asp_window);
+        let score = aspiration_loop(&mut search_refs, &mut pv, &board, &mut asp_window, depth);
 
-        if search_refs.should_stop() {
+        if search_refs.should_stop(depth) {
             break;
         }
 

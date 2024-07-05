@@ -123,6 +123,7 @@ pub fn aspiration_loop(
     pv: &mut Pv,
     board: &Board,
     asp_window: &mut AspirationWindow,
+    depth: Depth,
 ) -> Eval {
     loop {
         let score = search::<RootNode>(
@@ -131,12 +132,12 @@ pub fn aspiration_loop(
             board,
             asp_window.alpha(),
             asp_window.beta(),
-            search_refs.depth,
+            depth,
             0,
         );
 
         let time = search_refs.start.elapsed();
-        print_report(search_refs, time, score, pv);
+        print_report(search_refs, time, score, pv, depth);
 
         if search_refs.check_status() != SearchStatus::Continue {
             break score;
