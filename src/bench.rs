@@ -28,18 +28,16 @@ use crate::{
     transposition_table::TranspositionTable,
 };
 
+/// Test positions for benchmarks.
+static BENCH_POSITIONS: &str = include_str!("../bench_positions.epd");
 /// The default limit of each benched position.
 pub const LIMIT: u64 = 8;
 /// The default limit type.
 pub const LIMIT_TYPE: &str = "depth";
-/// Test positions with an expected depth 4 perft result at the end.
-static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
 /// The default hash size of each benched position.
 pub const TT_SIZE: usize = 32;
 
-/// Runs a benchmark on all the positions in [`TEST_POSITIONS`].
-///
-/// It treats the first 6 tokens as the FEN string and ignores the rest.
+/// Runs a benchmark on all the positions in [`BENCH_POSITIONS`].
 pub fn bench<'a, T>(mut options: T)
 where
     T: Iterator<Item = &'a str>,
@@ -71,23 +69,13 @@ where
     let rx = Mutex::new(rx);
     let mut tt = TranspositionTable::with_capacity(tt_size);
 
-    let mut fen_str = String::new();
     let mut total_time = Duration::ZERO;
     let mut total_nodes = 0;
 
-    for position in TEST_POSITIONS.lines() {
-        let mut tokens = position.split_whitespace();
+    for position in BENCH_POSITIONS.lines() {
+        println!("Position: {position}");
 
-        tokens.next_back();
-
-        for token in tokens.take(6) {
-            fen_str.push_str(token);
-            fen_str.push(' ');
-        }
-        println!("Position: {fen_str}");
-
-        let board = fen_str.parse::<Board>().expect("Malformed test position");
-        fen_str.clear();
+        let board = position.parse::<Board>().expect("Malformed test position");
 
         let start = Instant::now();
         let search_refs =
@@ -113,11 +101,12 @@ mod test {
         thread::{available_parallelism, spawn},
     };
 
-    use super::TEST_POSITIONS;
     use crate::perft::perft;
 
     /// The depth to which each position will run `perft`.
     const PERFT_DEPTH: u8 = 4;
+    /// Test positions with an expected depth 4 perft result at the end.
+    static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
 
     /// A FEN string and its expected result at depth [`PERFT_DEPTH`].
     struct TestPosition {
