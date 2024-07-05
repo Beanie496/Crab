@@ -64,7 +64,9 @@ impl AspirationWindow {
             50 / i32::from(depth).min(5) + i32::from(score) * i32::from(score) / 3_000;
 
         self.margin = Eval::try_from(unbounded_margin).unwrap_or(INF_EVAL);
-        self.alpha = score.saturating_sub(self.margin);
+        // same as `score.saturating_sub(self.margin)`, but saturates at
+        // `-Eval::MAX` instead of `Eval::MIN`
+        self.alpha = -(-score).saturating_add(self.margin);
         self.beta = score.saturating_add(self.margin);
     }
 
@@ -103,8 +105,7 @@ impl AspirationWindow {
         self.margin *= 2;
 
         self.beta = (self.alpha + self.beta) / 2;
-        // same as `score.saturating_sub(self.margin)`, but saturates at
-        // `-Eval::MAX` instead of `Eval::MIN`
+        // see comments of `Self::adjust_around()`
         self.alpha = -(-score).saturating_add(self.margin);
     }
 
