@@ -61,7 +61,7 @@ impl AspirationWindow {
             "an Eval must be half the size of an i32 or the following calculation could overflow"
         );
         let unbounded_margin =
-            50 / i32::from(depth).min(5) + i32::from(score) * i32::from(score) / 3_000;
+            60 / i32::from(depth).min(3) + i32::from(score) * i32::from(score) / 3_000;
 
         self.margin = Eval::try_from(unbounded_margin).unwrap_or(INF_EVAL);
         self.alpha = score.saturating_sub(self.margin);
