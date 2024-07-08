@@ -16,6 +16,9 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// this prevents clippy complaining about 'OpenBench' not being in backticks
+#![allow(clippy::doc_markdown)]
+
 //! Crab, a UCI-compatible chess engine written in Rust.
 //!
 //! Accepted commands:
@@ -44,6 +47,7 @@ use std::{env::args, sync::mpsc::RecvError};
 
 use bench::bench;
 use engine::Engine;
+use fen_generation::generate_fens;
 
 /// Unit testing.
 mod bench;
@@ -59,6 +63,8 @@ mod engine;
 mod error;
 /// Items related to evaluation.
 mod evaluation;
+/// Generation for openings in FEN.
+mod fen_generation;
 /// Static lookup items.
 mod lookups;
 /// Items related to move generation.
@@ -76,14 +82,16 @@ fn main() -> Result<(), RecvError> {
     let mut args = args();
     args.next();
 
-    // if it's on the command line, execute the `bench` command and return.
-    // Otherwise, continue as normal
-    if args.next().is_some_and(|s| s == "bench") {
-        // there's practically no difference between deallocating at the end of
-        // `bench()` and at the end of the program
-        bench(args.map(|s| s.leak() as &str));
-        Ok(())
-    } else {
-        Engine::new().main_loop()
+    if let Some(arg) = args.next() {
+        if arg == "bench" {
+            bench(args.map(|s| s.leak() as &str));
+            return Ok(());
+        }
+        let mut tokens = arg.split_whitespace();
+        if tokens.next() == Some("genfens") {
+            generate_fens(tokens);
+            return Ok(());
+        }
     }
+    Engine::new().main_loop()
 }

@@ -44,6 +44,8 @@ pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) 
         asp_window.adjust_around(score, depth);
     }
 
+    // unconditionally print because there's otherwise pretty much no point
+    // calling this function to begin with
     println!("bestmove {}", pv.get(0));
 
     if search_refs.check_status() == SearchStatus::Quit {

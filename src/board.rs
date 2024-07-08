@@ -176,17 +176,19 @@ impl FromStr for Board {
     ///
     /// It will return with an [`Err`] if the FEN string cannot be parsed (e.g.
     /// if it's too short) but does not check if the FEN string actually makes
-    /// sense (e.g. if it contains a row with 14 pieces).
+    /// sense (e.g. if it contains a row with 14 pieces). The castling rights,
+    /// ep square, halfmoves and fullmoves can be omitted but the board itself
+    /// and side must be present.
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let mut board = Self::new();
         let mut tokens = string.split_whitespace();
 
         let board_str = tokens.next().ok_or(ParseError)?;
         let side_to_move = tokens.next().ok_or(ParseError)?;
-        let castling_rights = tokens.next().ok_or(ParseError)?;
-        let ep_square = tokens.next().ok_or(ParseError)?;
-        let halfmoves = tokens.next().ok_or(ParseError)?;
-        let fullmoves = tokens.next().ok_or(ParseError)?;
+        let castling_rights = tokens.next().unwrap_or("-");
+        let ep_square = tokens.next().unwrap_or("-");
+        let halfmoves = tokens.next().unwrap_or("0");
+        let fullmoves = tokens.next().unwrap_or("1");
 
         // 1. the board itself
         let mut square = 56;

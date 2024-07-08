@@ -78,8 +78,15 @@ where
         let board = position.parse::<Board>().expect("Malformed test position");
 
         let start = Instant::now();
-        let search_refs =
-            SearchReferences::new(start, limits, Duration::MAX, &rx, ZobristStack::new(), &tt);
+        let search_refs = SearchReferences::new(
+            start,
+            true,
+            limits,
+            Duration::MAX,
+            &rx,
+            ZobristStack::new(),
+            &tt,
+        );
         let nodes = iterative_deepening(search_refs, board);
         let elapsed = start.elapsed();
 

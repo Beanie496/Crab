@@ -20,6 +20,8 @@
 
 use std::{cmp::Ordering, mem::MaybeUninit};
 
+use oorandom::Rand64;
+
 use crate::{
     bitboard::Bitboard,
     defs::{PieceType, Rank, Square},
@@ -154,6 +156,19 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         unsafe { item.assume_init_read() }
     }
 
+    /// Picks a random item, swaps it with the first item, then pops the
+    /// now-first item.
+    pub fn pop_random(&mut self, seed: &mut Rand64) -> Option<T> {
+        let total_moves = self.len();
+
+        if total_moves >= 2 {
+            let random_index = seed.rand_range(0_u64..total_moves as u64) as usize;
+            self.swap_with_top(random_index);
+        }
+
+        self.pop()
+    }
+
     /// Gets the item at the given index.
     ///
     /// Will panic in debug if the index is invalid.
@@ -162,6 +177,20 @@ impl<T: Copy, const SIZE: usize> Stack<T, SIZE> {
         // SAFETY: `get_unchecked()` makes sure that the index is to within the
         // stack (i.e. initialised memory)
         unsafe { item.assume_init_read() }
+    }
+
+    /// Sets the element at the given index to the given item.
+    ///
+    /// Will panic in debug if the index is invalid.
+    fn set(&mut self, item: T, index: usize) {
+        insert_unchecked(&mut self.stack, index, MaybeUninit::new(item));
+    }
+
+    /// Swaps the item at `index` with the top item.
+    fn swap_with_top(&mut self, index: usize) {
+        let temp = self.get(index);
+        self.set(self.get(self.first_empty - 1), index);
+        self.set(temp, self.first_empty - 1);
     }
 
     /// Clears the stack.

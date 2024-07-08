@@ -138,6 +138,7 @@ impl Engine {
         let allocated = calculate_time_window(start, limits, self.options().move_overhead());
         let search_refs = SearchReferences::new(
             start,
+            true,
             limits,
             allocated,
             self.uci_rx(),
