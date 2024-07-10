@@ -87,7 +87,7 @@ where
             ZobristStack::new(),
             &tt,
         );
-        let nodes = iterative_deepening(search_refs, board);
+        let nodes = iterative_deepening(search_refs, board).nodes;
         let elapsed = start.elapsed();
 
         total_nodes += nodes;

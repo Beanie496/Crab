@@ -150,6 +150,16 @@ pub struct SearchReferences<'a> {
     tt: &'a TranspositionTable,
 }
 
+/// Some of the final results of a search, which may or may not have been
+/// printed to stdout.
+#[allow(dead_code)]
+pub struct SearchReport {
+    /// How many positions were searched.
+    pub nodes: u64,
+    /// The final principle variation.
+    pub pv: Pv,
+}
+
 impl Default for Limits {
     fn default() -> Self {
         Self::Infinite
@@ -469,6 +479,13 @@ impl<'a> SearchReferences<'a> {
             // skip positions with the wrong stm
             .step_by(2)
             .any(|key| key == current_key)
+    }
+}
+
+impl SearchReport {
+    /// Creates a new [`SearchReport`].
+    pub const fn new(pv: Pv, nodes: u64) -> Self {
+        Self { nodes, pv }
     }
 }
 

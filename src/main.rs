@@ -40,14 +40,22 @@
 //! - `ucinewgame`
 //! - `quit`
 //!
-//! This program also accepts `bench` as a command-line argument, which it will
-//! process and execute instead of running the UCI loop.
+//! If this program is given command-line arguments, it will execute them
+//! instead of the UCI look. Accepted command-line arguments:
+//! - `bench`: this is the same as the regular `bench` command
+//! - `genfens <N> seed <S> book <None|path/to/some_book.epd> [T]`: see
+//! [`generate_fens()`] for more detail. Note that this is **one** argument
+//! because that's how OpenBench will run the argument.
+//! - `sample <path/to/some_book.epd>`: see module-level documentation of
+//! `game_sampler`. Requires the `sample` feature.
 
 use std::{env::args, sync::mpsc::RecvError};
 
 use bench::bench;
 use engine::Engine;
 use fen_generation::generate_fens;
+#[cfg(feature = "sample")]
+use game_parser::sample_from_games;
 
 /// Unit testing.
 mod bench;
@@ -65,6 +73,8 @@ mod error;
 mod evaluation;
 /// Generation for openings in FEN.
 mod fen_generation;
+#[cfg(feature = "sample")]
+mod game_parser;
 /// Static lookup items.
 mod lookups;
 /// Items related to move generation.
@@ -85,6 +95,11 @@ fn main() -> Result<(), RecvError> {
     if let Some(arg) = args.next() {
         if arg == "bench" {
             bench(args.map(|s| s.leak() as &str));
+            return Ok(());
+        }
+        #[cfg(feature = "sample")]
+        if arg == "sample" {
+            sample_from_games(args);
             return Ok(());
         }
         let mut tokens = arg.split_whitespace();
