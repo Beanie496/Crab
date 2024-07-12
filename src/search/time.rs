@@ -26,7 +26,7 @@ impl Limits {
     ///
     /// In other words, the time manager treats the moves until the next time
     /// control as `moves_to_go.min(MAX_MOVES_TO_GO)`.
-    const MAX_MOVES_TO_GO: u8 = 40;
+    const MAX_MOVES_TO_GO: u8 = 20;
 }
 
 /// Calculates the maximum window of time that should be used for the next
