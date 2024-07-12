@@ -39,7 +39,7 @@ pub fn search<NodeType: Node>(
     board: &Board,
     mut alpha: Eval,
     mut beta: Eval,
-    depth: Depth,
+    mut depth: Depth,
     height: Depth,
 ) -> Eval {
     if depth == 0 {
@@ -80,14 +80,20 @@ pub fn search<NodeType: Node>(
             return h.score();
         }
     }
+    let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
+
+    // Internal Iterative Reductions (IIR): if we don't have a TT move (either
+    // because we failed low last time or we because didn't even get a TT hit),
+    // it is better to reduce now and hope we have a TT move next time, rather
+    // than waste a lot of time doing a search with bad move ordering
+    if !NodeType::IS_PV && tt_move == Move::null() && depth >= 4 {
+        depth -= 1;
+    }
 
     let mut best_score = -INF_EVAL;
     let mut best_move = Move::null();
     let mut new_pv = Pv::new();
-    let movepicker = MovePicker::new::<{ MoveType::ALL }>(
-        board,
-        tt_hit.map_or(Move::null(), TranspositionHit::mv),
-    );
+    let movepicker = MovePicker::new::<{ MoveType::ALL }>(board, tt_move);
 
     let mut total_moves: u8 = 0;
     for mv in movepicker {
