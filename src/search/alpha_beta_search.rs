@@ -86,7 +86,7 @@ pub fn search<NodeType: Node>(
     // because we failed low last time or we because didn't even get a TT hit),
     // it is better to reduce now and hope we have a TT move next time, rather
     // than waste a lot of time doing a search with bad move ordering
-    if !NodeType::IS_PV && tt_move == Move::null() && depth >= 4 {
+    if tt_move == Move::null() && depth >= 4 {
         depth -= 1;
     }
 
