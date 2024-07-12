@@ -12,6 +12,7 @@ Features:
 - Move ordering:
   - TT-move
   - MVV + SEE captures
+- Internal iterative reductions
 - Extensions:
   - Check extensions
 - Late move reductions
