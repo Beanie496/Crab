@@ -86,7 +86,7 @@ pub fn search<NodeType: Node>(
     // because we failed low last time or we because didn't even get a TT hit),
     // it is better to reduce now and hope we have a TT move next time, rather
     // than waste a lot of time doing a search with bad move ordering
-    if !NodeType::IS_PV && tt_move == Move::null() && depth >= 4 {
+    if NodeType::IS_PV && tt_move == Move::null() && depth >= 4 {
         depth -= 1;
     }
 
@@ -124,7 +124,7 @@ pub fn search<NodeType: Node>(
         // then exceeds alpha, then great: we've found a better move.)
         let mut score = 0;
         if !NodeType::IS_PV || total_moves > 1 {
-            let reduction = reduction(depth, total_moves);
+            let reduction = reduction::<NodeType>(depth, total_moves);
 
             score = -search::<NonPvNode>(
                 search_refs,
@@ -297,9 +297,10 @@ const fn extension(is_in_check: bool) -> Depth {
 }
 
 /// Calculates how much to reduce the search by during late move reductions.
-fn reduction(depth: Depth, total_moves: u8) -> Depth {
+fn reduction<NodeType: Node>(depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
         base_reductions(depth, total_moves)
+            + Depth::from(!NodeType::IS_PV)
     } else {
         0
     }
