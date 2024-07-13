@@ -37,7 +37,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pgn_reader::{BufferedReader, CastlingSide, RawHeader, Role, San, SanPlus, Visitor};
+use oorandom::Rand64;
+use pgn_reader::{BufferedReader, CastlingSide, RawHeader, Role, San, SanPlus, Skip, Visitor};
 
 use crate::{
     bitboard::Bitboard,
@@ -60,32 +61,29 @@ struct SearchReferencesCache {
     tt: TranspositionTable,
 }
 
-/// Parses a game, periodically doing a high-depth search on each position,
-/// applying the PV, and outputting the resulting position and result.
+/// Parses a game and outputs a few random positions from it with the PV of a
+/// high-depth search applied to them.
 ///
-/// It extracts a maximum of [`SAMPLE_LIMIT`](Self::SAMPLE_LIMIT) positions and
-/// does a depth [`SEARCH_DEPTH`](SearchReferencesCache::SEARCH_DEPTH) search.
-///
-/// The output is to stdout in the format `format!("{board} {result}")`, where
-/// `result` is `1-0`, `0-1` or `1/2-1/2`.
+/// It outputs a maximum of [`SAMPLE_LIMIT`](Self::SAMPLE_LIMIT) positions,
+/// does a depth [`SEARCH_DEPTH`](SearchReferencesCache::SEARCH_DEPTH) search
+/// and the output is to stdout in the format `format!("{board} {result}")`,
+/// where `result` is `1-0`, `0-1` or `1/2-1/2`.
 struct GameSampler {
     /// Cached fields of [`SearchReferences`].
     search_refs_cache: SearchReferencesCache,
     /// The state of the game so far.
     board: Board,
-    /// How many halfmoves to go until the next analysis.
-    moves_until_sample: u8,
-    /// How many positions have been sampled from this game.
-    sampled_positions: u8,
     /// The result of the current game.
     result: String,
+    /// Sample position candidates.
+    candidates: Vec<Board>,
+    /// Random number generator used for picking random candidates.
+    rng: Rand64,
 }
 
 impl GameSampler {
-    /// The period (in halfmoves) of sampling a game.
-    const SAMPLE_INTERVAL: u8 = 16;
-    /// The maximum number of positions that can be sampled from a game.
-    const SAMPLE_LIMIT: u8 = 3;
+    /// The maximum number of positions to sample from a game.
+    const SAMPLE_LIMIT: usize = 3;
 }
 
 impl SearchReferencesCache {
@@ -103,13 +101,6 @@ impl From<pgn_reader::File> for defs::File {
 
 impl Visitor for GameSampler {
     type Result = Result<(), ()>;
-
-    fn end_game(&mut self) -> Self::Result {
-        self.search_refs_cache.tt.clear();
-        self.moves_until_sample = Self::SAMPLE_LIMIT / 2;
-        self.sampled_positions = 0;
-        Ok(())
-    }
 
     fn header(&mut self, key: &[u8], value: RawHeader<'_>) {
         match from_utf8(key).expect("could not convert key to UTF-8") {
@@ -130,13 +121,41 @@ impl Visitor for GameSampler {
         }
     }
 
-    fn san(&mut self, san_plus: SanPlus) {
-        if self.has_reached_sample_limit() {
-            return;
-        }
+    fn end_headers(&mut self) -> Skip {
+        self.candidates.push(self.board);
+        Skip(false)
+    }
 
-        self.try_sampling();
-        self.make_san_move(san_plus.san);
+    fn san(&mut self, san_plus: SanPlus) {
+        match san_plus.san {
+            San::Normal {
+                role,
+                file,
+                rank,
+                capture,
+                to,
+                promotion,
+            } => {
+                let file = file.map(defs::File::from);
+                let rank = rank.map(defs::Rank::from);
+                let end = defs::Square::from(to);
+                let promotion_piece = promotion.map(PieceType::from);
+
+                self.make_non_castle_move(role, file, rank, capture, end, promotion_piece);
+            }
+            San::Castle(side) => self.make_castling_move(side),
+            San::Put { .. } => panic!("there shouldn't be a Put in standard chess"),
+            San::Null => panic!("null move"),
+        }
+        self.candidates.push(self.board);
+    }
+
+    fn end_game(&mut self) -> Self::Result {
+        self.sample_positions();
+
+        self.search_refs_cache.tt.clear();
+        self.candidates.clear();
+        Ok(())
     }
 }
 
@@ -167,66 +186,9 @@ impl GameSampler {
             search_refs_cache: SearchReferencesCache::new(),
             // SAFETY: a hardcoded startpos cannot fail to be parsed
             board: unsafe { STARTPOS.parse().unwrap_unchecked() },
-            moves_until_sample: Self::SAMPLE_LIMIT / 2,
             result: String::from("1/2-1/2"),
-            sampled_positions: 0,
-        }
-    }
-
-    /// Checks if the game has reached the maximum number of sampled positions.
-    const fn has_reached_sample_limit(&self) -> bool {
-        self.sampled_positions == Self::SAMPLE_LIMIT
-    }
-
-    /// Decrements the sample counter if it's above 0 or re-sets the counter
-    /// and samples the position if it's at 0.
-    fn try_sampling(&mut self) {
-        if self.moves_until_sample > 0 {
-            self.moves_until_sample -= 1;
-            return;
-        }
-
-        self.sample_position();
-        self.moves_until_sample = Self::SAMPLE_INTERVAL;
-    }
-
-    /// Runs a deep-ish search on the current position, applies the moves in
-    /// the PV, then prints the resulting board and its result to stdout in the
-    /// format `format!("{board} {result}")`.
-    fn sample_position(&mut self) {
-        let pv = iterative_deepening(self.search_refs_cache.new_search_refs(), self.board).pv;
-
-        let mut copy = self.board;
-        for mv in pv {
-            copy.make_move(mv);
-        }
-        println!("{copy} {}", self.result);
-
-        self.sampled_positions += 1;
-    }
-
-    /// Makes a move that is in Standard Algebraic Notation.
-    #[allow(clippy::needless_pass_by_value)]
-    fn make_san_move(&mut self, san: San) {
-        match san {
-            San::Normal {
-                role,
-                file,
-                rank,
-                capture,
-                to,
-                promotion,
-            } => {
-                let file = file.map(defs::File::from);
-                let rank = rank.map(defs::Rank::from);
-                let end = defs::Square::from(to);
-                let promotion_piece = promotion.map(PieceType::from);
-
-                self.make_non_castle_move(role, file, rank, capture, end, promotion_piece);
-            }
-            San::Castle(side) => self.make_castling_move(side),
-            San::Put { .. } => panic!("there shouldn't be a Put in standard chess"),
-            San::Null => panic!("null move"),
+            candidates: Vec::new(),
+            rng: Rand64::new(0),
         }
     }
 
@@ -332,6 +294,23 @@ impl GameSampler {
         };
 
         assert!(self.board.make_move(mv), "illegal move: \"{mv}\"");
+    }
+
+    /// For three random positions, it runs a deep-ish search, applies the
+    /// moves in the PV, then prints the resulting board and its result to
+    /// stdout in the format `format!("{board} {result}")`.
+    fn sample_positions(&mut self) {
+        for _ in 0..Self::SAMPLE_LIMIT {
+            let random_index = self.rng.rand_range(0..self.candidates.len() as u64) as usize;
+            let mut random_board = self.candidates.swap_remove(random_index);
+
+            let pv = iterative_deepening(self.search_refs_cache.new_search_refs(), random_board).pv;
+
+            for mv in pv {
+                random_board.make_move(mv);
+            }
+            println!("{random_board} {}", self.result);
+        }
     }
 }
 
