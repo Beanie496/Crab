@@ -259,12 +259,11 @@ impl ScoreF64 {
 pub fn tune(positions: &str, mut learning_rate: f64) {
     let mut best_error = f64::MAX;
     let mut error;
-    let mut weights = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
     let mut adaptive_gradients = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
     let learning_rate_drop = 2.0;
 
-    eprintln!("initialising initial weights...");
-    let initial_weights = initialise_current_weights();
+    eprintln!("initialising weights...");
+    let mut weights = initialise_current_weights();
     eprintln!("initialising tuner entries...");
     let tune_entries = initialise_tuner_entries(positions);
     eprintln!("calculating optimal K...");
@@ -305,7 +304,7 @@ pub fn tune(positions: &str, mut learning_rate: f64) {
             if error > best_error {
                 learning_rate /= learning_rate_drop;
             }
-            print_weights(&weights, &initial_weights);
+            print_weights(&weights);
             best_error = error;
         }
 
@@ -561,11 +560,8 @@ fn sigmoid(eval: f64, k: f64) -> f64 {
 /// Prints the current best weights to stdout in the same format as is in the
 /// source of [`crate::evaluation::values`].
 #[allow(clippy::use_debug)]
-fn print_weights(weights: &Weights, initial_weights: &Weights) {
-    let mut iter = weights
-        .iter()
-        .zip(initial_weights.iter())
-        .map(|(&w, &c)| Score::from(w + c));
+fn print_weights(weights: &Weights) {
+    let mut iter = weights.iter().map(|&w| Score::from(w));
 
     println!("pub const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [");
     print!("   ");
