@@ -248,17 +248,17 @@ impl ScoreF64 {
 }
 
 /// Given a file of positions, tune the piece values and piece-square table
-/// values given in [`crate::evaluation::values`].
+/// values given in [`crate::evaluation::values`] with the given intial
+/// learning rate.
 ///
 /// The tables are printed to stdout and diagnostic/error messages are printed
 /// to stderr.
 #[allow(clippy::print_stderr, clippy::similar_names)]
-pub fn tune(positions: &str) {
+pub fn tune(positions: &str, mut learning_rate: f64) {
     let mut best_error = f64::MAX;
     let mut error;
     let mut weights = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
     let mut adaptive_gradients = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
-    let mut learning_rate = 0.1;
     let learning_rate_drop = 2.0;
 
     eprintln!("initialising initial weights...");

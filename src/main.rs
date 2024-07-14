@@ -48,8 +48,8 @@
 //! because that's how OpenBench will run the argument.
 //! - `sample <path/to/some_book.epd>`: see module-level documentation of
 //! `game_sampler`. Requires the `sample` feature.
-//! - `tune <path/to/positions.fen>`: see module-level documentation of `tune`.
-//! Requires the `tune` feature.
+//! - `tune <path/to/positions.fen> [learning rate]`: see module-level
+//! documentation of `tune`. Requires the `tune` feature.
 
 use std::{env::args, sync::mpsc::RecvError};
 
@@ -110,7 +110,9 @@ fn main() -> Result<(), RecvError> {
         }
         #[cfg(feature = "tune")]
         if arg == "tune" {
-            tune(&args.next().expect("expected positions file"));
+            let openings_file = &args.next().expect("expected positions file");
+            let learning_rate = args.next().and_then(|lr| lr.parse().ok()).unwrap_or(0.1);
+            tune(openings_file, learning_rate);
             return Ok(());
         }
         let mut tokens = arg.split_whitespace();
