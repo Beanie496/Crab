@@ -270,7 +270,7 @@ pub fn tune(positions: &str, mut learning_rate: f64) {
     let (k, k_error) = calculate_optimal_k(&tune_entries);
     error = k_error;
 
-    for iteration in 0.. {
+    for iteration in 0..=200_000 {
         let gradients = calculate_gradient(&tune_entries, &weights, k);
         for ((weight, adaptive_gradient), gradient) in weights
             .iter_mut()
