@@ -149,6 +149,14 @@ impl Div<f64> for ScoreF64 {
     }
 }
 
+impl Div for ScoreF64 {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self {
+        Self(self.0 / rhs.0, self.1 / rhs.1)
+    }
+}
+
 impl From<Score> for ScoreF64 {
     fn from(score: Score) -> Self {
         Self(f64::from(score.0), f64::from(score.1))
@@ -233,7 +241,7 @@ impl Coefficient {
 impl ScoreF64 {
     /// Lerps the score between its middlegame and endgame value depending on
     /// the phase.
-    pub fn lerp_to(self, phase: f64) -> f64 {
+    fn lerp_to(self, phase: f64) -> f64 {
         let diff = self.1 - self.0;
         diff.mul_add(-phase, self.1) // self.1 - diff * phase
     }
@@ -244,11 +252,12 @@ impl ScoreF64 {
 ///
 /// The tables are printed to stdout and diagnostic/error messages are printed
 /// to stderr.
-#[allow(clippy::print_stderr)]
+#[allow(clippy::print_stderr, clippy::similar_names)]
 pub fn tune(positions: &str) {
     let mut best_error = f64::MAX;
     let mut error;
     let mut weights = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
+    let mut adaptive_gradients = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
     let mut learning_rate = 0.1;
     let learning_rate_drop = 2.0;
 
@@ -262,11 +271,27 @@ pub fn tune(positions: &str) {
 
     for iteration in 0.. {
         let gradients = calculate_gradient(&tune_entries, &weights, k);
-        for (weight, gradient) in weights.iter_mut().zip(gradients.iter()) {
+        for ((weight, adaptive_gradient), gradient) in weights
+            .iter_mut()
+            .zip(adaptive_gradients.iter_mut())
+            .zip(gradients.iter())
+        {
             // this is the -2/N * K that was omitted from
             // `calculate_gradients()`
-            // `weight` is subtracting -2 * xyz so the negatives cancel
-            *weight += *gradient * 2.0 * learning_rate * k / tune_entries.len() as f64;
+            // `weight` will be subtracting this later so `*weight -= -2 * xyz`
+            // cancels both negatives
+            let full_gradient = *gradient * 2.0 * k / tune_entries.len() as f64;
+
+            let ScoreF64(mg, eg) = full_gradient;
+            *adaptive_gradient += ScoreF64(mg.powi(2), eg.powi(2));
+            let ScoreF64(ag_mg, ag_eg) = *adaptive_gradient;
+            let adaptive_gradient_sqrt =
+                ScoreF64(ag_mg.sqrt().max(0.0001), ag_eg.sqrt().max(0.0001));
+
+            // `adaptive_gradient_sqrt` is the root of the sum of the squares
+            // of the previous gradients for this weight. It's used to tailor
+            // the learning rate for each weight individually.
+            *weight += full_gradient * learning_rate / adaptive_gradient_sqrt;
         }
 
         eprintln!("iterations: {iteration}");
