@@ -65,8 +65,10 @@ use std::{
     fs,
     io::{BufRead, BufReader},
     iter::Sum,
+    num::NonZero,
     ops::{Add, AddAssign, Div, Mul},
     str::FromStr,
+    thread::{available_parallelism, scope},
 };
 
 use crate::{
@@ -477,6 +479,41 @@ where
 /// Given a vector of [`TuneEntry`]s and a vector of weights, calculate the
 /// gradient for each weight from the partial derivative of the error.
 fn calculate_gradient(tune_entries: &TuneEntries, weights: &Weights, k: f64) -> Weights {
+    let mut gradients = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
+
+    let total_threads = available_parallelism().map_or(1, NonZero::get);
+    let slice_len = tune_entries.len() / total_threads;
+
+    scope(|s| {
+        let mut handles = Vec::new();
+
+        for thread in 0..(total_threads - 1) {
+            let slice_index = (thread * slice_len)..((thread + 1) * slice_len);
+            let tune_entries_slice = &tune_entries[slice_index];
+            handles.push(
+                s.spawn(move || calculate_gradient_for_slice(tune_entries_slice, weights, k)),
+            );
+        }
+        let slice_index = ((total_threads - 1) * slice_len)..;
+        let tune_entries_slice = &tune_entries[slice_index];
+        handles.push(s.spawn(move || calculate_gradient_for_slice(tune_entries_slice, weights, k)));
+
+        for handle in handles {
+            for (gradient, local_gradient) in gradients
+                .iter_mut()
+                .zip(handle.join().expect("a thread panicked, somehow").iter())
+            {
+                *gradient += *local_gradient;
+            }
+        }
+    });
+
+    gradients
+}
+
+/// Same as [`calculate_gradient()`] but takes a slice of [`TuneEntry`]s
+/// instead of a vector.
+fn calculate_gradient_for_slice(tune_entries: &[TuneEntry], weights: &Weights, k: f64) -> Weights {
     let mut gradients = vec![ScoreF64(0.0, 0.0); TOTAL_WEIGHTS];
 
     // error = 1/N * sum of (R - sigmoid(E))², where N is tune_entries.len()
