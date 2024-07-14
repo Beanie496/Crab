@@ -48,6 +48,8 @@
 //! because that's how OpenBench will run the argument.
 //! - `sample <path/to/some_book.epd>`: see module-level documentation of
 //! `game_sampler`. Requires the `sample` feature.
+//! - `tune <path/to/positions.fen>`: see module-level documentation of `tune`.
+//! Requires the `tune` feature.
 
 use std::{env::args, sync::mpsc::RecvError};
 
@@ -56,6 +58,8 @@ use engine::Engine;
 use fen_generation::generate_fens;
 #[cfg(feature = "sample")]
 use game_parser::sample_from_games;
+#[cfg(feature = "tune")]
+use tune::tune;
 
 /// Unit testing.
 mod bench;
@@ -85,6 +89,8 @@ mod perft;
 mod search;
 /// A transposition table.
 mod transposition_table;
+#[cfg(feature = "tune")]
+mod tune;
 /// Utility.
 mod util;
 
@@ -100,6 +106,11 @@ fn main() -> Result<(), RecvError> {
         #[cfg(feature = "sample")]
         if arg == "sample" {
             sample_from_games(args);
+            return Ok(());
+        }
+        #[cfg(feature = "tune")]
+        if arg == "tune" {
+            tune(&args.next().expect("expected positions file"));
             return Ok(());
         }
         let mut tokens = arg.split_whitespace();

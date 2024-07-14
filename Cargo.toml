@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 sample = ["dep:pgn-reader"]
+tune = []
 
 [lints.clippy]
 nursery = { level = "deny", priority = -1 }

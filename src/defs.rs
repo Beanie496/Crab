@@ -487,6 +487,13 @@ impl Side {
 }
 
 impl Square {
+    /// Mirrors the square vertically across the board.
+    ///
+    /// e.g. `Square::A2.flip() == Square::A7`.
+    pub const fn flip(self) -> Self {
+        Self(self.0 ^ 56)
+    }
+
     /// Converts `rank` and `file` into a [`Square`].
     pub const fn from_pos(rank: Rank, file: File) -> Self {
         Self(rank.0 * 8 + file.0)

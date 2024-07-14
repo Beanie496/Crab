@@ -26,7 +26,7 @@ use crate::{
 ///
 /// Order: pawn, knight, bishop, rook, queen, king.
 #[rustfmt::skip]
-const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [
+pub const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [
     Score(82, 94), Score(337, 281), Score(365, 297), Score(477, 512), Score(1025, 936), Score(10_000, 10_000),
 ];
 
@@ -35,7 +35,7 @@ const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [
 ///
 /// Order: pawn, knight, bishop, rook, queen, king.
 #[rustfmt::skip]
-const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = [
+pub const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = [
     [
         Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0),
         Score(-35, 13), Score(-1, 8), Score(-20, 8), Score(-23, 10), Score(-15, 13), Score(24, 0), Score(38, 2), Score(-22, -7),
