@@ -9,10 +9,10 @@ Features:
 - Aspiration windows
 - Principle variation search
 - A transposition table
+- Internal iterative reductions
 - Move ordering:
   - TT-move
   - MVV + SEE captures
-- Internal iterative reductions
 - Extensions:
   - Check extensions
 - Late move reductions

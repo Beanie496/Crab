@@ -82,7 +82,7 @@ pub fn search<NodeType: Node>(
     }
     let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
 
-    // Internal Iterative Reductions (IIR): if we don't have a TT move (either
+    // Internal iterative reductions (IIR): if we don't have a TT move (either
     // because we failed low last time or we because didn't even get a TT hit),
     // it is better to reduce now and hope we have a TT move next time, rather
     // than waste a lot of time doing a search with bad move ordering
