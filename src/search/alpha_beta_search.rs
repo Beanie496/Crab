@@ -33,6 +33,7 @@ use crate::{
 /// Returns the evaluation of after searching to the given depth. If `NodeType`
 /// is `Root`, `pv` will always have at least one legal move in it after the
 /// search.
+#[allow(clippy::cognitive_complexity)]
 pub fn search<NodeType: Node>(
     search_refs: &mut SearchReferences<'_>,
     pv: &mut Pv,
@@ -81,6 +82,26 @@ pub fn search<NodeType: Node>(
         }
     }
     let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
+
+    let static_eval = if is_in_check {
+        -INF_EVAL
+    } else if let Some(h) = tt_hit {
+        h.score()
+    } else {
+        evaluate(board)
+    };
+
+    if !NodeType::IS_PV && !is_in_check {
+        // Razoring: if we're close to a leaf node and the static eval is far
+        // below alpha, check if it can exceed alpha with a quiescence search.
+        // If it can't, assume alpha cannot be beaten at all and prune.
+        if can_razor(static_eval, alpha, depth) {
+            let quiescence_eval = quiescence_search(search_refs, board, alpha - 1, alpha, height);
+            if quiescence_eval < alpha {
+                return quiescence_eval;
+            }
+        }
+    }
 
     // Internal iterative reductions (IIR): if we don't have a TT move (either
     // because we failed low last time or we because didn't even get a TT hit),
@@ -284,6 +305,11 @@ fn quiescence_search(
     }
 
     best_score
+}
+
+/// Checks if razoring is applicable for the node.
+fn can_razor(static_eval: Eval, alpha: Eval, depth: Depth) -> bool {
+    depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha
 }
 
 /// Calculates how much to extend the search by.

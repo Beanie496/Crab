@@ -9,6 +9,7 @@ Features:
 - Aspiration windows
 - Principle variation search
 - A transposition table
+- Razoring
 - Internal iterative reductions
 - Move ordering:
   - TT-move
