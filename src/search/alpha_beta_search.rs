@@ -309,7 +309,7 @@ fn quiescence_search(
 
 /// Checks if razoring is applicable for the node.
 fn can_razor(static_eval: Eval, alpha: Eval, depth: Depth) -> bool {
-    depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha
+    depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 300) < alpha
 }
 
 /// Calculates how much to extend the search by.
