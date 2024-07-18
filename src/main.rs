@@ -16,6 +16,9 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// this prevents clippy complaining about 'OpenBench' not being in backticks
+#![allow(clippy::doc_markdown)]
+
 //! Crab, a UCI-compatible chess engine written in Rust.
 //!
 //! Accepted commands:
@@ -37,13 +40,26 @@
 //! - `ucinewgame`
 //! - `quit`
 //!
-//! This program also accepts `bench` as a command-line argument, which it will
-//! process and execute instead of running the UCI loop.
+//! If this program is given command-line arguments, it will execute them
+//! instead of the UCI look. Accepted command-line arguments:
+//! - `bench`: this is the same as the regular `bench` command
+//! - `genfens <N> seed <S> book <None|path/to/some_book.epd> [T]`: see
+//! [`generate_fens()`] for more detail. Note that this is **one** argument
+//! because that's how OpenBench will run the argument.
+//! - `sample <path/to/some_book.epd>`: see module-level documentation of
+//! `game_sampler`. Requires the `sample` feature.
+//! - `tune <path/to/positions.fen> [learning rate]`: see module-level
+//! documentation of `tune`. Requires the `tune` feature.
 
 use std::{env::args, sync::mpsc::RecvError};
 
 use bench::bench;
 use engine::Engine;
+use fen_generation::generate_fens;
+#[cfg(feature = "sample")]
+use game_parser::sample_from_games;
+#[cfg(feature = "tune")]
+use tune::tune;
 
 /// Unit testing.
 mod bench;
@@ -59,6 +75,10 @@ mod engine;
 mod error;
 /// Items related to evaluation.
 mod evaluation;
+/// Generation for openings in FEN.
+mod fen_generation;
+#[cfg(feature = "sample")]
+mod game_parser;
 /// Static lookup items.
 mod lookups;
 /// Items related to move generation.
@@ -69,6 +89,8 @@ mod perft;
 mod search;
 /// A transposition table.
 mod transposition_table;
+#[cfg(feature = "tune")]
+mod tune;
 /// Utility.
 mod util;
 
@@ -76,14 +98,28 @@ fn main() -> Result<(), RecvError> {
     let mut args = args();
     args.next();
 
-    // if it's on the command line, execute the `bench` command and return.
-    // Otherwise, continue as normal
-    if args.next().is_some_and(|s| s == "bench") {
-        // there's practically no difference between deallocating at the end of
-        // `bench()` and at the end of the program
-        bench(args.map(|s| s.leak() as &str));
-        Ok(())
-    } else {
-        Engine::new().main_loop()
+    if let Some(arg) = args.next() {
+        if arg == "bench" {
+            bench(args.map(|s| s.leak() as &str));
+            return Ok(());
+        }
+        #[cfg(feature = "sample")]
+        if arg == "sample" {
+            sample_from_games(args);
+            return Ok(());
+        }
+        #[cfg(feature = "tune")]
+        if arg == "tune" {
+            let openings_file = &args.next().expect("expected positions file");
+            let learning_rate = args.next().and_then(|lr| lr.parse().ok()).unwrap_or(0.1);
+            tune(openings_file, learning_rate);
+            return Ok(());
+        }
+        let mut tokens = arg.split_whitespace();
+        if tokens.next() == Some("genfens") {
+            generate_fens(tokens);
+            return Ok(());
+        }
     }
+    Engine::new().main_loop()
 }

@@ -66,7 +66,7 @@ static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 static PHASE_WEIGHTS: [Phase; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
 /// A blend between a middlegame and endgame value.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Score(pub Eval, pub Eval);
 
 impl Add for Score {
@@ -104,7 +104,7 @@ impl SubAssign for Score {
 impl Score {
     /// Lerps the score between its middlegame and endgame value depending on
     /// the phase.
-    fn lerp_to(self, phase: Phase) -> Eval {
+    pub fn lerp_to(self, phase: Phase) -> Eval {
         let phase = Eval::from(phase.min(24));
         let diff = self.1 - self.0;
         self.1 - (diff * phase) / 24

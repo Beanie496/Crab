@@ -138,7 +138,9 @@ pub fn aspiration_loop(
         );
 
         let time = search_refs.start.elapsed();
-        print_report(search_refs, time, score, pv, depth);
+        if search_refs.can_print {
+            print_report(search_refs, time, score, pv, depth);
+        }
 
         if search_refs.check_status() != SearchStatus::Continue {
             break score;

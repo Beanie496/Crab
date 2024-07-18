@@ -30,10 +30,10 @@ use crate::{
     util::{get_unchecked, insert_unchecked},
 };
 
-/// For running the main alpha-beta search within the aspiration loop.
-mod alpha_beta_search;
-/// For running the aspiration loop within the iterative deepening loop.
-mod aspiration;
+/// For running the main alpha-beta search.
+pub mod alpha_beta_search;
+/// For running the aspiration loop.
+pub mod aspiration;
 /// For running the iterative deepening loop.
 pub mod iterative_deepening;
 /// For selecting which order moves are searched in.
@@ -47,7 +47,7 @@ pub type Depth = u8;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
-trait Node {
+pub trait Node {
     const IS_PV: bool;
     const IS_ROOT: bool;
 }
@@ -57,7 +57,7 @@ struct NonPvNode;
 /// A node that could be in the final PV.
 struct PvNode;
 /// The node from which the search starts.
-struct RootNode;
+pub struct RootNode;
 
 impl Node for NonPvNode {
     const IS_ROOT: bool = false;
@@ -132,6 +132,8 @@ pub struct SearchReferences<'a> {
     nodes: u64,
     /// The status of the search: continue, stop or quit?
     status: SearchStatus,
+    /// If the search is allowed to print to stdout.
+    can_print: bool,
     /// The limits of the search.
     limits: Limits,
     /// How much time we're allocated.
@@ -146,6 +148,16 @@ pub struct SearchReferences<'a> {
     past_zobrists: ZobristStack,
     /// The transposition table.
     tt: &'a TranspositionTable,
+}
+
+/// Some of the final results of a search, which may or may not have been
+/// printed to stdout.
+#[allow(dead_code)]
+pub struct SearchReport {
+    /// How many positions were searched.
+    pub nodes: u64,
+    /// The final principle variation.
+    pub pv: Pv,
 }
 
 impl Default for Limits {
@@ -278,7 +290,7 @@ impl Limits {
 
 impl Pv {
     /// Returns a new 0-initialised [`Pv`].
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             moves: [Move::null(); Depth::MAX as usize],
             first_item: 0,
@@ -337,6 +349,7 @@ impl<'a> SearchReferences<'a> {
     /// given parameters.
     pub const fn new(
         start: Instant,
+        can_print: bool,
         limits: Limits,
         allocated: Duration,
         uci_rx: &'a Mutex<Receiver<String>>,
@@ -348,6 +361,7 @@ impl<'a> SearchReferences<'a> {
             seldepth: 0,
             nodes: 0,
             status: SearchStatus::Continue,
+            can_print,
             limits,
             allocated,
             uci_rx,
@@ -439,7 +453,7 @@ impl<'a> SearchReferences<'a> {
 
     /// Returns if the root node should print extra information.
     fn should_print(&mut self) -> bool {
-        self.start.elapsed() > Duration::from_millis(3000)
+        self.start.elapsed() > Duration::from_millis(3000) && self.can_print
     }
 
     /// Checks if the position is drawn, either because of repetition or
@@ -465,6 +479,13 @@ impl<'a> SearchReferences<'a> {
             // skip positions with the wrong stm
             .step_by(2)
             .any(|key| key == current_key)
+    }
+}
+
+impl SearchReport {
+    /// Creates a new [`SearchReport`].
+    pub const fn new(pv: Pv, nodes: u64) -> Self {
+        Self { nodes, pv }
     }
 }
 

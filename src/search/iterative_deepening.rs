@@ -20,14 +20,14 @@ use std::process::exit;
 
 use super::{
     aspiration::{aspiration_loop, AspirationWindow},
-    Depth, Pv, SearchReferences, SearchStatus,
+    Depth, Pv, SearchReferences, SearchReport, SearchStatus,
 };
 use crate::board::Board;
 
 /// Performs iterative deepening on the given board.
 ///
 /// Returns the number of positions searched.
-pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> u64 {
+pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
     let mut asp_window = AspirationWindow::new();
     let mut pv = Pv::new();
 
@@ -44,11 +44,13 @@ pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) 
         asp_window.adjust_around(score, depth);
     }
 
-    println!("bestmove {}", pv.get(0));
+    if search_refs.can_print {
+        println!("bestmove {}", pv.get(0));
+    }
 
     if search_refs.check_status() == SearchStatus::Quit {
         exit(0);
     }
 
-    search_refs.nodes
+    SearchReport::new(pv, search_refs.nodes)
 }
