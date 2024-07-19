@@ -323,7 +323,7 @@ fn can_razor(static_eval: Eval, alpha: Eval, depth: Depth) -> bool {
 
 /// Checks if reverse futility pruning is applicable for the node.
 fn can_reverse_futility_prune(static_eval: Eval, beta: Eval, depth: Depth) -> bool {
-    depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50)
+    depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 100)
 }
 
 /// Calculates how much to extend the search by.
