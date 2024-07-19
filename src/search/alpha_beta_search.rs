@@ -101,6 +101,16 @@ pub fn search<NodeType: Node>(
                 return quiescence_eval;
             }
         }
+
+        // Reverse futility pruning (a.k.a. child futility pruning): if the
+        // static evaluation is somewhat above beta, it's unlikely to decrease,
+        // so we can prune it. The exception is mate finding, where we could be
+        // getting mated and accidentally prune because the static eval is much
+        // better: the depth condition mitigates that.
+        if can_reverse_futility_prune(static_eval, beta, depth) {
+            // can't do (static_eval + beta) / 2 because of potential wraps
+            return static_eval / 2 + beta / 2;
+        }
     }
 
     // Internal iterative reductions (IIR): if we don't have a TT move (either
@@ -310,6 +320,11 @@ fn quiescence_search(
 /// Checks if razoring is applicable for the node.
 fn can_razor(static_eval: Eval, alpha: Eval, depth: Depth) -> bool {
     depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha
+}
+
+/// Checks if reverse futility pruning is applicable for the node.
+fn can_reverse_futility_prune(static_eval: Eval, beta: Eval, depth: Depth) -> bool {
+    depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50)
 }
 
 /// Calculates how much to extend the search by.

@@ -10,6 +10,7 @@ Features:
 - Principle variation search
 - A transposition table
 - Razoring
+- Reverse futility pruning
 - Internal iterative reductions
 - Move ordering:
   - TT-move
