@@ -108,7 +108,8 @@ pub fn search<NodeType: Node>(
         // getting mated and accidentally prune because the static eval is much
         // better: the depth condition mitigates that.
         if can_reverse_futility_prune(static_eval, beta, depth) {
-            return (static_eval + beta) / 2;
+            // can't do (static_eval + beta) / 2 because of potential wraps
+            return static_eval / 2 + beta / 2;
         }
     }
 
