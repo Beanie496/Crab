@@ -85,7 +85,7 @@ impl Worker<'_> {
         let static_eval = if is_in_check {
             -INF_EVAL
         } else if let Some(h) = tt_hit {
-            h.score()
+            h.static_eval()
         } else {
             evaluate(board)
         };
@@ -140,7 +140,7 @@ impl Worker<'_> {
             // so we can prune it. The exception is mate finding, where we could be
             // getting mated and accidentally prune because the static eval is much
             // better: the depth condition mitigates that.
-            if depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50) {
+            if depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 100) {
                 // can't do (static_eval + beta) / 2 because of potential wraps
                 return static_eval / 2 + beta / 2;
             }
@@ -286,8 +286,15 @@ impl Worker<'_> {
         } else {
             Bound::Exact
         };
-        let tt_entry =
-            TranspositionEntry::new(board.key(), best_score, best_move, depth, bound, height);
+        let tt_entry = TranspositionEntry::new(
+            board.key(),
+            static_eval,
+            best_score,
+            best_move,
+            depth,
+            bound,
+            height,
+        );
         self.state.tt.store(tt_entry);
 
         best_score
