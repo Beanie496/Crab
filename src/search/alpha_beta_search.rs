@@ -85,7 +85,7 @@ impl Worker<'_> {
         let static_eval = if is_in_check {
             -INF_EVAL
         } else if let Some(h) = tt_hit {
-            h.score()
+            h.static_eval()
         } else {
             evaluate(board)
         };
@@ -286,8 +286,15 @@ impl Worker<'_> {
         } else {
             Bound::Exact
         };
-        let tt_entry =
-            TranspositionEntry::new(board.key(), best_score, best_move, depth, bound, height);
+        let tt_entry = TranspositionEntry::new(
+            board.key(),
+            static_eval,
+            best_score,
+            best_move,
+            depth,
+            bound,
+            height,
+        );
         self.state.tt.store(tt_entry);
 
         best_score
