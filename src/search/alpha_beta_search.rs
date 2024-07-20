@@ -85,7 +85,7 @@ impl Worker<'_> {
         let static_eval = if is_in_check {
             -INF_EVAL
         } else if let Some(h) = tt_hit {
-            h.score()
+            h.static_eval()
         } else {
             evaluate(board)
         };
@@ -94,7 +94,7 @@ impl Worker<'_> {
             // Razoring: if we're close to a leaf node and the static eval is far
             // below alpha, check if it can exceed alpha with a quiescence search.
             // If it can't, assume alpha cannot be beaten at all and prune.
-            if depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha {
+            if depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 300) < alpha {
                 let quiescence_eval = self.quiescence_search(board, alpha - 1, alpha, height);
                 if quiescence_eval < alpha {
                     return quiescence_eval;
@@ -140,7 +140,7 @@ impl Worker<'_> {
             // so we can prune it. The exception is mate finding, where we could be
             // getting mated and accidentally prune because the static eval is much
             // better: the depth condition mitigates that.
-            if depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50) {
+            if depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 100) {
                 // can't do (static_eval + beta) / 2 because of potential wraps
                 return static_eval / 2 + beta / 2;
             }
@@ -286,8 +286,15 @@ impl Worker<'_> {
         } else {
             Bound::Exact
         };
-        let tt_entry =
-            TranspositionEntry::new(board.key(), best_score, best_move, depth, bound, height);
+        let tt_entry = TranspositionEntry::new(
+            board.key(),
+            static_eval,
+            best_score,
+            best_move,
+            depth,
+            bound,
+            height,
+        );
         self.state.tt.store(tt_entry);
 
         best_score
@@ -350,7 +357,7 @@ impl Worker<'_> {
 
 /// Calculates the reduction for a move.
 fn null_move_reduction(static_eval: Eval, beta: Eval, depth: Depth) -> Depth {
-    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 3
+    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 4
 }
 
 /// Calculates how much to extend the search by.
