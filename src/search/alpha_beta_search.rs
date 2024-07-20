@@ -86,7 +86,7 @@ pub fn search<NodeType: Node>(
     let static_eval = if is_in_check {
         -INF_EVAL
     } else if let Some(h) = tt_hit {
-        h.score()
+        h.static_eval()
     } else {
         evaluate(board)
     };
@@ -256,8 +256,15 @@ pub fn search<NodeType: Node>(
     } else {
         Bound::Exact
     };
-    let tt_entry =
-        TranspositionEntry::new(board.zobrist(), best_score, best_move, depth, bound, height);
+    let tt_entry = TranspositionEntry::new(
+        board.zobrist(),
+        static_eval,
+        best_score,
+        best_move,
+        depth,
+        bound,
+        height,
+    );
     search_refs.tt.store(board.zobrist(), tt_entry);
 
     best_score
