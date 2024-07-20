@@ -277,9 +277,23 @@ fn quiescence_search(
     search_refs.seldepth = search_refs.seldepth.max(height);
     search_refs.nodes += 1;
 
+    // load from tt
+    let tt_hit = search_refs.tt.load(board.zobrist(), height);
+    if let Some(h) = tt_hit {
+        if h.bound() == Bound::Exact
+            || h.bound() == Bound::Lower && h.score() >= beta
+            || h.bound() == Bound::Upper && h.score() <= alpha
+        {
+            return h.score();
+        }
+    }
+    let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
+
     let is_in_check = board.is_in_check();
     let mut best_score = if is_in_check {
         mated_in(height)
+    } else if let Some(h) = tt_hit {
+        h.score()
     } else {
         evaluate(board)
     };
@@ -290,9 +304,9 @@ fn quiescence_search(
     }
 
     let movepicker = if is_in_check {
-        MovePicker::new::<{ MoveType::EVASIONS }>(board, Move::null())
+        MovePicker::new::<{ MoveType::EVASIONS }>(board, tt_move)
     } else {
-        MovePicker::new::<{ MoveType::CAPTURES }>(board, Move::null())
+        MovePicker::new::<{ MoveType::CAPTURES }>(board, tt_move)
     };
 
     for mv in movepicker {
