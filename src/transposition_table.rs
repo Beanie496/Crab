@@ -26,6 +26,7 @@ use crate::{
     evaluation::{Eval, MATE_BOUND},
     movegen::Move,
     search::Depth,
+    util::get_unchecked,
 };
 
 /// The bound of a score depending on how it was obtained.
@@ -180,8 +181,7 @@ impl TranspositionTable {
 
     /// Returns the entry with the given key, or [`None`] if it doesn't exist.
     pub fn load(&self, key: Key, height: Depth) -> Option<TranspositionHit> {
-        // SAFETY: `index()` is guaranteed to be a valid index
-        let atomic_entry = unsafe { self.tt().get_unchecked(self.index(key)) };
+        let atomic_entry = get_unchecked(self.tt(), self.index(key));
         let upper_bits = atomic_entry[0].load(Ordering::Relaxed);
         let lower_bits = atomic_entry[1].load(Ordering::Relaxed);
         // XOR trick again - see comments in `Self::store()`
@@ -200,8 +200,7 @@ impl TranspositionTable {
     ///
     /// It uses the 'always-replace' strategy.
     pub fn store(&self, key: Key, entry: TranspositionEntry) {
-        // SAFETY: `index()` is guaranteed to be a valid index
-        let atomic_entry = unsafe { self.tt().get_unchecked(self.index(key)) };
+        let atomic_entry = get_unchecked(self.tt(), self.index(key));
         let bits: [u64; 2] = entry.into();
         let upper_bits = bits[0];
         let lower_bits = bits[1];
