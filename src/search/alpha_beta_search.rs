@@ -258,7 +258,7 @@ pub fn search<NodeType: Node>(
     };
     let tt_entry =
         TranspositionEntry::new(board.zobrist(), best_score, best_move, depth, bound, height);
-    search_refs.tt.store(board.zobrist(), tt_entry);
+    search_refs.tt.store(tt_entry);
 
     best_score
 }

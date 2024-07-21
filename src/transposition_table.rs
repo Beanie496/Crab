@@ -196,11 +196,11 @@ impl TranspositionTable {
         ))
     }
 
-    /// Stores an entry with the given key.
+    /// Stores an entry.
     ///
     /// It uses the 'always-replace' strategy.
-    pub fn store(&self, key: Key, entry: TranspositionEntry) {
-        let atomic_entry = get_unchecked(self.tt(), self.index(key));
+    pub fn store(&self, entry: TranspositionEntry) {
+        let atomic_entry = get_unchecked(self.tt(), self.index(entry.key));
         let bits: [u64; 2] = entry.into();
         let upper_bits = bits[0];
         let lower_bits = bits[1];
