@@ -86,7 +86,7 @@ pub fn search<NodeType: Node>(
     let static_eval = if is_in_check {
         -INF_EVAL
     } else if let Some(h) = tt_hit {
-        h.score()
+        h.static_eval()
     } else {
         evaluate(board)
     };
@@ -256,8 +256,15 @@ pub fn search<NodeType: Node>(
     } else {
         Bound::Exact
     };
-    let tt_entry =
-        TranspositionEntry::new(board.zobrist(), best_score, best_move, depth, bound, height);
+    let tt_entry = TranspositionEntry::new(
+        board.zobrist(),
+        static_eval,
+        best_score,
+        best_move,
+        depth,
+        bound,
+        height,
+    );
     search_refs.tt.store(board.zobrist(), tt_entry);
 
     best_score
@@ -288,20 +295,23 @@ fn quiescence_search(
         }
     }
     let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
-
     let is_in_check = board.is_in_check();
-    let mut best_score = if is_in_check {
+
+    let static_eval = if is_in_check {
         mated_in(height)
     } else if let Some(h) = tt_hit {
-        h.score()
+        h.static_eval()
     } else {
         evaluate(board)
     };
 
-    alpha = alpha.max(best_score);
+    alpha = alpha.max(static_eval);
     if alpha >= beta {
         return alpha;
     }
+
+    let mut best_score = static_eval;
+    let mut best_move = Move::null();
 
     let movepicker = if is_in_check {
         MovePicker::new::<{ MoveType::EVASIONS }>(board, tt_move)
@@ -322,11 +332,33 @@ fn quiescence_search(
         }
 
         best_score = best_score.max(score);
-        alpha = alpha.max(score);
-        if alpha >= beta {
-            return alpha;
+        if score > alpha {
+            best_move = mv;
+            alpha = score;
+
+            if alpha >= beta {
+                return alpha;
+            }
         }
     }
+
+    let bound = if best_score >= beta {
+        Bound::Lower
+    } else if best_move == Move::null() {
+        Bound::Upper
+    } else {
+        Bound::Exact
+    };
+    let tt_entry = TranspositionEntry::new(
+        board.zobrist(),
+        static_eval,
+        best_score,
+        best_move,
+        0,
+        bound,
+        height,
+    );
+    search_refs.tt.store(board.zobrist(), tt_entry);
 
     best_score
 }
