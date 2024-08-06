@@ -23,12 +23,13 @@ use std::{
 };
 
 use crate::{
-    engine::ZobristStack,
+    board::{Board, Key},
     evaluation::{is_mate, moves_to_mate, Eval},
     movegen::Move,
     transposition_table::TranspositionTable,
-    util::{get_unchecked, insert_unchecked},
+    util::{get_unchecked, insert_unchecked, Stack},
 };
+use time::calculate_time_window;
 
 /// For running the main alpha-beta search.
 pub mod alpha_beta_search;
@@ -44,6 +45,8 @@ pub mod time;
 /// The difference between the root or leaf node (for height or depth
 /// respectively) and the current node.
 pub type Depth = u8;
+/// A stack of zobrist keys.
+pub type ZobristStack = Stack<Key, { Depth::MAX as usize }>;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -122,14 +125,27 @@ pub struct Pv {
     first_empty: u8,
 }
 
-/// Various items needed throughout during the search.
-pub struct SearchReferences<'a> {
+/// The information that [`Worker`]s need to share between them.
+pub struct SharedState {
+    /// A receiver to receive UCI commands from.
+    pub uci_rx: Mutex<Receiver<String>>,
+    /// A hash table of previously-encountered positions.
+    pub tt: TranspositionTable,
+}
+
+/// Performs the searching.
+///
+/// It retains the working information of the search, so it can be queried for
+/// the final statistics of the search (nodes, time taken, etc.)
+pub struct Worker<'a> {
     /// The moment the search started.
     start: Instant,
     /// The maximum depth reached.
     seldepth: Depth,
     /// How many positions have been searched.
     nodes: u64,
+    /// The final PV from the initial position.
+    root_pv: Pv,
     /// The status of the search: continue, stop or quit?
     status: SearchStatus,
     /// If the search is allowed to print to stdout.
@@ -138,26 +154,22 @@ pub struct SearchReferences<'a> {
     limits: Limits,
     /// How much time we're allocated.
     allocated: Duration,
-    /// A receiver for the inputted UCI commands.
-    uci_rx: &'a Mutex<Receiver<String>>,
+    /// The overhead of sending a move.
+    ///
+    /// See [`UciOptions`](crate::uci::UciOptions).
+    move_overhead: Duration,
+    /// The initial board.
+    ///
+    /// See [`Board`].
+    board: Board,
     /// A stack of zobrist hashes of previous board states, beginning from the
-    /// FEN string in the initial `position fen ...` command.
+    /// initial `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     past_zobrists: ZobristStack,
-    /// The transposition table.
-    tt: &'a TranspositionTable,
-}
-
-/// Some of the final results of a search, which may or may not have been
-/// printed to stdout.
-#[allow(dead_code)]
-pub struct SearchReport {
-    /// How many positions were searched.
-    pub nodes: u64,
-    /// The final principle variation.
-    pub pv: Pv,
+    /// State that all threads have access to.
+    state: &'a SharedState,
 }
 
 impl Default for Limits {
@@ -344,30 +356,112 @@ impl Pv {
     }
 }
 
-impl<'a> SearchReferences<'a> {
-    /// Creates a new [`SearchReferences`], which includes but is not limited to the
-    /// given parameters.
-    pub const fn new(
-        start: Instant,
-        can_print: bool,
-        limits: Limits,
-        allocated: Duration,
-        uci_rx: &'a Mutex<Receiver<String>>,
-        past_zobrists: ZobristStack,
-        tt: &'a TranspositionTable,
-    ) -> Self {
+impl SharedState {
+    /// Created new [`SharedState`].
+    pub const fn new(uci_rx: Mutex<Receiver<String>>, tt: TranspositionTable) -> Self {
+        Self { uci_rx, tt }
+    }
+}
+
+impl<'a> Worker<'a> {
+    /// Creates a new [`Worker`].
+    ///
+    /// Each field starts off zeroed.
+    pub fn new(state: &'a SharedState) -> Self {
         Self {
-            start,
+            start: Instant::now(),
             seldepth: 0,
             nodes: 0,
+            root_pv: Pv::new(),
             status: SearchStatus::Continue,
-            can_print,
-            limits,
-            allocated,
-            uci_rx,
-            past_zobrists,
-            tt,
+            can_print: true,
+            limits: Limits::default(),
+            allocated: Duration::MAX,
+            move_overhead: Duration::ZERO,
+            board: Board::new(),
+            past_zobrists: ZobristStack::new(),
+            state,
         }
+    }
+
+    /// Calls [`Self::set_board()`] on `self`.
+    pub fn with_board(mut self, past_zobrists: ZobristStack, board: &Board) -> Self {
+        self.set_board(past_zobrists, board);
+        self
+    }
+
+    /// Sets whether or not the worker should print.
+    pub const fn with_printing(mut self, can_print: bool) -> Self {
+        self.can_print = can_print;
+        self
+    }
+
+    /// Sets the limits of the worker.
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Sets the overhead of sending the best move of the worker.
+    pub const fn with_move_overhead(mut self, move_overhead: Duration) -> Self {
+        self.move_overhead = move_overhead;
+        self
+    }
+
+    /// Sets the board of the worker to the given board and zobrist key
+    /// stack.
+    ///
+    /// The top entry of `past_zobrists` is assumed to be the key of `board`.
+    pub fn set_board(&mut self, past_zobrists: ZobristStack, board: &Board) {
+        self.past_zobrists = past_zobrists;
+        self.board = *board;
+    }
+
+    /// Clears the zobrist stack, sets the board to `board` and adds the key of
+    /// the board to the stack.
+    pub fn reset_board(&mut self, board: &Board) {
+        self.past_zobrists.clear();
+        self.past_zobrists.push(board.zobrist());
+        self.board = *board;
+    }
+
+    /// Starts the search.
+    ///
+    /// Each necessary field is reset.
+    pub fn start_search(&mut self) {
+        self.start = Instant::now();
+        self.seldepth = 0;
+        self.nodes = 0;
+        self.status = SearchStatus::Continue;
+        self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
+
+        self.iterative_deepening();
+    }
+
+    /// Returns the number of searched nodes.
+    pub const fn nodes(&self) -> u64 {
+        self.nodes
+    }
+
+    /// Returns a copy of the PV of the current positon.
+    #[allow(dead_code)]
+    pub fn root_pv(&self) -> Pv {
+        self.root_pv.clone()
+    }
+
+    /// Returns the time taken since the search started.
+    pub fn elapsed_time(&self) -> Duration {
+        self.start.elapsed()
+    }
+
+    /// Adds a zobrist key to the stack.
+    pub fn push_zobrist(&mut self, zobrist: Key) {
+        self.past_zobrists.push(zobrist);
+    }
+
+    /// Pops a zobrist key off the stack.
+    pub fn pop_zobrist(&mut self) -> Option<Key> {
+        self.past_zobrists.pop()
     }
 
     /// Check the status of the search.
@@ -382,7 +476,7 @@ impl<'a> SearchReferences<'a> {
         }
 
         #[allow(clippy::unwrap_used)]
-        if let Ok(token) = self.uci_rx.lock().unwrap().try_recv() {
+        if let Ok(token) = self.state.uci_rx.lock().unwrap().try_recv() {
             let token = token.trim();
             if token == "stop" {
                 self.status = SearchStatus::Stop;
@@ -480,41 +574,28 @@ impl<'a> SearchReferences<'a> {
             .step_by(2)
             .any(|key| key == current_key)
     }
-}
 
-impl SearchReport {
-    /// Creates a new [`SearchReport`].
-    pub const fn new(pv: Pv, nodes: u64) -> Self {
-        Self { nodes, pv }
+    /// Prints information about a completed search iteration.
+    fn print_report(&self, score: Eval, pv: &Pv, depth: Depth) {
+        let time = self.start.elapsed();
+        let nps = 1_000_000 * self.nodes / time.as_micros().max(1) as u64;
+
+        #[allow(clippy::unwrap_used)]
+        let score_str = if is_mate(score) {
+            format!("score mate {}", moves_to_mate(score))
+        } else {
+            format!("score cp {score}")
+        };
+
+        println!(
+            "info depth {} seldepth {} {score_str} hashfull {} nodes {} time {} nps {} pv {}",
+            depth,
+            self.seldepth,
+            self.state.tt.estimate_hashfull(),
+            self.nodes,
+            time.as_millis(),
+            nps,
+            pv,
+        );
     }
-}
-
-/// Prints information about a completed search iteration.
-fn print_report(
-    search_refs: &SearchReferences<'_>,
-    time: Duration,
-    score: Eval,
-    pv: &Pv,
-    depth: Depth,
-) {
-    let mut print_str = format!("info depth {} seldepth {}", depth, search_refs.seldepth);
-
-    #[allow(clippy::unwrap_used)]
-    if is_mate(score) {
-        write!(&mut print_str, " score mate {}", moves_to_mate(score))
-    } else {
-        write!(&mut print_str, " score cp {score}")
-    }
-    .unwrap();
-
-    let nps = 1_000_000 * search_refs.nodes / time.as_micros().max(1) as u64;
-
-    println!(
-        "{print_str} hashfull {} nodes {} time {} nps {} pv {}",
-        search_refs.tt.estimate_hashfull(),
-        search_refs.nodes,
-        time.as_millis(),
-        nps,
-        pv,
-    );
 }

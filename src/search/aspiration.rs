@@ -18,13 +18,10 @@
 
 use std::mem::size_of;
 
-use super::{
-    alpha_beta_search::search, print_report, Depth, Eval, Pv, RootNode, SearchReferences,
-    SearchStatus,
-};
-use crate::{board::Board, evaluation::INF_EVAL};
+use super::{Depth, Eval, Pv, RootNode, SearchStatus, Worker};
+use crate::evaluation::INF_EVAL;
 
-/// An aspiration window: a set of bounds used for [`search()`] and updated if
+/// An aspiration window: a set of bounds used for the search and updated if
 /// the returned score fails high or low.
 pub struct AspirationWindow {
     /// The lower bound.
@@ -115,50 +112,51 @@ impl AspirationWindow {
     }
 }
 
-/// Runs the aspiration loop on the given board.
-///
-/// See <https://www.chessprogramming.org/Aspiration_Windows>.
-/// `pv` does not need to be empty.
-pub fn aspiration_loop(
-    search_refs: &mut SearchReferences<'_>,
-    pv: &mut Pv,
-    board: &Board,
-    asp_window: &mut AspirationWindow,
-    depth: Depth,
-) -> Eval {
-    loop {
-        let score = search::<RootNode>(
-            search_refs,
-            pv,
-            board,
-            asp_window.alpha(),
-            asp_window.beta(),
-            depth,
-            0,
-        );
+impl Worker<'_> {
+    /// Runs the aspiration loop on the given board.
+    ///
+    /// See <https://www.chessprogramming.org/Aspiration_Windows>.
+    /// `pv` does not need to be empty.
+    pub fn aspiration_loop(
+        &mut self,
+        pv: &mut Pv,
+        asp_window: &mut AspirationWindow,
+        depth: Depth,
+    ) -> Eval {
+        let board = self.board;
 
-        let time = search_refs.start.elapsed();
-        if search_refs.can_print {
-            print_report(search_refs, time, score, pv, depth);
-        }
+        loop {
+            let score = self.search::<RootNode>(
+                pv,
+                &board,
+                asp_window.alpha(),
+                asp_window.beta(),
+                depth,
+                0,
+            );
 
-        if search_refs.check_status() != SearchStatus::Continue {
+            if self.can_print {
+                self.print_report(score, pv, depth);
+            }
+
+            if self.check_status() != SearchStatus::Continue {
+                break score;
+            }
+
+            // fail-low
+            if score <= asp_window.alpha() && asp_window.can_widen_down() {
+                asp_window.widen_down(score);
+                continue;
+            }
+
+            // fail-high
+            if score >= asp_window.beta() && asp_window.can_widen_up() {
+                asp_window.widen_up(score);
+                continue;
+            }
+
+            // exact score
             break score;
         }
-
-        // fail-low
-        if score <= asp_window.alpha() && asp_window.can_widen_down() {
-            asp_window.widen_down(score);
-            continue;
-        }
-
-        // fail-high
-        if score >= asp_window.beta() && asp_window.can_widen_up() {
-            asp_window.widen_up(score);
-            continue;
-        }
-
-        // exact score
-        break score;
     }
 }

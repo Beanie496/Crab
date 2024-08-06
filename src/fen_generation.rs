@@ -21,7 +21,6 @@ use std::{
     io::{BufRead, BufReader},
     path::Path,
     sync::{mpsc::channel, Mutex},
-    time::{Duration, Instant},
 };
 
 use oorandom::Rand64;
@@ -29,14 +28,9 @@ use oorandom::Rand64;
 use crate::{
     board::{Board, STARTPOS},
     defs::{MoveType, Side},
-    engine::ZobristStack,
     evaluation::Eval,
     movegen::generate_moves,
-    search::{
-        alpha_beta_search::search,
-        aspiration::{aspiration_loop, AspirationWindow},
-        Depth, Limits, Pv, RootNode, SearchReferences,
-    },
+    search::{aspiration::AspirationWindow, Depth, Limits, Pv, RootNode, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -87,15 +81,10 @@ where
     let mut pv = Pv::new();
     let rx = Mutex::new(channel().1);
     let tt = TranspositionTable::with_capacity(32);
-    let mut search_refs = SearchReferences::new(
-        Instant::now(),
-        false,
-        Limits::Infinite,
-        Duration::MAX,
-        &rx,
-        ZobristStack::new(),
-        &tt,
-    );
+    let state = SharedState::new(rx, tt);
+    let mut worker = Worker::new(&state)
+        .with_printing(false)
+        .with_limits(Limits::Infinite);
 
     // generate up to `average_openings_per_base_opening` number of openings
     // per base opening until there are no more left to generate
@@ -107,19 +96,15 @@ where
         let board = opening
             .parse::<Board>()
             .unwrap_or_else(|_| panic!("Error while parsing \"{opening}\""));
+        worker.reset_board(&board);
 
         let (alpha, beta) = if favoured_side == board.side_to_move() {
             (MIN_SCORE, MAX_SCORE)
         } else if favoured_side != Side::NONE {
             (-MAX_SCORE, -MIN_SCORE)
         } else {
-            let base_score = aspiration_loop(
-                &mut search_refs,
-                &mut pv,
-                &board,
-                &mut AspirationWindow::new(),
-                SEARCH_DEPTH,
-            );
+            let base_score =
+                worker.aspiration_loop(&mut pv, &mut AspirationWindow::new(), SEARCH_DEPTH);
             if base_score > 0 {
                 (MIN_SCORE, MAX_SCORE)
             } else {
@@ -129,7 +114,7 @@ where
 
         remaining_openings -= this_iteration_openings
             - generate_openings_for_board(
-                &mut search_refs,
+                &mut worker,
                 &mut pv,
                 &board,
                 this_iteration_openings,
@@ -198,7 +183,7 @@ where
 /// not too unbalanced.
 #[allow(clippy::too_many_arguments)]
 fn generate_openings_for_board(
-    search_refs: &mut SearchReferences<'_>,
+    worker: &mut Worker<'_>,
     pv: &mut Pv,
     board: &Board,
     mut required_openings: usize,
@@ -216,19 +201,22 @@ fn generate_openings_for_board(
 
     while let Some(mv) = all_moves.pop_random(rng) {
         let mut board_copy = *board;
-
         if !board_copy.make_move(mv) {
             continue;
         }
 
-        let score =
-            -search::<RootNode>(search_refs, pv, &board_copy, -beta, -alpha, SEARCH_DEPTH, 0);
+        worker.push_zobrist(board_copy.zobrist());
+
+        let score = -worker.search::<RootNode>(pv, &board_copy, -beta, -alpha, SEARCH_DEPTH, 0);
+
+        worker.pop_zobrist();
+
         if score <= alpha || score >= beta {
             continue;
         }
 
         required_openings = generate_openings_for_board(
-            search_refs,
+            worker,
             pv,
             &board_copy,
             required_openings,

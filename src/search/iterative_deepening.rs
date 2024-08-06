@@ -18,39 +18,38 @@
 
 use std::process::exit;
 
-use super::{
-    aspiration::{aspiration_loop, AspirationWindow},
-    Depth, Pv, SearchReferences, SearchReport, SearchStatus,
-};
-use crate::board::Board;
+use super::{aspiration::AspirationWindow, Depth, Pv, SearchStatus, Worker};
 
-/// Performs iterative deepening on the given board.
-///
-/// Returns the number of positions searched.
-pub fn iterative_deepening(mut search_refs: SearchReferences<'_>, board: Board) -> SearchReport {
-    let mut asp_window = AspirationWindow::new();
-    let mut pv = Pv::new();
+impl Worker<'_> {
+    /// Performs iterative deepening on the given board.
+    ///
+    /// Returns the number of positions searched.
+    pub fn iterative_deepening(&mut self) {
+        let mut asp_window = AspirationWindow::new();
+        let mut pv = Pv::new();
 
-    for depth in 1..Depth::MAX {
-        search_refs.seldepth = 0;
-        search_refs.status = SearchStatus::Continue;
+        for depth in 1..Depth::MAX {
+            self.seldepth = 0;
+            self.status = SearchStatus::Continue;
 
-        let score = aspiration_loop(&mut search_refs, &mut pv, &board, &mut asp_window, depth);
+            let score = self.aspiration_loop(&mut pv, &mut asp_window, depth);
 
-        if search_refs.should_stop(depth) {
-            break;
+            if self.should_stop(depth) {
+                break;
+            }
+
+            asp_window.adjust_around(score, depth);
         }
 
-        asp_window.adjust_around(score, depth);
-    }
+        self.root_pv.clear();
+        self.root_pv.append_pv(&mut pv);
 
-    if search_refs.can_print {
-        println!("bestmove {}", pv.get(0));
-    }
+        if self.can_print {
+            println!("bestmove {}", self.root_pv.get(0));
+        }
 
-    if search_refs.check_status() == SearchStatus::Quit {
-        exit(0);
+        if self.check_status() == SearchStatus::Quit {
+            exit(0);
+        }
     }
-
-    SearchReport::new(pv, search_refs.nodes)
 }

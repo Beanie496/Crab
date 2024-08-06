@@ -29,12 +29,8 @@ use std::{
     fs, io,
     num::NonZero,
     str::from_utf8,
-    sync::{
-        mpsc::{channel, Receiver},
-        Mutex,
-    },
+    sync::{mpsc::channel, Mutex},
     thread::{available_parallelism, scope},
-    time::{Duration, Instant},
 };
 
 use oorandom::Rand64;
@@ -44,33 +40,21 @@ use crate::{
     bitboard::Bitboard,
     board::{Board, STARTPOS},
     defs::{self, Piece, PieceType, Side},
-    engine::ZobristStack,
     movegen::{Move, LOOKUPS},
-    search::{iterative_deepening::iterative_deepening, Depth, Limits, SearchReferences},
+    search::{Depth, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
-
-/// A cache of parameters used for [`SearchReferences::new()`].
-#[allow(clippy::missing_docs_in_private_items)]
-struct SearchReferencesCache {
-    start: Instant,
-    can_print: bool,
-    limits: Limits,
-    allocated: Duration,
-    uci_rx: Mutex<Receiver<String>>,
-    tt: TranspositionTable,
-}
 
 /// Parses a game and outputs a few random positions from it with the PV of a
 /// high-depth search applied to them.
 ///
 /// It outputs a maximum of [`SAMPLE_LIMIT`](Self::SAMPLE_LIMIT) positions,
-/// does a depth [`SEARCH_DEPTH`](SearchReferencesCache::SEARCH_DEPTH) search
-/// and the output is to stdout in the format `format!("{board} {result}")`,
-/// where `result` is `1-0`, `0-1` or `1/2-1/2`.
+/// does a depth [`SEARCH_DEPTH`](Self::SEARCH_DEPTH) search and the output is
+/// to stdout in the format `format!("{board} {result}")`, where `result` is
+/// `1-0`, `0-1` or `1/2-1/2`.
 struct GameSampler {
-    /// Cached fields of [`SearchReferences`].
-    search_refs_cache: SearchReferencesCache,
+    /// State for each created worker.
+    state: SharedState,
     /// The state of the game so far.
     board: Board,
     /// The result of the current game.
@@ -84,9 +68,6 @@ struct GameSampler {
 impl GameSampler {
     /// The maximum number of positions to sample from a game.
     const SAMPLE_LIMIT: usize = 3;
-}
-
-impl SearchReferencesCache {
     /// The hash size (in MiB) of the transposition table.
     const HASH_SIZE_MIB: usize = 16;
     /// The depth to which each position is searched.
@@ -153,7 +134,7 @@ impl Visitor for GameSampler {
     fn end_game(&mut self) -> Self::Result {
         self.sample_positions();
 
-        self.search_refs_cache.tt.clear();
+        self.state.tt.clear();
         self.candidates.clear();
         Ok(())
     }
@@ -183,7 +164,10 @@ impl GameSampler {
     /// Creates a new [`GameSampler`].
     fn new() -> Self {
         Self {
-            search_refs_cache: SearchReferencesCache::new(),
+            state: SharedState::new(
+                Mutex::new(channel().1),
+                TranspositionTable::with_capacity(Self::HASH_SIZE_MIB),
+            ),
             // SAFETY: a hardcoded startpos cannot fail to be parsed
             board: unsafe { STARTPOS.parse().unwrap_unchecked() },
             result: String::from("1/2-1/2"),
@@ -300,44 +284,20 @@ impl GameSampler {
     /// moves in the PV, then prints the resulting board and its result to
     /// stdout in the format `format!("{board} {result}")`.
     fn sample_positions(&mut self) {
+        let mut worker = Worker::new(&self.state).with_limits(Limits::Depth(Self::SEARCH_DEPTH));
+
         for _ in 0..Self::SAMPLE_LIMIT {
             let random_index = self.rng.rand_range(0..self.candidates.len() as u64) as usize;
             let mut random_board = self.candidates.swap_remove(random_index);
 
-            let pv = iterative_deepening(self.search_refs_cache.new_search_refs(), random_board).pv;
+            worker.reset_board(&random_board);
+            worker.start_search();
 
-            for mv in pv {
+            for mv in worker.root_pv() {
                 random_board.make_move(mv);
             }
             println!("{random_board} {}", self.result);
         }
-    }
-}
-
-impl SearchReferencesCache {
-    /// Creates a new [`SearchReferencesCache`].
-    fn new() -> Self {
-        Self {
-            start: Instant::now(),
-            can_print: false,
-            limits: Limits::Depth(Self::SEARCH_DEPTH),
-            allocated: Duration::MAX,
-            uci_rx: Mutex::new(channel().1),
-            tt: TranspositionTable::with_capacity(Self::HASH_SIZE_MIB),
-        }
-    }
-
-    /// Creates a new [`SearchReferences`] out of the cached information.
-    const fn new_search_refs(&self) -> SearchReferences<'_> {
-        SearchReferences::new(
-            self.start,
-            self.can_print,
-            self.limits,
-            self.allocated,
-            &self.uci_rx,
-            ZobristStack::new(),
-            &self.tt,
-        )
     }
 }
 

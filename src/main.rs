@@ -54,12 +54,12 @@
 use std::{env::args, sync::mpsc::RecvError};
 
 use bench::bench;
-use engine::Engine;
 use fen_generation::generate_fens;
 #[cfg(feature = "sample")]
 use game_parser::sample_from_games;
 #[cfg(feature = "tune")]
 use tune::tune;
+use uci::main_loop;
 
 /// Unit testing.
 mod bench;
@@ -69,8 +69,6 @@ mod bitboard;
 mod board;
 /// Definitions and enumerations.
 mod defs;
-/// Items associated with [`Engine`].
-mod engine;
 /// Error variants.
 mod error;
 /// Items related to evaluation.
@@ -91,6 +89,8 @@ mod search;
 mod transposition_table;
 #[cfg(feature = "tune")]
 mod tune;
+/// Items for handling UCI input.
+mod uci;
 /// Utility.
 mod util;
 
@@ -121,5 +121,6 @@ fn main() -> Result<(), RecvError> {
             return Ok(());
         }
     }
-    Engine::new().main_loop()
+
+    main_loop()
 }

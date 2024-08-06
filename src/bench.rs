@@ -18,13 +18,12 @@
 
 use std::{
     sync::{mpsc::channel, Mutex},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use crate::{
     board::Board,
-    engine::ZobristStack,
-    search::{iterative_deepening::iterative_deepening, Limits, SearchReferences},
+    search::{Limits, SharedState, Worker, ZobristStack},
     transposition_table::TranspositionTable,
 };
 
@@ -65,9 +64,9 @@ where
         "movetime" => limits.set_movetime(Some(Duration::from_millis(limit))),
         _ => return,
     }
-    let (_tx, rx) = channel();
-    let rx = Mutex::new(rx);
-    let mut tt = TranspositionTable::with_capacity(tt_size);
+    let rx = Mutex::new(channel().1);
+    let tt = TranspositionTable::with_capacity(tt_size);
+    let mut state = SharedState::new(rx, tt);
 
     let mut total_time = Duration::ZERO;
     let mut total_nodes = 0;
@@ -77,22 +76,16 @@ where
 
         let board = position.parse::<Board>().expect("Malformed test position");
 
-        let start = Instant::now();
-        let search_refs = SearchReferences::new(
-            start,
-            true,
-            limits,
-            Duration::MAX,
-            &rx,
-            ZobristStack::new(),
-            &tt,
-        );
-        let nodes = iterative_deepening(search_refs, board).nodes;
-        let elapsed = start.elapsed();
+        let mut worker = Worker::new(&state)
+            .with_board(ZobristStack::new(), &board)
+            .with_limits(limits);
+        worker.start_search();
+        let elapsed = worker.elapsed_time();
+        let nodes = worker.nodes();
 
-        total_nodes += nodes;
         total_time += elapsed;
-        tt.clear();
+        total_nodes += nodes;
+        state.tt.clear();
     }
 
     let total_time = total_time.as_millis();
