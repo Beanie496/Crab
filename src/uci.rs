@@ -35,7 +35,7 @@ use crate::{
     movegen::generate_moves,
     movegen::magic::find_magics,
     perft::perft,
-    search::{Limits, SharedState, Worker, ZobristStack},
+    search::{Limits, SharedState, Worker, ZobristKeyStack},
     transposition_table::TranspositionTable,
 };
 
@@ -174,7 +174,7 @@ pub fn main_loop() -> Result<(), RecvError> {
 
     let mut options = UciOptions::new();
     let mut board = Board::new();
-    let mut past_zobrists = ZobristStack::new();
+    let mut past_keys = ZobristKeyStack::new();
     let tt = TranspositionTable::with_capacity(options.hash());
     let mut state = SharedState::new(Mutex::new(uci_rx), tt);
 
@@ -192,7 +192,7 @@ pub fn main_loop() -> Result<(), RecvError> {
                 find_magics::<{ PieceType::ROOK.0 }>();
             }
             Some("go") => {
-                go(tokens, &past_zobrists, &board, &options, &state);
+                go(tokens, &past_keys, &board, &options, &state);
             }
             Some("isready") => {
                 println!("readyok");
@@ -201,7 +201,7 @@ pub fn main_loop() -> Result<(), RecvError> {
                 board.pretty_print();
             }
             Some("position") => {
-                set_position(tokens, &mut past_zobrists, &mut board);
+                set_position(tokens, &mut past_keys, &mut board);
             }
             Some("setoption") => {
                 set_option(tokens, &mut options, &mut state);
@@ -212,8 +212,8 @@ pub fn main_loop() -> Result<(), RecvError> {
             }
             Some("ucinewgame") => {
                 board.set_startpos();
-                past_zobrists.clear();
-                past_zobrists.push(board.zobrist());
+                past_keys.clear();
+                past_keys.push(board.key());
                 state.tt.clear();
             }
             Some("quit") => {
@@ -230,7 +230,7 @@ pub fn main_loop() -> Result<(), RecvError> {
 /// Interprets and executes the `go` command.
 pub fn go<'b, T>(
     mut given_limits: T,
-    past_zobrists: &ZobristStack,
+    past_keys: &ZobristKeyStack,
     board: &Board,
     options: &UciOptions,
     state: &SharedState,
@@ -275,7 +275,7 @@ pub fn go<'b, T>(
 
         for _ in 0..options.threads() {
             let mut worker = Worker::new(state)
-                .with_board(past_zobrists.clone(), board)
+                .with_board(past_keys.clone(), board)
                 .with_printing(true)
                 .with_limits(limits)
                 .with_move_overhead(options.move_overhead());
@@ -292,12 +292,12 @@ pub fn go<'b, T>(
 ///
 /// Will not change anything if the command fails to get parsed
 /// successfully.
-pub fn set_position<'b, T>(mut tokens: T, old_zobrists: &mut ZobristStack, old_board: &mut Board)
+pub fn set_position<'b, T>(mut tokens: T, old_keys: &mut ZobristKeyStack, old_board: &mut Board)
 where
     T: Iterator<Item = &'b str>,
 {
     let mut board = Board::new();
-    let mut zobrists = ZobristStack::new();
+    let mut keys = ZobristKeyStack::new();
 
     match tokens.next() {
         Some("startpos") => board.set_startpos(),
@@ -329,7 +329,7 @@ where
             return;
         }
     }
-    zobrists.push(board.zobrist());
+    keys.push(board.key());
 
     // if there are no moves to begin with, this loop will just be skipped
     for mv in tokens {
@@ -370,14 +370,14 @@ where
 
         // we can safely discard all moves before an irreversible move
         if board.halfmoves() == 0 {
-            zobrists.clear();
+            keys.clear();
         }
 
-        zobrists.push(board.zobrist());
+        keys.push(board.key());
     }
 
     *old_board = board;
-    *old_zobrists = zobrists;
+    *old_keys = keys;
 }
 
 /// Sets a UCI option from a `setoption` command.

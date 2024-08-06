@@ -80,7 +80,7 @@ pub struct Board {
     /// The current zobrist key of the board.
     ///
     /// It is incrementally updated.
-    zobrist: Key,
+    key: Key,
 }
 
 /// Castling rights.
@@ -322,7 +322,7 @@ impl Board {
             fullmoves: 1,
             phase: 0,
             score: Score(0, 0),
-            zobrist: 0,
+            key: 0,
         }
     }
 
@@ -341,7 +341,7 @@ impl Board {
         println!("    a b c d e f g h");
         println!();
         println!("FEN: {self}");
-        println!("Zobrist key: {}", self.zobrist());
+        println!("Zobrist key: {}", self.key());
     }
 
     /// Returns the piece bitboard given by `PIECE`.
@@ -432,7 +432,7 @@ impl Board {
 
         // it's easiest just to unset them now and then re-set them later
         // rather than doing additional checks
-        self.toggle_castling_rights_zobrist(self.castling_rights());
+        self.toggle_castling_rights_key(self.castling_rights());
         self.clear_ep_square();
 
         self.move_piece(start, end, piece, piece_type, us);
@@ -540,7 +540,7 @@ impl Board {
             self.clear_castling_rights_for(us);
         }
 
-        self.toggle_castling_rights_zobrist(self.castling_rights());
+        self.toggle_castling_rights_key(self.castling_rights());
         self.flip_side();
 
         true
@@ -637,26 +637,26 @@ impl Board {
     /// Sets side to move to `side`.
     fn set_side_to_move(&mut self, side: Side) {
         if side == Side::BLACK {
-            self.toggle_side_zobrist();
+            self.toggle_side_key();
         }
         self.side_to_move = side;
     }
 
     /// Flip the side to move.
     fn flip_side(&mut self) {
-        self.toggle_side_zobrist();
+        self.toggle_side_key();
         self.side_to_move = self.side_to_move.flip();
     }
 
     /// Sets the en passant square to `square`.
     fn set_ep_square(&mut self, square: Square) {
-        self.toggle_ep_square_zobrist(square);
+        self.toggle_ep_square_key(square);
         self.ep_square = square;
     }
 
     /// Sets the en passant square to [`Square::NONE`].
     fn clear_ep_square(&mut self) {
-        self.toggle_ep_square_zobrist(self.ep_square());
+        self.toggle_ep_square_key(self.ep_square());
         self.ep_square = Square::NONE;
     }
 
@@ -670,7 +670,7 @@ impl Board {
             "Adding rights that already exist"
         );
         self.castling_rights.add_rights(rights);
-        self.toggle_castling_rights_zobrist(rights);
+        self.toggle_castling_rights_key(rights);
     }
 
     /// Removes all of the given rights, whether or not they already exist.

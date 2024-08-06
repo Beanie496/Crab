@@ -69,7 +69,7 @@ impl Worker<'_> {
         }
 
         // load from tt
-        let tt_hit = self.state.tt.load(board.zobrist(), height);
+        let tt_hit = self.state.tt.load(board.key(), height);
         if let Some(h) = tt_hit {
             if !NodeType::IS_PV
                 && h.depth() >= depth
@@ -131,7 +131,7 @@ impl Worker<'_> {
             if !copy.make_move(mv) {
                 continue;
             }
-            self.past_zobrists.push(copy.zobrist());
+            self.past_keys.push(copy.key());
             total_moves += 1;
 
             if NodeType::IS_ROOT && self.should_print() {
@@ -188,7 +188,7 @@ impl Worker<'_> {
                 );
             }
 
-            self.past_zobrists.pop();
+            self.past_keys.pop();
 
             // if the search was stopped early, we can't trust its results
             if self.check_status() != SearchStatus::Continue {
@@ -253,7 +253,7 @@ impl Worker<'_> {
             Bound::Exact
         };
         let tt_entry =
-            TranspositionEntry::new(board.zobrist(), best_score, best_move, depth, bound, height);
+            TranspositionEntry::new(board.key(), best_score, best_move, depth, bound, height);
         self.state.tt.store(tt_entry);
 
         best_score

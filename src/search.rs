@@ -46,7 +46,7 @@ pub mod time;
 /// respectively) and the current node.
 pub type Depth = u8;
 /// A stack of zobrist keys.
-pub type ZobristStack = Stack<Key, { Depth::MAX as usize }>;
+pub type ZobristKeyStack = Stack<Key, { Depth::MAX as usize }>;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -162,12 +162,12 @@ pub struct Worker<'a> {
     ///
     /// See [`Board`].
     board: Board,
-    /// A stack of zobrist hashes of previous board states, beginning from the
-    /// initial `position fen ...` command.
+    /// A stack of keys of previous board states, beginning from the initial
+    /// `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
-    past_zobrists: ZobristStack,
+    past_keys: ZobristKeyStack,
     /// State that all threads have access to.
     state: &'a SharedState,
 }
@@ -379,14 +379,14 @@ impl<'a> Worker<'a> {
             allocated: Duration::MAX,
             move_overhead: Duration::ZERO,
             board: Board::new(),
-            past_zobrists: ZobristStack::new(),
+            past_keys: ZobristKeyStack::new(),
             state,
         }
     }
 
     /// Calls [`Self::set_board()`] on `self`.
-    pub fn with_board(mut self, past_zobrists: ZobristStack, board: &Board) -> Self {
-        self.set_board(past_zobrists, board);
+    pub fn with_board(mut self, past_keys: ZobristKeyStack, board: &Board) -> Self {
+        self.set_board(past_keys, board);
         self
     }
 
@@ -411,17 +411,17 @@ impl<'a> Worker<'a> {
     /// Sets the board of the worker to the given board and zobrist key
     /// stack.
     ///
-    /// The top entry of `past_zobrists` is assumed to be the key of `board`.
-    pub fn set_board(&mut self, past_zobrists: ZobristStack, board: &Board) {
-        self.past_zobrists = past_zobrists;
+    /// The top entry of `past_keys` is assumed to be the key of `board`.
+    pub fn set_board(&mut self, past_keys: ZobristKeyStack, board: &Board) {
+        self.past_keys = past_keys;
         self.board = *board;
     }
 
-    /// Clears the zobrist stack, sets the board to `board` and adds the key of
-    /// the board to the stack.
+    /// Clears the key stack, sets the board to `board` and adds the key of the
+    /// board to the stack.
     pub fn reset_board(&mut self, board: &Board) {
-        self.past_zobrists.clear();
-        self.past_zobrists.push(board.zobrist());
+        self.past_keys.clear();
+        self.past_keys.push(board.key());
         self.board = *board;
     }
 
@@ -455,13 +455,13 @@ impl<'a> Worker<'a> {
     }
 
     /// Adds a zobrist key to the stack.
-    pub fn push_zobrist(&mut self, zobrist: Key) {
-        self.past_zobrists.push(zobrist);
+    pub fn push_key(&mut self, key: Key) {
+        self.past_keys.push(key);
     }
 
     /// Pops a zobrist key off the stack.
-    pub fn pop_zobrist(&mut self) -> Option<Key> {
-        self.past_zobrists.pop()
+    pub fn pop_key(&mut self) -> Option<Key> {
+        self.past_keys.pop()
     }
 
     /// Check the status of the search.
@@ -558,10 +558,10 @@ impl<'a> Worker<'a> {
             return true;
         }
 
-        let current_key = self.past_zobrists.peek();
+        let current_key = self.past_keys.peek();
 
         // check if any past position's key is the same as the current key
-        self.past_zobrists
+        self.past_keys
             .iter()
             // most recent position is last
             .rev()

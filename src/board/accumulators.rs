@@ -66,28 +66,28 @@ impl Board {
     }
 
     /// Gets the zobrist key.
-    pub const fn zobrist(&self) -> Key {
-        self.zobrist
+    pub const fn key(&self) -> Key {
+        self.key
     }
 
     /// Moves the accumulated `piece` from `start` to `end`.
     pub fn move_accumulated_piece(&mut self, start: Square, end: Square, piece: Piece) {
         self.move_piece_score(start, end, piece);
-        self.move_piece_zobrist(start, end, piece);
+        self.move_piece_key(start, end, piece);
     }
 
     /// Adds `piece` on `square` to the accumulators.
     pub fn add_accumulated_piece(&mut self, square: Square, piece: Piece) {
         self.add_piece_phase(piece);
         self.add_piece_score(square, piece);
-        self.toggle_piece_zobrist(square, piece);
+        self.toggle_piece_key(square, piece);
     }
 
     /// Removes `piece` on `square` from the accumulators.
     pub fn remove_accumulated_piece(&mut self, square: Square, piece: Piece) {
         self.remove_piece_phase(piece);
         self.remove_piece_score(square, piece);
-        self.toggle_piece_zobrist(square, piece);
+        self.toggle_piece_key(square, piece);
     }
 
     /// Adds the value of `piece` to the phase accumulator.
@@ -117,31 +117,31 @@ impl Board {
     }
 
     /// Removes the zobrist key of `piece` on `start` and adds it to `end`.
-    fn move_piece_zobrist(&mut self, start: Square, end: Square, piece: Piece) {
-        self.toggle_piece_zobrist(start, piece);
-        self.toggle_piece_zobrist(end, piece);
+    fn move_piece_key(&mut self, start: Square, end: Square, piece: Piece) {
+        self.toggle_piece_key(start, piece);
+        self.toggle_piece_key(end, piece);
     }
 
     /// Toggles the zobrist key of the given piece on the given square.
     ///
     /// `piece` can be [`Piece::NONE`] but `square` has to be a valid square.
-    fn toggle_piece_zobrist(&mut self, square: Square, piece: Piece) {
-        self.zobrist ^= ZOBRIST_KEYS.piece_key(square, piece);
+    fn toggle_piece_key(&mut self, square: Square, piece: Piece) {
+        self.key ^= ZOBRIST_KEYS.piece_key(square, piece);
     }
 
     /// Toggles the side to move zobrist key.
-    pub fn toggle_side_zobrist(&mut self) {
-        self.zobrist ^= ZOBRIST_KEYS.side_key();
+    pub fn toggle_side_key(&mut self) {
+        self.key ^= ZOBRIST_KEYS.side_key();
     }
 
     /// Toggles the zobrist keys of the given castling rights.
-    pub fn toggle_castling_rights_zobrist(&mut self, rights: CastlingRights) {
-        self.zobrist ^= ZOBRIST_KEYS.castling_rights_key(rights);
+    pub fn toggle_castling_rights_key(&mut self, rights: CastlingRights) {
+        self.key ^= ZOBRIST_KEYS.castling_rights_key(rights);
     }
 
     /// Toggles the zobrist keys of the given en passant square.
-    pub fn toggle_ep_square_zobrist(&mut self, square: Square) {
-        self.zobrist ^= ZOBRIST_KEYS.ep_square_key(square);
+    pub fn toggle_ep_square_key(&mut self, square: Square) {
+        self.key ^= ZOBRIST_KEYS.ep_square_key(square);
     }
 }
 

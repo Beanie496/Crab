@@ -205,11 +205,11 @@ fn generate_openings_for_board(
             continue;
         }
 
-        worker.push_zobrist(board_copy.zobrist());
+        worker.push_key(board_copy.key());
 
         let score = -worker.search::<RootNode>(pv, &board_copy, -beta, -alpha, SEARCH_DEPTH, 0);
 
-        worker.pop_zobrist();
+        worker.pop_key();
 
         if score <= alpha || score >= beta {
             continue;
