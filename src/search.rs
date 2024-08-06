@@ -396,9 +396,9 @@ impl<'a> Worker<'a> {
         self
     }
 
-    /// Sets the limits of the worker.
-    pub const fn with_limits(mut self, limits: Limits) -> Self {
-        self.limits = limits;
+    /// Calls [`Self::set_limits()`] on `self`.
+    pub fn with_limits(mut self, limits: Limits) -> Self {
+        self.set_limits(limits);
         self
     }
 
@@ -406,6 +406,11 @@ impl<'a> Worker<'a> {
     pub const fn with_move_overhead(mut self, move_overhead: Duration) -> Self {
         self.move_overhead = move_overhead;
         self
+    }
+
+    /// Sets the limits of the worker.
+    pub fn set_limits(&mut self, limits: Limits) {
+        self.limits = limits;
     }
 
     /// Sets the board of the worker to the given board and zobrist key

@@ -177,6 +177,13 @@ pub fn main_loop() -> Result<(), RecvError> {
     let mut past_keys = ZobristKeyStack::new();
     let tt = TranspositionTable::with_capacity(options.hash());
     let mut state = SharedState::new(Mutex::new(uci_rx), tt);
+    let mut workers = create_workers(
+        &state,
+        &past_keys,
+        &board,
+        options.threads(),
+        options.move_overhead(),
+    );
 
     loop {
         // the sender will never hang up
@@ -192,7 +199,7 @@ pub fn main_loop() -> Result<(), RecvError> {
                 find_magics::<{ PieceType::ROOK.0 }>();
             }
             Some("go") => {
-                go(tokens, &past_keys, &board, &options, &state);
+                go(tokens, &board, &mut workers);
             }
             Some("isready") => {
                 println!("readyok");
@@ -205,6 +212,13 @@ pub fn main_loop() -> Result<(), RecvError> {
             }
             Some("setoption") => {
                 set_option(tokens, &mut options, &mut state);
+                workers = create_workers(
+                    &state,
+                    &past_keys,
+                    &board,
+                    options.threads(),
+                    options.move_overhead(),
+                );
             }
             Some("uci") => {
                 UciOptions::print();
@@ -215,6 +229,13 @@ pub fn main_loop() -> Result<(), RecvError> {
                 past_keys.clear();
                 past_keys.push(board.key());
                 state.tt.clear();
+                workers = create_workers(
+                    &state,
+                    &past_keys,
+                    &board,
+                    options.threads(),
+                    options.move_overhead(),
+                );
             }
             Some("quit") => {
                 break Ok(());
@@ -228,13 +249,8 @@ pub fn main_loop() -> Result<(), RecvError> {
 }
 
 /// Interprets and executes the `go` command.
-pub fn go<'b, T>(
-    mut given_limits: T,
-    past_keys: &ZobristKeyStack,
-    board: &Board,
-    options: &UciOptions,
-    state: &SharedState,
-) where
+pub fn go<'a, 'b, T>(mut given_limits: T, board: &Board, workers: &mut Vec<Worker<'a>>)
+where
     T: Iterator<Item = &'b str>,
 {
     let mut limits = Limits::default();
@@ -271,19 +287,15 @@ pub fn go<'b, T>(
     }
 
     scope(|s| {
-        let mut workers = Vec::with_capacity(options.threads());
-
-        for _ in 0..options.threads() {
-            let mut worker = Worker::new(state)
-                .with_board(past_keys.clone(), board)
-                .with_printing(true)
-                .with_limits(limits)
-                .with_move_overhead(options.move_overhead());
-            workers.push(s.spawn(move || worker.start_search()));
-        }
+        let mut threads = Vec::with_capacity(workers.len());
 
         for worker in workers {
-            worker.join().expect("a thread panicked during the search");
+            worker.set_limits(limits);
+            threads.push(s.spawn(|| worker.start_search()));
+        }
+
+        for thread in threads {
+            thread.join().expect("a thread panicked during the search");
         }
     });
 }
@@ -429,6 +441,25 @@ where
         }
         _ => (),
     }
+}
+
+/// Creates `threads` [`Worker`]s.
+fn create_workers<'a>(
+    state: &'a SharedState,
+    past_keys: &ZobristKeyStack,
+    board: &Board,
+    threads: usize,
+    move_overhead: Duration,
+) -> Vec<Worker<'a>> {
+    let mut workers = Vec::with_capacity(threads);
+    for _ in 0..workers.capacity() {
+        let worker = Worker::new(state)
+            .with_board(past_keys.clone(), board)
+            .with_printing(true)
+            .with_move_overhead(move_overhead);
+        workers.push(worker);
+    }
+    workers
 }
 
 /// Parses an `Option<&str>` into an `Option<T>`.
