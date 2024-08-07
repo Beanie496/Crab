@@ -20,7 +20,7 @@ use super::{movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchStat
 use crate::{
     board::Board,
     defs::MoveType,
-    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
+    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
     lookups::base_reductions,
     movegen::Move,
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
@@ -101,6 +101,40 @@ impl Worker<'_> {
                 }
             }
 
+            // Null move pruning: if we can give the opponent a free move (by
+            // not moving a piece this move) and the resulting evaluation on a
+            // reduced-depth search is above beta, we will probably be able to
+            // beat beta if we do have a move. The only time this isn't true is
+            // in zugzwang, which usually happens in king + pawn endgames.
+            if self.nmp_rights.can_make_null_move(board.side_to_move())
+                && depth >= 3
+                && static_eval >= beta
+                && beta > -MATE_BOUND
+                && board.has_non_pawn_pieces()
+            {
+                let reduction = null_move_reduction(static_eval, beta, depth);
+
+                self.nmp_rights.remove_right(board.side_to_move());
+                let mut copy = *board;
+                copy.make_null_move();
+
+                let mut new_pv = Pv::new();
+                let score = -self.search::<NonPvNode>(
+                    &mut new_pv,
+                    &copy,
+                    -beta,
+                    -alpha,
+                    depth.saturating_sub(reduction),
+                    height + 1,
+                );
+
+                self.nmp_rights.add_right(board.side_to_move());
+
+                if score >= beta && score < MATE_BOUND {
+                    return score;
+                }
+            }
+
             // Reverse futility pruning (a.k.a. child futility pruning): if the
             // static evaluation is somewhat above beta, it's unlikely to decrease,
             // so we can prune it. The exception is mate finding, where we could be
@@ -154,7 +188,7 @@ impl Worker<'_> {
             // then exceeds alpha, then great: we've found a better move.)
             let mut score = 0;
             if !NodeType::IS_PV || total_moves > 1 {
-                let reduction = reduction(depth, total_moves);
+                let reduction = late_move_reduction(depth, total_moves);
 
                 score = -self.search::<NonPvNode>(
                     &mut new_pv,
@@ -314,6 +348,11 @@ impl Worker<'_> {
     }
 }
 
+/// Calculates the reduction for a move.
+fn null_move_reduction(static_eval: Eval, beta: Eval, depth: Depth) -> Depth {
+    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 3
+}
+
 /// Calculates how much to extend the search by.
 const fn extension(is_in_check: bool) -> Depth {
     // more to come of course...
@@ -325,7 +364,7 @@ const fn extension(is_in_check: bool) -> Depth {
 }
 
 /// Calculates how much to reduce the search by during late move reductions.
-fn reduction(depth: Depth, total_moves: u8) -> Depth {
+fn late_move_reduction(depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
         base_reductions(depth, total_moves)
     } else {

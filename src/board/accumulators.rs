@@ -140,6 +140,8 @@ impl Board {
     }
 
     /// Toggles the zobrist keys of the given en passant square.
+    ///
+    /// This does nothing if `square` isn't a valid en passant square.
     pub fn toggle_ep_square_key(&mut self, square: Square) {
         self.key ^= ZOBRIST_KEYS.ep_square_key(square);
     }
