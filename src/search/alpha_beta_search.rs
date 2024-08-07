@@ -94,7 +94,7 @@ impl Worker<'_> {
             // Razoring: if we're close to a leaf node and the static eval is far
             // below alpha, check if it can exceed alpha with a quiescence search.
             // If it can't, assume alpha cannot be beaten at all and prune.
-            if can_razor(static_eval, alpha, depth) {
+            if depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha {
                 let quiescence_eval = self.quiescence_search(board, alpha - 1, alpha, height);
                 if quiescence_eval < alpha {
                     return quiescence_eval;
@@ -106,7 +106,7 @@ impl Worker<'_> {
             // so we can prune it. The exception is mate finding, where we could be
             // getting mated and accidentally prune because the static eval is much
             // better: the depth condition mitigates that.
-            if can_reverse_futility_prune(static_eval, beta, depth) {
+            if depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50) {
                 // can't do (static_eval + beta) / 2 because of potential wraps
                 return static_eval / 2 + beta / 2;
             }
@@ -312,16 +312,6 @@ impl Worker<'_> {
 
         best_score
     }
-}
-
-/// Checks if razoring is applicable for the node.
-fn can_razor(static_eval: Eval, alpha: Eval, depth: Depth) -> bool {
-    depth <= 4 && static_eval.saturating_add(Eval::from(depth) * 200) < alpha
-}
-
-/// Checks if reverse futility pruning is applicable for the node.
-fn can_reverse_futility_prune(static_eval: Eval, beta: Eval, depth: Depth) -> bool {
-    depth <= 8 && static_eval > beta.saturating_add(Eval::from(depth) * 50)
 }
 
 /// Calculates how much to extend the search by.
