@@ -109,7 +109,7 @@ impl Worker<'_> {
                 copy.make_null_move();
 
                 let mut new_pv = Pv::new();
-                let score = -self.search::<NonPvNode>(
+                let mut score = -self.search::<NonPvNode>(
                     &mut new_pv,
                     &copy,
                     -beta,
@@ -121,7 +121,27 @@ impl Worker<'_> {
                 self.nmp_rights.add_right(board.side_to_move());
 
                 if score >= beta && score < MATE_BOUND {
-                    return score;
+                    if depth <= 8 {
+                        return score;
+                    }
+
+                    self.nmp_rights.remove_right(board.side_to_move());
+
+                    new_pv.clear();
+                    score = self.search::<NonPvNode>(
+                        &mut new_pv,
+                        board,
+                        alpha,
+                        beta,
+                        depth.saturating_sub(reduction),
+                        height,
+                    );
+
+                    self.nmp_rights.add_right(board.side_to_move());
+
+                    if score >= beta {
+                        return score;
+                    }
                 }
             }
         }
