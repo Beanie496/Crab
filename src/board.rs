@@ -546,15 +546,6 @@ impl Board {
         true
     }
 
-    /// Makes a null move.
-    ///
-    /// This flips the side to move, clears the en passant square and does
-    /// nothing else.
-    pub fn make_null_move(&mut self) {
-        self.clear_ep_square();
-        self.flip_side();
-    }
-
     /// Moves `piece` from `start` to `end`, updating all relevant fields.
     ///
     /// `piece == Piece::from_piecetype(piece_type, side)`. Having the two
@@ -739,16 +730,6 @@ impl Board {
         Square::from(
             self.piece::<{ PieceType::KING.to_index() }>() & self.side_any(self.side_to_move()),
         )
-    }
-
-    /// Checks if there are pieces on the board that aren't pawns (or kings).
-    #[rustfmt::skip]
-    pub const fn has_non_pawn_pieces(&self) -> bool {
-        self.piece::<{ PieceType::KNIGHT.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::BISHOP.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::ROOK.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::QUEEN.to_index() }>().0.count_ones()
-            > 0
     }
 
     /// Returns all the attackers from the given side to move to the given
