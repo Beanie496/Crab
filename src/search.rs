@@ -24,6 +24,7 @@ use std::{
 
 use crate::{
     board::{Board, Key},
+    defs::Side,
     evaluation::{is_mate, moves_to_mate, Eval},
     movegen::Move,
     transposition_table::TranspositionTable,
@@ -112,6 +113,12 @@ enum SearchStatus {
     Quit,
 }
 
+/// Whether White, Black or both sides can do a null move within a search.
+#[allow(clippy::missing_docs_in_private_items)]
+struct NmpRights {
+    rights: u8,
+}
+
 /// The principle variation: the current best sequence of moves for both sides.
 #[derive(Clone)]
 pub struct Pv {
@@ -148,6 +155,8 @@ pub struct Worker<'a> {
     root_pv: Pv,
     /// The status of the search: continue, stop or quit?
     status: SearchStatus,
+    /// Which side (if at all) null move pruning is allowed for.
+    nmp_rights: NmpRights,
     /// If the search is allowed to print to stdout.
     can_print: bool,
     /// The limits of the search.
@@ -170,6 +179,15 @@ pub struct Worker<'a> {
     past_keys: ZobristKeyStack,
     /// State that all threads have access to.
     state: &'a SharedState,
+}
+
+impl NmpRights {
+    /// The flag for Black being able to make a null move.
+    const BLACK: u8 = 0b01;
+    /// The flag for White being able to make a null move.
+    const WHITE: u8 = 0b10;
+    /// The flag for both sides being able to make a null move.
+    const BOTH: u8 = Self::BLACK | Self::WHITE;
 }
 
 impl Default for Limits {
@@ -300,6 +318,46 @@ impl Limits {
     }
 }
 
+impl NmpRights {
+    /// Creates new [`NmpRights`] with both rights being enabled.
+    const fn new() -> Self {
+        Self { rights: Self::BOTH }
+    }
+
+    /// Checks if `side` can make a null move.
+    #[allow(clippy::assertions_on_constants)]
+    fn can_make_null_move(&self, side: Side) -> bool {
+        assert!(
+            Self::BLACK == Side::BLACK.0 + 1,
+            "this function breaks without this precondition"
+        );
+        assert!(
+            Self::WHITE == Side::WHITE.0 + 1,
+            "this function breaks without this precondition"
+        );
+
+        self.rights & (side.0 + 1) != 0
+    }
+
+    /// Adds the right of `side`.
+    fn add_right(&mut self, side: Side) {
+        debug_assert!(
+            !self.can_make_null_move(side),
+            "adding a right to a side that already has it"
+        );
+        self.rights ^= side.0 + 1;
+    }
+
+    /// Removes the right of `side`.
+    fn remove_right(&mut self, side: Side) {
+        debug_assert!(
+            self.can_make_null_move(side),
+            "removing a nmp right from a side that doesn't have it"
+        );
+        self.rights ^= side.0 + 1;
+    }
+}
+
 impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     pub const fn new() -> Self {
@@ -374,6 +432,7 @@ impl<'a> Worker<'a> {
             nodes: 0,
             root_pv: Pv::new(),
             status: SearchStatus::Continue,
+            nmp_rights: NmpRights::new(),
             can_print: true,
             limits: Limits::default(),
             allocated: Duration::MAX,
@@ -438,6 +497,7 @@ impl<'a> Worker<'a> {
         self.seldepth = 0;
         self.nodes = 0;
         self.status = SearchStatus::Continue;
+        self.nmp_rights = NmpRights::new();
         self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
 
         self.iterative_deepening();
