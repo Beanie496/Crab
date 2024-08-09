@@ -20,7 +20,7 @@ use super::{movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchStat
 use crate::{
     board::Board,
     defs::MoveType,
-    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL},
+    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
     lookups::base_reductions,
     movegen::Move,
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
@@ -81,6 +81,50 @@ impl Worker<'_> {
             }
         }
         let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
+
+        let static_eval = if is_in_check {
+            -INF_EVAL
+        } else if let Some(h) = tt_hit {
+            h.static_eval()
+        } else {
+            evaluate(board)
+        };
+
+        if !NodeType::IS_PV && !is_in_check {
+            // Null move pruning: if we can give the opponent a free move (by
+            // not moving a piece this move) and the resulting evaluation on a
+            // reduced-depth search is above beta, we will probably be able to
+            // beat beta if we do have a move. The only time this isn't true is
+            // in zugzwang, which usually happens in king + pawn endgames.
+            if self.nmp_rights.can_make_null_move(board.side_to_move())
+                && depth >= 3
+                && static_eval >= beta
+                && beta > -MATE_BOUND
+                && board.has_non_pawn_pieces()
+            {
+                let reduction = null_move_reduction(static_eval, beta, depth);
+
+                self.nmp_rights.remove_right(board.side_to_move());
+                let mut copy = *board;
+                copy.make_null_move();
+
+                let mut new_pv = Pv::new();
+                let score = -self.search::<NonPvNode>(
+                    &mut new_pv,
+                    &copy,
+                    -beta,
+                    -alpha,
+                    depth.saturating_sub(reduction),
+                    height + 1,
+                );
+
+                self.nmp_rights.add_right(board.side_to_move());
+
+                if score >= beta && score < MATE_BOUND {
+                    return score;
+                }
+            }
+        }
 
         // Internal iterative reductions (IIR): if we don't have a TT move (either
         // because we failed low last time or we because didn't even get a TT hit),
@@ -222,8 +266,15 @@ impl Worker<'_> {
         } else {
             Bound::Exact
         };
-        let tt_entry =
-            TranspositionEntry::new(board.key(), best_score, best_move, depth, bound, height);
+        let tt_entry = TranspositionEntry::new(
+            board.key(),
+            static_eval,
+            best_score,
+            best_move,
+            depth,
+            bound,
+            height,
+        );
         self.state.tt.store(tt_entry);
 
         best_score
@@ -282,6 +333,11 @@ impl Worker<'_> {
 
         best_score
     }
+}
+
+/// Calculates the reduction for a move.
+fn null_move_reduction(static_eval: Eval, beta: Eval, depth: Depth) -> Depth {
+    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 3
 }
 
 /// Calculates how much to extend the search by.
