@@ -337,7 +337,7 @@ impl Worker<'_> {
 
 /// Calculates the reduction for a move.
 fn null_move_reduction(static_eval: Eval, beta: Eval, depth: Depth) -> Depth {
-    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 4
+    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 3
 }
 
 /// Calculates how much to extend the search by.
