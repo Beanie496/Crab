@@ -128,6 +128,7 @@ impl Worker<'_> {
                     self.nmp_rights.remove_right(board.side_to_move());
 
                     new_pv.clear();
+                    // do a verification search at higher depths
                     score = self.search::<NonPvNode>(
                         &mut new_pv,
                         board,
