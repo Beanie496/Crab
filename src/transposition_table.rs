@@ -49,6 +49,8 @@ pub enum Bound {
 pub struct TranspositionEntry {
     /// The key, used as a checksum.
     key: Key,
+    /// The static evaluation of the position.
+    static_eval: Eval,
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
@@ -57,14 +59,13 @@ pub struct TranspositionEntry {
     depth: Depth,
     /// The bound of the score.
     bound: Bound,
-    /// The compiler would do this anyway but I want the location to be
-    /// explicit.
-    _padding: u16,
 }
 
 /// The information from a successful transposition table lookup.
 #[derive(Clone, Copy)]
 pub struct TranspositionHit {
+    /// The static evaluation of the position.
+    static_eval: Eval,
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
@@ -99,14 +100,22 @@ impl From<TranspositionEntry> for [u64; 2] {
 
 impl TranspositionEntry {
     /// Creates a new [`TranspositionEntry`] with the given attributes.
-    pub fn new(key: Key, score: Eval, mv: Move, depth: Depth, bound: Bound, height: Depth) -> Self {
+    pub fn new(
+        key: Key,
+        static_eval: Eval,
+        score: Eval,
+        mv: Move,
+        depth: Depth,
+        bound: Bound,
+        height: Depth,
+    ) -> Self {
         Self {
             key,
+            static_eval,
             score: normalise(score, height),
             mv,
             depth,
             bound,
-            _padding: 0,
         }
     }
 
@@ -118,13 +127,26 @@ impl TranspositionEntry {
 
 impl TranspositionHit {
     /// Creates a new [`TranspositionHit`].
-    fn new(score: Eval, mv: Move, depth: Depth, bound: Bound, height: Depth) -> Self {
+    fn new(
+        static_eval: Eval,
+        score: Eval,
+        mv: Move,
+        depth: Depth,
+        bound: Bound,
+        height: Depth,
+    ) -> Self {
         Self {
+            static_eval,
             score: denormalise(score, height),
             mv,
             depth,
             bound,
         }
+    }
+
+    /// Returns the static evaluation.
+    pub const fn static_eval(self) -> Eval {
+        self.static_eval
     }
 
     /// Returns the score.
@@ -188,6 +210,7 @@ impl TranspositionTable {
         let entry = TranspositionEntry::from([upper_bits ^ lower_bits, lower_bits]);
 
         entry.matches(key).then_some(TranspositionHit::new(
+            entry.static_eval,
             entry.score,
             entry.mv,
             entry.depth,
