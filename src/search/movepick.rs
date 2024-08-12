@@ -127,7 +127,7 @@ impl MovePicker {
     /// `tt_move`.
     ///
     /// If `tt_move == Move::null()`, it will be ignored.
-    pub fn new<const MOVE_TYPE: u8>(board: &Board, tt_move: Move) -> Self {
+    pub fn new<const MOVE_TYPE: u8>(board: &Board, tt_move: Option<Move>) -> Self {
         let mut moves = generate_moves::<MOVE_TYPE>(board).score::<MOVE_TYPE>(board, tt_move);
         moves.sort();
         Self { moves }
@@ -137,7 +137,7 @@ impl MovePicker {
 impl Moves {
     /// Scores the moves in `moves`, given the information in `search_info` and
     /// the current height.
-    pub fn score<const MOVE_TYPE: u8>(self, board: &Board, tt_move: Move) -> ScoredMoves {
+    pub fn score<const MOVE_TYPE: u8>(self, board: &Board, tt_move: Option<Move>) -> ScoredMoves {
         self.into_iter()
             .map(|mv| ScoredMove::new::<MOVE_TYPE>(board, mv, tt_move))
             .collect()
@@ -146,8 +146,8 @@ impl Moves {
 
 impl ScoredMove {
     /// Scores a [`Move`].
-    pub fn new<const MOVE_TYPE: u8>(board: &Board, mv: Move, tt_move: Move) -> Self {
-        if MOVE_TYPE != MoveType::CAPTURES && mv == tt_move {
+    pub fn new<const MOVE_TYPE: u8>(board: &Board, mv: Move, tt_move: Option<Move>) -> Self {
+        if MOVE_TYPE != MoveType::CAPTURES && Some(mv) == tt_move {
             return Self {
                 mv,
                 score: TT_SCORE,

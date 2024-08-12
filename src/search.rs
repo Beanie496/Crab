@@ -18,6 +18,7 @@
 
 use std::{
     fmt::{self, Display, Formatter, Write},
+    mem::MaybeUninit,
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
@@ -125,13 +126,20 @@ struct NmpRights {
 #[derive(Clone)]
 pub struct Pv {
     /// A non-circular queue of moves.
-    moves: [Move; Depth::MAX as usize],
+    moves: [MaybeUninit<Move>; Depth::MAX as usize],
     /// Index of the first [`Move`].
     ///
     /// This will be equal to `first_empty` if there are no [`Move`]s.
     first_item: u8,
     /// Index of the first empty space.
     first_empty: u8,
+}
+
+struct PvIter<'a> {
+    /// A slice of moves to iterate over.
+    moves: &'a [MaybeUninit<Move>],
+    /// The index of the next move to return.
+    index: usize,
 }
 
 /// The information that [`Worker`]s need to share between them.
@@ -201,7 +209,7 @@ impl Default for Limits {
 impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
-        for mv in self.moves() {
+        for mv in self.iter() {
             write!(ret_str, "{mv} ")?;
         }
         ret_str.pop();
@@ -214,6 +222,19 @@ impl Iterator for Pv {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.dequeue()
+    }
+}
+
+impl<'a> Iterator for PvIter<'a> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        (self.index < self.moves.len()).then(|| {
+            let mv = *get_unchecked(self.moves, self.index);
+            self.index += 1;
+            // SAFETY: all moves within `self.moves` are initialised
+            unsafe { mv.assume_init_read() }
+        })
     }
 }
 
@@ -364,7 +385,7 @@ impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     pub const fn new() -> Self {
         Self {
-            moves: [Move::null(); Depth::MAX as usize],
+            moves: [MaybeUninit::uninit(); Depth::MAX as usize],
             first_item: 0,
             first_empty: 0,
         }
@@ -381,7 +402,11 @@ impl Pv {
 
     /// Adds a [`Move`] to the back of the queue.
     fn enqueue(&mut self, mv: Move) {
-        insert_unchecked(&mut self.moves, self.first_empty as usize, mv);
+        insert_unchecked(
+            &mut self.moves,
+            self.first_empty as usize,
+            MaybeUninit::new(mv),
+        );
         self.first_empty += 1;
     }
 
@@ -390,7 +415,9 @@ impl Pv {
         (self.first_item < self.first_empty).then(|| {
             let mv = *get_unchecked(&self.moves, self.first_item as usize);
             self.first_item += 1;
-            mv
+            // SAFETY: all moves within `self.first_item..self.first_empty` are
+            // initialised
+            unsafe { mv.assume_init_read() }
         })
     }
 
@@ -401,18 +428,24 @@ impl Pv {
     }
 
     /// Returns a slice to the moves of the queue.
-    fn moves(&self) -> &[Move] {
-        &self.moves[(self.first_item as usize)..(self.first_empty as usize)]
-    }
-
-    /// Gets the [`Move`] at the given index.
-    fn get(&self, index: usize) -> Move {
-        *get_unchecked(&self.moves, index)
+    fn iter(&self) -> PvIter<'_> {
+        PvIter::new(self)
     }
 
     /// Calculates the length of the queue.
     fn len(&self) -> usize {
         usize::from(self.first_empty - self.first_item)
+    }
+}
+
+impl<'a> PvIter<'a> {
+    /// Creates a new [`PvIter`] which contains a slice of all the moves in
+    /// `pv`.
+    fn new(pv: &'a Pv) -> Self {
+        Self {
+            moves: &pv.moves[(pv.first_item as usize)..(pv.first_empty as usize)],
+            index: 0,
+        }
     }
 }
 

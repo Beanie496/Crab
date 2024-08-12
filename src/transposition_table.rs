@@ -54,7 +54,7 @@ pub struct TranspositionEntry {
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
-    mv: Move,
+    mv: Option<Move>,
     /// The depth at which the score was obtained.
     depth: Depth,
     /// The bound of the score.
@@ -69,7 +69,7 @@ pub struct TranspositionHit {
     /// The score of the position.
     score: Eval,
     /// The best move in the position.
-    mv: Move,
+    mv: Option<Move>,
     /// The depth at which the score was obtained.
     depth: Depth,
     /// The bound of the score.
@@ -104,7 +104,7 @@ impl TranspositionEntry {
         key: Key,
         static_eval: Eval,
         score: Eval,
-        mv: Move,
+        mv: Option<Move>,
         depth: Depth,
         bound: Bound,
         height: Depth,
@@ -130,7 +130,7 @@ impl TranspositionHit {
     fn new(
         static_eval: Eval,
         score: Eval,
-        mv: Move,
+        mv: Option<Move>,
         depth: Depth,
         bound: Bound,
         height: Depth,
@@ -155,7 +155,7 @@ impl TranspositionHit {
     }
 
     /// Returns the best move.
-    pub const fn mv(self) -> Move {
+    pub const fn mv(self) -> Option<Move> {
         self.mv
     }
 

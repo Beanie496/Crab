@@ -18,6 +18,7 @@
 
 use std::{
     fmt::{self, Display, Formatter},
+    num::NonZeroU16,
     ops::{Deref, DerefMut},
 };
 
@@ -77,12 +78,9 @@ pub struct Lookup {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(C)]
 pub struct Move {
-    /// Contains: start square (0-63), in `0b00XX_XXXX`; and flags, in
-    /// `0bXX00_0000`.
-    lower: u8,
-    /// Contains: end square (0-63), in `0b00XX_XXXX`; and extra bits, in
-    /// `0bXX00_0000`.
-    upper: u8,
+    /// From most significant bit: extra bits (2 bits), end square (6 bits),
+    /// flags (2 bits) and start square (6 bits). `0beeEEEEEEffSSSSSS`.
+    bits: NonZeroU16,
 }
 
 /// An stack of [`Move`]s.
@@ -138,19 +136,23 @@ pub static LOOKUPS: Lookup = Lookup::new();
 
 impl Move {
     /// Flag for castling.
-    const CASTLING: u8 = 0b0100_0000;
+    const CASTLING: u16 = 0b0100_0000;
     /// Flag for en passant.
-    const EN_PASSANT: u8 = 0b1000_0000;
+    const EN_PASSANT: u16 = 0b1000_0000;
     /// Flag for promotion.
-    const PROMOTION: u8 = 0b1100_0000;
+    const PROMOTION: u16 = 0b1100_0000;
     /// No flags.
-    const NORMAL: u8 = 0b0000_0000;
-    /// Mask for the squares.
-    const SQUARE_MASK: u8 = 0b11_1111;
+    const NORMAL: u16 = 0b0000_0000;
+    /// Shift for the start square.
+    const START_SQUARE_SHIFT: usize = 0;
+    /// Shift for the end square.
+    const END_SQUARE_SHIFT: usize = 8;
+    /// Mask for the squares after shifting.
+    const SQUARE_MASK: u16 = 0b11_1111;
     /// Mask for the flags.
-    const FLAG_MASK: u8 = 0b1100_0000;
+    const FLAG_MASK: u16 = 0b1100_0000;
     /// Shift for the promotion piece/rook offset.
-    const EXTRA_BITS_SHIFT: usize = 6;
+    const EXTRA_BITS_SHIFT: usize = 14;
 }
 
 impl Display for Move {
@@ -162,10 +164,6 @@ impl Display for Move {
         if self.is_promotion() {
             // we want the lowercase letter here
             write!(f, "{start}{end}{promotion_piece}")
-        } else if *self == Self::null() {
-            // UCI specifies a null move should look like this. A null move
-            // should never be sent, but just in case.
-            write!(f, "0000")
         } else {
             write!(f, "{start}{end}")
         }
@@ -345,18 +343,18 @@ impl Move {
     /// Creates a normal [`Move`] from `start` to `end`.
     ///
     /// This function cannot be used for special moves like castling.
-    pub const fn new(start: Square, end: Square) -> Self {
+    pub fn new(start: Square, end: Square) -> Self {
         Self::base(start, end).flag(Self::NORMAL)
     }
 
     /// Creates an en passant [`Move`] from `start` to `end`.
-    pub const fn new_en_passant(start: Square, end: Square) -> Self {
+    pub fn new_en_passant(start: Square, end: Square) -> Self {
         Self::base(start, end).flag(Self::EN_PASSANT)
     }
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
     /// White and if the side of the board is kingside.
-    pub const fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
+    pub fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
             if IS_KINGSIDE {
@@ -383,48 +381,69 @@ impl Move {
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    pub const fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
+    pub fn new_promo<const PIECE: u8>(start: Square, end: Square) -> Self {
         Self::base(start, end)
             .flag(Self::PROMOTION)
-            .extra_bits(PIECE - 1)
+            .extra_bits(u16::from(PIECE) - 1)
     }
 
     /// Creates a promotion [`Move`] to the given piece type from `start` to
     /// `end`.
-    pub const fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
+    pub fn new_promo_any(start: Square, end: Square, promotion_piece: PieceType) -> Self {
         Self::base(start, end)
             .flag(Self::PROMOTION)
-            .extra_bits(promotion_piece.0 - 1)
+            .extra_bits(u16::from(promotion_piece.0) - 1)
     }
 
-    /// Creates a null [`Move`].
-    pub const fn null() -> Self {
-        Self::base(Square(0), Square(0))
+    /// Creates a base [`Move`] with the given start and end square.
+    fn base(start: Square, end: Square) -> Self {
+        debug_assert!(start.0 != 0 || end.0 != 0, "storing a 0 in a NonZeroU16");
+        Self {
+            // SAFETY: `start` and `end` cannot both be 0
+            bits: unsafe {
+                NonZeroU16::new_unchecked(
+                    u16::from(end.0) << Self::END_SQUARE_SHIFT
+                        | u16::from(start.0) << Self::START_SQUARE_SHIFT,
+                )
+            },
+        }
+    }
+
+    /// Adds the given flag to the move.
+    fn flag(mut self, flag: u16) -> Self {
+        self.bits |= flag;
+        self
+    }
+
+    /// Adds the given extra bits to the move.
+    fn extra_bits(mut self, extra_bits: u16) -> Self {
+        self.bits |= extra_bits << Self::EXTRA_BITS_SHIFT;
+        self
     }
 
     /// Calculates the start square of the move.
     pub const fn start(self) -> Square {
-        Square(self.upper & Self::SQUARE_MASK)
+        Square(((self.bits.get() >> Self::START_SQUARE_SHIFT) & Self::SQUARE_MASK) as u8)
     }
 
     /// Calculates the end square of the move.
     pub const fn end(self) -> Square {
-        Square(self.lower & Self::SQUARE_MASK)
+        Square(((self.bits.get() >> Self::END_SQUARE_SHIFT) & Self::SQUARE_MASK) as u8)
     }
 
     /// Checks if the move is castling.
     pub const fn is_castling(self) -> bool {
-        self.upper & Self::FLAG_MASK == Self::CASTLING
+        self.bits.get() & Self::FLAG_MASK == Self::CASTLING
     }
 
     /// Checks if the move is en passant.
     pub const fn is_en_passant(self) -> bool {
-        self.upper & Self::FLAG_MASK == Self::EN_PASSANT
+        self.bits.get() & Self::FLAG_MASK == Self::EN_PASSANT
     }
 
     /// Checks if the move is a promotion.
     pub const fn is_promotion(self) -> bool {
-        self.upper & Self::FLAG_MASK == Self::PROMOTION
+        self.bits.get() & Self::FLAG_MASK == Self::PROMOTION
     }
 
     /// Returns the difference from the king destination square to the rook
@@ -432,45 +451,25 @@ impl Move {
     ///
     /// Assumes `self.is_castling()`. Can only return -2 or 1.
     pub const fn rook_offset(self) -> i8 {
-        (self.lower >> Self::EXTRA_BITS_SHIFT) as i8 - 2
+        (self.bits.get() >> Self::EXTRA_BITS_SHIFT) as i8 - 2
     }
 
     /// Returns the piece to be promoted to.
     ///
     /// Assumes `self.is_promotion()`. The piece will only ever be a valid piece.
     pub const fn promotion_piece(self) -> PieceType {
-        PieceType((self.lower >> Self::EXTRA_BITS_SHIFT) + 1)
+        PieceType(((self.bits.get() >> Self::EXTRA_BITS_SHIFT) + 1) as u8)
     }
 
     /// Checks if the move is moving from the given start square to the given
     /// end square.
-    pub const fn is_moving_from_to(self, start: Square, end: Square) -> bool {
+    pub fn is_moving_from_to(self, start: Square, end: Square) -> bool {
         let other = Self::new(start, end);
         // if the start and end square are the same, xoring them together
         // will be 0
-        (self.lower ^ other.lower) & Self::SQUARE_MASK
-            | (self.upper ^ other.upper) & Self::SQUARE_MASK
-            == 0
-    }
-
-    /// Creates a base [`Move`] with the given start and end square.
-    const fn base(start: Square, end: Square) -> Self {
-        Self {
-            lower: end.0,
-            upper: start.0,
-        }
-    }
-
-    /// Adds the given flag to the move.
-    const fn flag(mut self, flag: u8) -> Self {
-        self.upper |= flag;
-        self
-    }
-
-    /// Adds the given extra bits to the move.
-    const fn extra_bits(mut self, extra_bits: u8) -> Self {
-        self.lower |= extra_bits << Self::EXTRA_BITS_SHIFT;
-        self
+        let both_square_mask = (Self::SQUARE_MASK << Self::START_SQUARE_SHIFT)
+            | (Self::SQUARE_MASK << Self::END_SQUARE_SHIFT);
+        (self.bits.get() ^ other.bits.get()) & both_square_mask == 0
     }
 }
 

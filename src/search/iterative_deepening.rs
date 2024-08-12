@@ -45,7 +45,10 @@ impl Worker<'_> {
         self.root_pv.append_pv(&mut pv);
 
         if self.can_print {
-            println!("bestmove {}", self.root_pv.get(0));
+            println!(
+                "bestmove {}",
+                self.root_pv.iter().next().expect("null best move")
+            );
         }
 
         if self.check_status() == SearchStatus::Quit {

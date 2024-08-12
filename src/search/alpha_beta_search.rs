@@ -22,7 +22,6 @@ use crate::{
     defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
     lookups::base_reductions,
-    movegen::Move,
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
@@ -80,7 +79,7 @@ impl Worker<'_> {
                 return h.score();
             }
         }
-        let tt_move = tt_hit.map_or(Move::null(), TranspositionHit::mv);
+        let tt_move = tt_hit.and_then(TranspositionHit::mv);
 
         let static_eval = if is_in_check {
             -INF_EVAL
@@ -151,12 +150,12 @@ impl Worker<'_> {
         // because we failed low last time or we because didn't even get a TT hit),
         // it is better to reduce now and hope we have a TT move next time, rather
         // than waste a lot of time doing a search with bad move ordering
-        if !NodeType::IS_PV && tt_move == Move::null() && depth >= 4 {
+        if !NodeType::IS_PV && tt_move.is_none() && depth >= 4 {
             depth -= 1;
         }
 
         let mut best_score = -INF_EVAL;
-        let mut best_move = Move::null();
+        let mut best_move = None;
         let mut new_pv = Pv::new();
         let movepicker = MovePicker::new::<{ MoveType::ALL }>(board, tt_move);
 
@@ -232,7 +231,7 @@ impl Worker<'_> {
                 // in the (admittedly never observed before) scenario where the
                 // search was terminated during depth 1 and the PV was never
                 // updated, just add whatever move the search is currently on
-                if NodeType::IS_ROOT && pv.get(0) == Move::null() {
+                if NodeType::IS_ROOT && pv.len() == 0 {
                     pv.enqueue(mv);
                 }
                 return if NodeType::IS_ROOT { alpha } else { 0 };
@@ -246,7 +245,7 @@ impl Worker<'_> {
 
             // the move is even better than what we originally had
             if score > alpha {
-                best_move = mv;
+                best_move = Some(mv);
 
                 // if we're in a zero-window search, raising alpha will raise beta
                 // and we don't care about the PV
@@ -284,7 +283,7 @@ impl Worker<'_> {
         let bound = if best_score >= beta {
             Bound::Lower
         // this only happens if we fail to raise alpha
-        } else if best_move == Move::null() {
+        } else if best_move.is_none() {
             Bound::Upper
         } else {
             Bound::Exact
@@ -330,9 +329,9 @@ impl Worker<'_> {
         }
 
         let movepicker = if is_in_check {
-            MovePicker::new::<{ MoveType::EVASIONS }>(board, Move::null())
+            MovePicker::new::<{ MoveType::EVASIONS }>(board, None)
         } else {
-            MovePicker::new::<{ MoveType::CAPTURES }>(board, Move::null())
+            MovePicker::new::<{ MoveType::CAPTURES }>(board, None)
         };
 
         for mv in movepicker {
