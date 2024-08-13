@@ -16,14 +16,18 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
+
+use arrayvec::ArrayVec;
 
 use crate::{
     board::Board,
     defs::{MoveType, PieceType},
     evaluation::{Eval, INF_EVAL},
     movegen::{generate_moves, Move, Moves, MAX_LEGAL_MOVES},
-    util::Stack,
 };
 
 /// A selector of the next best move in a position.
@@ -43,7 +47,7 @@ pub struct ScoredMove {
 /// A scored stack of [`ScoredMove`]s.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct ScoredMoves {
-    moves: Stack<ScoredMove, MAX_LEGAL_MOVES>,
+    moves: ArrayVec<ScoredMove, MAX_LEGAL_MOVES>,
 }
 
 /// The score of a quiet move.
@@ -81,12 +85,29 @@ impl PartialOrd for ScoredMove {
     }
 }
 
+impl Deref for ScoredMoves {
+    type Target = ArrayVec<ScoredMove, MAX_LEGAL_MOVES>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.moves
+    }
+}
+
+impl DerefMut for ScoredMoves {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.moves
+    }
+}
+
 impl FromIterator<ScoredMove> for ScoredMoves {
     fn from_iter<Moves: IntoIterator<Item = ScoredMove>>(other_stack: Moves) -> Self {
-        let mut stack = Stack::new();
+        let mut stack = ArrayVec::new();
 
         for item in other_stack {
-            stack.push(item);
+            // SAFETY: `Moves` and `ScoredMoves` have the same length, so
+            // `stack` is guaranteed to be able to hold all of `other_stack`s
+            // items
+            unsafe { stack.push_unchecked(item) };
         }
 
         Self { moves: stack }
@@ -117,7 +138,8 @@ impl Moves {
     /// Scores the moves in `moves`, given the information in `search_info` and
     /// the current height.
     pub fn score<const MOVE_TYPE: u8>(self, board: &Board, tt_move: Move) -> ScoredMoves {
-        self.map(|mv| ScoredMove::new::<MOVE_TYPE>(board, mv, tt_move))
+        self.into_iter()
+            .map(|mv| ScoredMove::new::<MOVE_TYPE>(board, mv, tt_move))
             .collect()
     }
 }
@@ -163,13 +185,6 @@ impl ScoredMove {
 impl ScoredMoves {
     /// Sorts the scored moves.
     pub fn sort(&mut self) {
-        self.moves.sort_by(Ord::cmp);
-    }
-
-    /// Returns the last move.
-    ///
-    /// Assumes the moves have already been sorted.
-    fn pop(&mut self) -> Option<ScoredMove> {
-        self.moves.pop()
+        self.sort_by(Ord::cmp);
     }
 }

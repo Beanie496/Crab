@@ -16,14 +16,20 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::{Deref, DerefMut},
+};
+
+use arrayvec::ArrayVec;
+use oorandom::Rand64;
 
 use crate::{
     bitboard::Bitboard,
     board::Board,
     cfor,
     defs::{Direction, MoveType, PieceType, Rank, Side, Square},
-    util::{get_unchecked, Stack},
+    util::get_unchecked,
 };
 use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
 use util::{bitboard_from_square, east, north, sliding_attacks, south, west};
@@ -80,7 +86,32 @@ pub struct Move {
 }
 
 /// An stack of [`Move`]s.
-pub type Moves = Stack<Move, MAX_LEGAL_MOVES>;
+#[allow(clippy::missing_docs_in_private_items)]
+pub struct Moves {
+    moves: ArrayVec<Move, MAX_LEGAL_MOVES>,
+}
+
+impl Deref for Moves {
+    type Target = ArrayVec<Move, MAX_LEGAL_MOVES>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.moves
+    }
+}
+
+impl DerefMut for Moves {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.moves
+    }
+}
+
+impl Iterator for Moves {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pop()
+    }
+}
 
 /// The number of bitboards required to store all bishop attacks, where each
 /// element corresponds to one permutation of blockers.
@@ -444,13 +475,29 @@ impl Move {
 }
 
 impl Moves {
+    /// Creates a new list of moves.
+    pub fn new() -> Self {
+        Self {
+            moves: ArrayVec::new(),
+        }
+    }
+
+    /// Pushes `mv` without bounds checking in release mode.
+    pub fn push(&mut self, mv: Move) {
+        debug_assert!(self.len() < self.capacity(), "stack overflow");
+        // SAFETY: we just checked that we are able to push
+        unsafe { self.push_unchecked(mv) };
+    }
+
     /// Finds and returns, if it exists, the [`Move`] that has start square
     /// `start` and end square `end`.
     ///
     /// Returns `Some(mv)` if a [`Move`] does match the start and end square;
     /// returns `None` otherwise.
-    pub fn move_with(&mut self, start: Square, end: Square) -> Option<Move> {
-        self.find(|&mv| mv.is_moving_from_to(start, end))
+    pub fn move_with(&self, start: Square, end: Square) -> Option<Move> {
+        self.iter()
+            .find(|&mv| mv.is_moving_from_to(start, end))
+            .copied()
     }
 
     /// Finds and returns, if it exists, the [`Move`] that has start square
@@ -459,12 +506,28 @@ impl Moves {
     /// Returns `Some(mv)` if a [`Move`] does match the criteria; returns `None`
     /// otherwise.
     pub fn move_with_promo(
-        &mut self,
+        &self,
         start: Square,
         end: Square,
         piece_type: PieceType,
     ) -> Option<Move> {
-        self.find(|&mv| mv == Move::new_promo_any(start, end, piece_type))
+        self.iter()
+            .copied()
+            .find(|&mv| mv == Move::new_promo_any(start, end, piece_type))
+    }
+
+    /// Picks a random item, swaps it with the first item, then pops the
+    /// now-first item.
+    pub fn pop_random(&mut self, seed: &mut Rand64) -> Option<Move> {
+        let total_moves = self.len();
+
+        let index = if total_moves >= 2 {
+            seed.rand_range(0_u64..total_moves as u64) as usize
+        } else {
+            0
+        };
+
+        self.swap_pop(index)
     }
 }
 

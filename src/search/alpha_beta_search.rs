@@ -166,7 +166,9 @@ impl Worker<'_> {
             if !copy.make_move(mv) {
                 continue;
             }
-            self.past_keys.push(copy.key());
+            // SAFETY: we will push once per recursive call and the maximum
+            // number of recursive calls is equal to the length of past_keys
+            unsafe { self.past_keys.push_unchecked(copy.key()) };
             total_moves += 1;
 
             if NodeType::IS_ROOT && self.should_print() {

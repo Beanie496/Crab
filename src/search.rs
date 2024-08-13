@@ -22,13 +22,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+use arrayvec::ArrayVec;
+
 use crate::{
     board::{Board, Key},
     defs::Side,
     evaluation::{is_mate, moves_to_mate, Eval},
     movegen::Move,
     transposition_table::TranspositionTable,
-    util::{get_unchecked, insert_unchecked, Stack},
+    util::{get_unchecked, insert_unchecked},
 };
 use time::calculate_time_window;
 
@@ -47,7 +49,7 @@ pub mod time;
 /// respectively) and the current node.
 pub type Depth = u8;
 /// A stack of zobrist keys.
-pub type ZobristKeyStack = Stack<Key, { Depth::MAX as usize }>;
+pub type ZobristKeyStack = ArrayVec<Key, { Depth::MAX as usize }>;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -521,7 +523,12 @@ impl<'a> Worker<'a> {
 
     /// Adds a zobrist key to the stack.
     pub fn push_key(&mut self, key: Key) {
-        self.past_keys.push(key);
+        debug_assert!(
+            self.past_keys.len() < self.past_keys.capacity(),
+            "stack overflow"
+        );
+        // SAFETY: we just checked that we can push
+        unsafe { self.past_keys.push_unchecked(key) };
     }
 
     /// Pops a zobrist key off the stack.
@@ -623,7 +630,8 @@ impl<'a> Worker<'a> {
             return true;
         }
 
-        let current_key = self.past_keys.peek();
+        // SAFETY: there is always at least 1 key
+        let current_key = unsafe { self.past_keys.get_unchecked(self.past_keys.len() - 1) };
 
         // check if any past position's key is the same as the current key
         self.past_keys

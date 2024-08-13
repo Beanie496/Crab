@@ -352,7 +352,7 @@ where
 
     // if there are no moves to begin with, this loop will just be skipped
     for mv in tokens {
-        let mut moves = generate_moves::<{ MoveType::ALL }>(&board);
+        let moves = generate_moves::<{ MoveType::ALL }>(&board);
 
         let Some(start) = mv.get(0..=1) else {
             return;
