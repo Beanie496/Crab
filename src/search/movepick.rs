@@ -25,7 +25,7 @@ use arrayvec::ArrayVec;
 
 use crate::{
     board::Board,
-    defs::{MoveType, PieceType},
+    defs::PieceType,
     evaluation::{Eval, INF_EVAL},
     movegen::{generate_moves, Move, Moves, MAX_LEGAL_MOVES},
 };
@@ -147,7 +147,7 @@ impl Moves {
 impl ScoredMove {
     /// Scores a [`Move`].
     pub fn new<const MOVE_TYPE: u8>(board: &Board, mv: Move, tt_move: Option<Move>) -> Self {
-        if MOVE_TYPE != MoveType::CAPTURES && Some(mv) == tt_move {
+        if Some(mv) == tt_move {
             return Self {
                 mv,
                 score: TT_SCORE,
@@ -156,8 +156,6 @@ impl ScoredMove {
 
         let captured_piece = if mv.is_en_passant() {
             PieceType::PAWN
-        } else if mv.is_promotion() {
-            PieceType(mv.promotion_piece().0 - PieceType::PAWN.0)
         } else {
             PieceType::from(board.piece_on(mv.end()))
         };

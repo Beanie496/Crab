@@ -646,9 +646,6 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
-        }
-        // count queen promotions as captures
-        if MOVE_TYPE == MoveType::ALL || MOVE_TYPE == MoveType::CAPTURES {
             moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
         }
     }
@@ -722,7 +719,7 @@ fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
 ) {
     let us_bb = board.side::<IS_WHITE>();
     let occupancies = board.occupancies();
-    let target_squares = if MOVE_TYPE == MoveType::CAPTURES {
+    let target_squares = if MOVE_TYPE == MoveType::CAPTURES || MOVE_TYPE == MoveType::EVASIONS {
         // the bitboard of our opponent
         us_bb ^ occupancies
     } else {
