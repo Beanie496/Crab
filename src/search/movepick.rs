@@ -210,7 +210,7 @@ impl<Type: MovesType> MovePicker<Type> {
                 || self.killers[1] == Some(scored_move.mv)
                 || self.counter_move == Some(scored_move.mv)
             {
-                self.moves.remove(best_index);
+                self.moves.swap_remove(best_index);
                 continue;
             }
 
@@ -227,7 +227,7 @@ impl<Type: MovesType> MovePicker<Type> {
                 return None;
             }
 
-            return Some(self.moves.remove(best_index));
+            return Some(self.moves.swap_remove(best_index));
         }
     }
 
