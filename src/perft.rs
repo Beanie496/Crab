@@ -55,7 +55,7 @@ pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, dept
     generate_moves::<AllMoves>(board, &mut moves);
 
     let mut total = 0;
-    for mv in moves.map(|scored_move| scored_move.mv) {
+    for mv in moves.iter().map(|scored_move| scored_move.mv) {
         let mut copy = *board;
         if !copy.make_move(mv) {
             continue;

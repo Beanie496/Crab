@@ -164,14 +164,6 @@ impl DerefMut for Moves {
     }
 }
 
-impl Iterator for Moves {
-    type Item = ScoredMove;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.pop()
-    }
-}
-
 /// The number of bitboards required to store all bishop attacks, where each
 /// element corresponds to one permutation of blockers.
 ///
