@@ -17,6 +17,7 @@
  */
 
 use std::{
+    cmp::Ordering,
     fmt::{self, Display, Formatter},
     num::NonZeroU16,
     ops::{Deref, DerefMut},
@@ -29,7 +30,8 @@ use crate::{
     bitboard::Bitboard,
     board::Board,
     cfor,
-    defs::{Direction, MoveType, PieceType, Rank, Side, Square},
+    defs::{Direction, PieceType, Rank, Side, Square},
+    evaluation::Eval,
     util::get_unchecked,
 };
 use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
@@ -39,6 +41,57 @@ use util::{bitboard_from_square, east, north, sliding_attacks, south, west};
 pub mod magic;
 /// Useful functions for move generation.
 mod util;
+
+/// Moves of a certain type.
+pub trait MovesType {
+    /// Generate quiet moves for all non-king pieces (so including castling)?
+    const NON_KING_QUIETS: bool;
+    /// Generate quiet moves exclusively for the king (so excluding castling)?
+    const KING_QUIETS: bool;
+    /// Generate captures?
+    const CAPTURES: bool;
+}
+
+/// Generate all legal moves.
+pub struct AllMoves;
+/// Generate only captures.
+pub struct CapturesOnly;
+/// Generate captures and quiet king moves.
+pub struct Evasions;
+/// Generate only quiet king moves.
+pub struct KingMovesOnly;
+/// Generate only quiet moves.
+pub struct QuietsOnly;
+
+impl MovesType for AllMoves {
+    const NON_KING_QUIETS: bool = true;
+    const KING_QUIETS: bool = true;
+    const CAPTURES: bool = true;
+}
+
+impl MovesType for CapturesOnly {
+    const NON_KING_QUIETS: bool = false;
+    const KING_QUIETS: bool = false;
+    const CAPTURES: bool = true;
+}
+
+impl MovesType for Evasions {
+    const NON_KING_QUIETS: bool = false;
+    const KING_QUIETS: bool = true;
+    const CAPTURES: bool = true;
+}
+
+impl MovesType for KingMovesOnly {
+    const NON_KING_QUIETS: bool = false;
+    const KING_QUIETS: bool = true;
+    const CAPTURES: bool = false;
+}
+
+impl MovesType for QuietsOnly {
+    const NON_KING_QUIETS: bool = true;
+    const KING_QUIETS: bool = true;
+    const CAPTURES: bool = false;
+}
 
 /// Contains lookup tables for each piece.
 pub struct Lookup {
@@ -83,14 +136,22 @@ pub struct Move {
     bits: NonZeroU16,
 }
 
+/// A [`Move`] that has been given a certain score.
+#[allow(clippy::missing_docs_in_private_items)]
+#[derive(Clone, Copy)]
+pub struct ScoredMove {
+    pub mv: Move,
+    pub score: Eval,
+}
+
 /// An stack of [`Move`]s.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct Moves {
-    moves: ArrayVec<Move, MAX_LEGAL_MOVES>,
+    moves: ArrayVec<ScoredMove, MAX_LEGAL_MOVES>,
 }
 
 impl Deref for Moves {
-    type Target = ArrayVec<Move, MAX_LEGAL_MOVES>;
+    type Target = ArrayVec<ScoredMove, MAX_LEGAL_MOVES>;
 
     fn deref(&self) -> &Self::Target {
         &self.moves
@@ -104,7 +165,7 @@ impl DerefMut for Moves {
 }
 
 impl Iterator for Moves {
-    type Item = Move;
+    type Item = ScoredMove;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop()
@@ -134,6 +195,26 @@ pub const MAX_LEGAL_MOVES: usize = 218;
 /// The lookup tables.
 pub static LOOKUPS: Lookup = Lookup::new();
 
+impl Eq for ScoredMove {}
+
+impl Ord for ScoredMove {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.score.cmp(&other.score)
+    }
+}
+
+impl PartialEq for ScoredMove {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score
+    }
+}
+
+impl PartialOrd for ScoredMove {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.score.cmp(&other.score))
+    }
+}
+
 impl Move {
     /// Flag for castling.
     const CASTLING: u16 = 0b0100_0000;
@@ -153,6 +234,13 @@ impl Move {
     const FLAG_MASK: u16 = 0b1100_0000;
     /// Shift for the promotion piece/rook offset.
     const EXTRA_BITS_SHIFT: usize = 14;
+}
+
+impl ScoredMove {
+    /// The score of a capture with a winning static exchange evaluation.
+    pub const WINNING_CAPTURE_SCORE: Eval = 0x2000;
+    /// The score of a quiet move.
+    pub const QUIET_SCORE: Eval = 0x1000;
 }
 
 impl Display for Move {
@@ -483,9 +571,14 @@ impl Moves {
 
     /// Pushes `mv` without bounds checking in release mode.
     pub fn push(&mut self, mv: Move) {
+        self.push_scored_move(ScoredMove::new(mv));
+    }
+
+    /// Pushes `mv` without bounds checking in release mode.
+    pub fn push_scored_move(&mut self, scored_move: ScoredMove) {
         debug_assert!(self.len() < self.capacity(), "stack overflow");
         // SAFETY: we just checked that we are able to push
-        unsafe { self.push_unchecked(mv) };
+        unsafe { self.push_unchecked(scored_move) };
     }
 
     /// Finds and returns, if it exists, the [`Move`] that has start square
@@ -495,8 +588,8 @@ impl Moves {
     /// returns `None` otherwise.
     pub fn move_with(&self, start: Square, end: Square) -> Option<Move> {
         self.iter()
-            .find(|&mv| mv.is_moving_from_to(start, end))
-            .copied()
+            .find(|&scored_move| scored_move.mv.is_moving_from_to(start, end))
+            .map(|&scored_move| scored_move.mv)
     }
 
     /// Finds and returns, if it exists, the [`Move`] that has start square
@@ -511,13 +604,13 @@ impl Moves {
         piece_type: PieceType,
     ) -> Option<Move> {
         self.iter()
-            .copied()
-            .find(|&mv| mv == Move::new_promo_any(start, end, piece_type))
+            .find(|&scored_move| scored_move.mv == Move::new_promo_any(start, end, piece_type))
+            .map(|&scored_move| scored_move.mv)
     }
 
     /// Picks a random item, swaps it with the first item, then pops the
     /// now-first item.
-    pub fn pop_random(&mut self, seed: &mut Rand64) -> Option<Move> {
+    pub fn pop_random(&mut self, seed: &mut Rand64) -> Option<ScoredMove> {
         let total_moves = self.len();
 
         let index = if total_moves >= 2 {
@@ -530,32 +623,64 @@ impl Moves {
     }
 }
 
-/// Calculates all legal moves for the current position of the given board.
-pub fn generate_moves<const MOVE_TYPE: u8>(board: &Board) -> Moves {
-    let mut moves = Moves::new();
-    if board.side_to_move() == Side::WHITE {
-        generate_pawn_moves::<true, MOVE_TYPE>(board, &mut moves);
-        generate_non_sliding_moves::<true, MOVE_TYPE>(board, &mut moves);
-        generate_sliding_moves::<true, MOVE_TYPE>(board, &mut moves);
-        if MOVE_TYPE == MoveType::ALL {
-            generate_castling::<true>(board, &mut moves);
+impl ScoredMove {
+    /// Creates a new [`ScoredMove`] with a score of `0`.
+    const fn new(mv: Move) -> Self {
+        Self { mv, score: 0 }
+    }
+
+    /// Scores `self.mv`.
+    #[allow(clippy::assertions_on_constants)]
+    pub fn score<Type: MovesType>(&mut self, board: &Board) {
+        if !Type::CAPTURES {
+            self.score += Self::QUIET_SCORE;
+            return;
         }
-    } else {
-        generate_pawn_moves::<false, MOVE_TYPE>(board, &mut moves);
-        generate_non_sliding_moves::<false, MOVE_TYPE>(board, &mut moves);
-        generate_sliding_moves::<false, MOVE_TYPE>(board, &mut moves);
-        if MOVE_TYPE == MoveType::ALL {
-            generate_castling::<false>(board, &mut moves);
+
+        let mv = self.mv;
+
+        let captured_piece = if mv.is_en_passant() {
+            PieceType::PAWN
+        } else {
+            PieceType::from(board.piece_on(mv.end()))
+        };
+
+        // pre-emptively give the capture a winning score - it can be
+        // checked later
+        if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
+            self.score += Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
+        } else {
+            self.score += if captured_piece == PieceType::NONE {
+                Self::QUIET_SCORE
+            } else {
+                Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus()
+            };
         }
     }
-    moves
+}
+
+/// Calculates all legal moves for the current position of the given board and
+/// appends them to `moves`.
+#[allow(clippy::assertions_on_constants)]
+pub fn generate_moves<Type: MovesType>(board: &Board, moves: &mut Moves) {
+    if board.side_to_move() == Side::WHITE {
+        generate_pawn_moves::<Type, true>(board, moves);
+        generate_non_sliding_moves::<Type, true>(board, moves);
+        generate_sliding_moves::<Type, true>(board, moves);
+        generate_castling::<Type, true>(board, moves);
+    } else {
+        generate_pawn_moves::<Type, false>(board, moves);
+        generate_non_sliding_moves::<Type, false>(board, moves);
+        generate_sliding_moves::<Type, false>(board, moves);
+        generate_castling::<Type, false>(board, moves);
+    }
 }
 
 /// Calculates all legal pawn moves for `board` and puts them in `moves`.
 // god dammit this function could be so much shorter if full const generics
 // existed
 #[rustfmt::skip]
-fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
+fn generate_pawn_moves<Type: MovesType, const IS_WHITE: bool>(
     board: &Board,
     moves: &mut Moves,
 ) {
@@ -583,7 +708,7 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
     let promotion_pawns = pawns & penultimate_rank;
 
     // regular pushes
-    if MOVE_TYPE == MoveType::ALL {
+    if Type::NON_KING_QUIETS {
         let single_push = normal_pawns.pawn_push::<IS_WHITE>() & empty;
         let double_push = single_push.pawn_push::<IS_WHITE>() & empty & double_push_rank;
 
@@ -595,35 +720,37 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
         }
     }
 
-    // regular captures
-    let right_captures = if IS_WHITE {
-        normal_pawns.north().east() & them_bb
-    } else {
-        normal_pawns.south().east() & them_bb
-    };
-    let left_captures = if IS_WHITE {
-        normal_pawns.north().west() & them_bb
-    } else {
-        normal_pawns.south().west() & them_bb
-    };
-
-    for dest_pawn in right_captures {
-        moves.push(Move::new(dest_pawn - forward_right, dest_pawn));
-    }
-    for dest_pawn in left_captures {
-        moves.push(Move::new(dest_pawn - forward_left, dest_pawn));
-    }
-
-    // en passant
-    if ep_square != Square::NONE {
-        let attackers = if IS_WHITE {
-            LOOKUPS.pawn_attacks(Side::BLACK, ep_square) & normal_pawns
+    if Type::CAPTURES {
+        // regular captures
+        let right_captures = if IS_WHITE {
+            normal_pawns.north().east() & them_bb
         } else {
-            LOOKUPS.pawn_attacks(Side::WHITE, ep_square) & normal_pawns
+            normal_pawns.south().east() & them_bb
+        };
+        let left_captures = if IS_WHITE {
+            normal_pawns.north().west() & them_bb
+        } else {
+            normal_pawns.south().west() & them_bb
         };
 
-        for pawn in attackers {
-            moves.push(Move::new_en_passant(pawn, ep_square));
+        for dest_pawn in right_captures {
+            moves.push(Move::new(dest_pawn - forward_right, dest_pawn));
+        }
+        for dest_pawn in left_captures {
+            moves.push(Move::new(dest_pawn - forward_left, dest_pawn));
+        }
+
+        // en passant
+        if ep_square != Square::NONE {
+            let attackers = if IS_WHITE {
+                LOOKUPS.pawn_attacks(Side::BLACK, ep_square) & normal_pawns
+            } else {
+                LOOKUPS.pawn_attacks(Side::WHITE, ep_square) & normal_pawns
+            };
+
+            for pawn in attackers {
+                moves.push(Move::new_en_passant(pawn, ep_square));
+            }
         }
     }
 
@@ -642,88 +769,115 @@ fn generate_pawn_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
 
     for dest_pawn in single_push {
         let origin = dest_pawn - forward;
-        if MOVE_TYPE == MoveType::ALL {
+        if Type::NON_KING_QUIETS {
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
         }
     }
-    for dest_pawn in right_captures {
-        let origin = dest_pawn - forward_right;
-        moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
-    }
-    for dest_pawn in left_captures {
-        let origin = dest_pawn - forward_left;
-        moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
-        moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+    if Type::CAPTURES {
+        for dest_pawn in right_captures {
+            let origin = dest_pawn - forward_right;
+            moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+        }
+        for dest_pawn in left_captures {
+            let origin = dest_pawn - forward_left;
+            moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
+            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+        }
     }
 }
 
 /// Calculates all legal knight and king moves (excluding castling) for `board`
 /// and puts them in `moves`.
-fn generate_non_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
+#[allow(clippy::assertions_on_constants)]
+fn generate_non_sliding_moves<Type: MovesType, const IS_WHITE: bool>(
     board: &Board,
     moves: &mut Moves,
 ) {
     let us_bb = board.side::<IS_WHITE>();
-    let knight_target_squares = match MOVE_TYPE {
-        MoveType::ALL => !us_bb,
-        MoveType::CAPTURES | MoveType::EVASIONS => {
-            // all squares that are occupied by them
-            // oh how I wish Rust allowed operations on consts generics
-            if IS_WHITE {
-                board.side::<false>()
-            } else {
-                board.side::<true>()
-            }
-        }
-        _ => unreachable!(),
-    };
-    let king_target_squares = if MOVE_TYPE == MoveType::EVASIONS {
-        !us_bb
-    } else {
-        knight_target_squares
-    };
 
-    let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
-    for knight in knights {
-        let targets = LOOKUPS.knight_attacks(knight) & knight_target_squares;
-        for target in targets {
-            moves.push(Move::new(knight, target));
+    if Type::NON_KING_QUIETS || Type::CAPTURES {
+        let them_bb = if IS_WHITE {
+            board.side::<false>()
+        } else {
+            board.side::<true>()
+        };
+
+        let knight_target_squares = if Type::NON_KING_QUIETS {
+            if Type::CAPTURES {
+                !us_bb
+            } else {
+                !us_bb ^ them_bb
+            }
+        } else {
+            them_bb
+        };
+
+        let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
+        for knight in knights {
+            let targets = LOOKUPS.knight_attacks(knight) & knight_target_squares;
+            for target in targets {
+                moves.push(Move::new(knight, target));
+            }
         }
     }
 
-    let mut kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
-    debug_assert!(
-        kings.0.count_ones() == 1,
-        "Number of kings is not equal to one"
-    );
-    let king = kings.pop_next_square();
-    let targets = LOOKUPS.king_attacks(king) & king_target_squares;
-    for target in targets {
-        moves.push(Move::new(king, target));
+    if Type::KING_QUIETS || Type::CAPTURES {
+        let them_bb = if IS_WHITE {
+            board.side::<false>()
+        } else {
+            board.side::<true>()
+        };
+
+        let king_target_squares = if Type::KING_QUIETS {
+            if Type::CAPTURES {
+                !us_bb
+            } else {
+                !us_bb ^ them_bb
+            }
+        } else {
+            them_bb
+        };
+
+        let mut kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
+        debug_assert!(
+            kings.0.count_ones() == 1,
+            "Number of kings is not equal to one"
+        );
+        let king = kings.pop_next_square();
+        let targets = LOOKUPS.king_attacks(king) & king_target_squares;
+        for target in targets {
+            moves.push(Move::new(king, target));
+        }
     }
 }
 
 /// Generates all legal bishop, rook and queen moves for `board` and puts them
 /// in `moves`.
-fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
-    board: &Board,
-    moves: &mut Moves,
-) {
+fn generate_sliding_moves<Type: MovesType, const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
+    if !Type::NON_KING_QUIETS && !Type::CAPTURES {
+        return;
+    }
+
     let us_bb = board.side::<IS_WHITE>();
     let occupancies = board.occupancies();
-    let target_squares = if MOVE_TYPE == MoveType::CAPTURES || MOVE_TYPE == MoveType::EVASIONS {
-        // the bitboard of our opponent
-        us_bb ^ occupancies
+    let them_bb = us_bb ^ occupancies;
+
+    let target_squares = if Type::NON_KING_QUIETS {
+        if Type::CAPTURES {
+            !us_bb
+        } else {
+            !us_bb ^ them_bb
+        }
     } else {
-        !us_bb
+        them_bb
     };
 
     let bishops = board.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
@@ -752,7 +906,11 @@ fn generate_sliding_moves<const IS_WHITE: bool, const MOVE_TYPE: u8>(
 }
 
 /// Generates the castling moves for the given side and puts them in `moves`.
-fn generate_castling<const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
+fn generate_castling<Type: MovesType, const IS_WHITE: bool>(board: &Board, moves: &mut Moves) {
+    if !Type::NON_KING_QUIETS {
+        return;
+    }
+
     let occupancies = board.occupancies();
 
     if board.castling_rights().can_castle_kingside::<IS_WHITE>()
