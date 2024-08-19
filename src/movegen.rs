@@ -637,8 +637,13 @@ impl ScoredMove {
             PieceType::from(board.piece_on(mv.end()))
         };
 
-        // pre-emptively give the capture a winning score - it can be
-        // checked later
+        // Pre-emptively give the capture a winning score - it can be
+        // checked later.
+        // This outer if statement has odd but intentional behaviour - if a
+        // move doesn't capture anything but this function is being told it's a
+        // capture, it will treat it as a capture, but if it's told it's
+        // scoring any type of move, it will treat it as a quiet. This is so
+        // queen promotions (even quiet ones) can be treated as captures.
         if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
             self.score += Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
         } else {
@@ -765,10 +770,13 @@ fn generate_pawn_moves<Type: MovesType, const IS_WHITE: bool>(
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
-            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
         }
     }
     if Type::CAPTURES {
+        for dest_pawn in single_push {
+            let origin = dest_pawn - forward;
+            moves.push(Move::new_promo::<{ PieceType::QUEEN.0 }>(origin, dest_pawn));
+        }
         for dest_pawn in right_captures {
             let origin = dest_pawn - forward_right;
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
