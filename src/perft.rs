@@ -18,7 +18,10 @@
 
 use std::time::Instant;
 
-use crate::{board::Board, defs::MoveType, movegen::generate_moves};
+use crate::{
+    board::Board,
+    movegen::{generate_moves, AllMoves, Moves},
+};
 
 /// Outputs and returns the number of leaf nodes `depth` moves in the future.
 ///
@@ -48,10 +51,11 @@ pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, dept
         return 1;
     }
 
-    let moves = generate_moves::<{ MoveType::ALL }>(board);
+    let mut moves = Moves::new();
+    generate_moves::<AllMoves>(board, &mut moves);
 
     let mut total = 0;
-    for mv in moves {
+    for mv in moves.map(|scored_move| scored_move.mv) {
         let mut copy = *board;
         if !copy.make_move(mv) {
             continue;

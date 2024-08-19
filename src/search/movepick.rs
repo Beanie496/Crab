@@ -16,175 +16,164 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    cmp::Ordering,
-    ops::{Deref, DerefMut},
-};
-
-use arrayvec::ArrayVec;
-
 use crate::{
     board::Board,
-    defs::{MoveType, PieceType},
-    evaluation::{Eval, INF_EVAL},
-    movegen::{generate_moves, Move, Moves, MAX_LEGAL_MOVES},
+    evaluation::Eval,
+    movegen::{
+        generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
+    },
 };
+
+/// The stage of move picking.
+#[derive(PartialEq)]
+enum Stage {
+    /// Return the TT move.
+    TtMove,
+    /// Generate all captures.
+    GenerateCaptures,
+    /// Return all good captures.
+    GoodCaptures,
+    /// Generate all remaining moves (i.e. quiets).
+    GenerateRemaining,
+    /// Return all remaining moves (bad captures and quiets).
+    Remaining,
+    /// There is nothing left to return.
+    Completed,
+}
 
 /// A selector of the next best move in a position.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct MovePicker {
-    moves: ScoredMoves,
-}
-
-/// A [`Move`] that has been given a certain score.
-#[allow(clippy::missing_docs_in_private_items)]
-#[derive(Clone, Copy)]
-pub struct ScoredMove {
-    mv: Move,
-    score: Eval,
-}
-
-/// A scored stack of [`ScoredMove`]s.
-#[allow(clippy::missing_docs_in_private_items)]
-pub struct ScoredMoves {
-    moves: ArrayVec<ScoredMove, MAX_LEGAL_MOVES>,
-}
-
-/// The score of a quiet move.
-const QUIET_SCORE: Eval = 5_000;
-/// The score of a move found in the transposition table.
-const TT_SCORE: Eval = INF_EVAL;
-/// The score of a capture with a winning static exchange evaluation.
-const WINNING_CAPTURE_SCORE: Eval = 10_000;
-
-impl Iterator for MovePicker {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.moves.next()
-    }
-}
-
-impl Eq for ScoredMove {}
-
-impl Ord for ScoredMove {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.score.cmp(&other.score)
-    }
-}
-
-impl PartialEq for ScoredMove {
-    fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
-    }
-}
-
-impl PartialOrd for ScoredMove {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.score.cmp(&other.score))
-    }
-}
-
-impl Deref for ScoredMoves {
-    type Target = ArrayVec<ScoredMove, MAX_LEGAL_MOVES>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.moves
-    }
-}
-
-impl DerefMut for ScoredMoves {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.moves
-    }
-}
-
-impl FromIterator<ScoredMove> for ScoredMoves {
-    fn from_iter<Moves: IntoIterator<Item = ScoredMove>>(other_stack: Moves) -> Self {
-        let mut stack = ArrayVec::new();
-
-        for item in other_stack {
-            // SAFETY: `Moves` and `ScoredMoves` have the same length, so
-            // `stack` is guaranteed to be able to hold all of `other_stack`s
-            // items
-            unsafe { stack.push_unchecked(item) };
-        }
-
-        Self { moves: stack }
-    }
-}
-
-impl Iterator for ScoredMoves {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.pop().map(|scored_move| scored_move.mv)
-    }
+    tt_move: Option<Move>,
+    stage: Stage,
+    moves: Moves,
+    skip_non_king_quiets: bool,
+    skip_king_quiets: bool,
 }
 
 impl MovePicker {
     /// Creates a new [`MovePicker`] based on the information in `board` and
     /// `tt_move`.
-    ///
-    /// If `tt_move == Move::null()`, it will be ignored.
-    pub fn new<const MOVE_TYPE: u8>(board: &Board, tt_move: Option<Move>) -> Self {
-        let mut moves = generate_moves::<MOVE_TYPE>(board).score::<MOVE_TYPE>(board, tt_move);
-        moves.sort();
-        Self { moves }
-    }
-}
-
-impl Moves {
-    /// Scores the moves in `moves`, given the information in `search_info` and
-    /// the current height.
-    pub fn score<const MOVE_TYPE: u8>(self, board: &Board, tt_move: Option<Move>) -> ScoredMoves {
-        self.into_iter()
-            .map(|mv| ScoredMove::new::<MOVE_TYPE>(board, mv, tt_move))
-            .collect()
-    }
-}
-
-impl ScoredMove {
-    /// Scores a [`Move`].
-    pub fn new<const MOVE_TYPE: u8>(board: &Board, mv: Move, tt_move: Option<Move>) -> Self {
-        if MOVE_TYPE != MoveType::CAPTURES && Some(mv) == tt_move {
-            return Self {
-                mv,
-                score: TT_SCORE,
-            };
-        }
-
-        let captured_piece = if mv.is_en_passant() {
-            PieceType::PAWN
-        } else if mv.is_promotion() {
-            PieceType(mv.promotion_piece().0 - PieceType::PAWN.0)
-        } else {
-            PieceType::from(board.piece_on(mv.end()))
-        };
-
-        if captured_piece == PieceType::NONE {
-            return Self {
-                mv,
-                score: QUIET_SCORE,
-            };
-        }
-
-        debug_assert!(
-            captured_piece != PieceType::KING,
-            "How are you capturing a king?"
+    pub fn new<Type: MovesType>(tt_move: Option<Move>) -> Self {
+        assert!(
+            Type::CAPTURES,
+            "the movepicker relies on always generating captures"
         );
-
-        let mut score = captured_piece.mvv_bonus();
-        if board.is_winning_exchange(mv) {
-            score += WINNING_CAPTURE_SCORE;
+        Self {
+            tt_move,
+            stage: Stage::TtMove,
+            moves: Moves::new(),
+            skip_non_king_quiets: !Type::NON_KING_QUIETS,
+            skip_king_quiets: !Type::KING_QUIETS,
         }
-        Self { mv, score }
     }
-}
 
-impl ScoredMoves {
-    /// Sorts the scored moves.
-    pub fn sort(&mut self) {
-        self.sort_by(Ord::cmp);
+    /// Return the next best [`Move`] in the list of legal moves.
+    pub fn next(&mut self, board: &Board) -> Option<Move> {
+        if self.stage == Stage::TtMove {
+            self.stage = Stage::GenerateCaptures;
+            if self.tt_move.is_some() {
+                return self.tt_move;
+            }
+        }
+        if self.stage == Stage::GenerateCaptures {
+            self.stage = Stage::GoodCaptures;
+            generate_moves::<CapturesOnly>(board, &mut self.moves);
+            // SAFETY: either `self.moves.len() - 1` is a valid index,
+            // or it's 0, in which case `moves[0..0]` will return an
+            // empty array
+            unsafe { self.score::<CapturesOnly>(board, 0, self.moves.len()) };
+        }
+        if self.stage == Stage::GoodCaptures {
+            if let Some(scored_move) = self.find_next_best(board) {
+                return Some(scored_move.mv);
+            }
+            if self.skip_non_king_quiets && self.skip_king_quiets {
+                self.stage = Stage::Remaining;
+            } else {
+                self.stage = Stage::GenerateRemaining;
+            }
+        }
+        if self.stage == Stage::GenerateRemaining {
+            self.stage = Stage::Remaining;
+            let total_non_quiets = self.moves.len();
+            if self.skip_non_king_quiets {
+                generate_moves::<KingMovesOnly>(board, &mut self.moves);
+                // SAFETY: `total_non_quiets..self.moves.len()` is
+                // always valid
+                unsafe {
+                    self.score::<KingMovesOnly>(board, total_non_quiets, self.moves.len());
+                }
+            } else {
+                generate_moves::<QuietsOnly>(board, &mut self.moves);
+                // SAFETY: `total_non_quiets..self.moves.len()` is
+                // always valid
+                unsafe {
+                    self.score::<QuietsOnly>(board, total_non_quiets, self.moves.len());
+                }
+            }
+        }
+        if self.stage == Stage::Remaining {
+            if let Some(scored_move) = self.find_next_best(board) {
+                return Some(scored_move.mv);
+            }
+            self.stage = Stage::Completed;
+        }
+        None
+    }
+
+    /// Find the next best move in the current list of generated moves.
+    fn find_next_best(&mut self, board: &Board) -> Option<ScoredMove> {
+        loop {
+            if self.moves.is_empty() {
+                return None;
+            }
+
+            let mut best_score = -Eval::MAX;
+            let mut best_index = 0;
+            for (index, scored_move) in self.moves.iter().enumerate() {
+                if scored_move.score > best_score {
+                    best_score = scored_move.score;
+                    best_index = index;
+                }
+            }
+
+            // SAFETY: `best_index` was created from within `self.moves` so it
+            // must be valid
+            let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
+
+            if Some(scored_move.mv) == self.tt_move {
+                self.moves.remove(best_index);
+                continue;
+            }
+
+            if best_score >= ScoredMove::WINNING_CAPTURE_SCORE
+                && !board.is_winning_exchange(scored_move.mv)
+            {
+                scored_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
+                continue;
+            }
+
+            if self.stage == Stage::GoodCaptures
+                && scored_move.score < ScoredMove::WINNING_CAPTURE_SCORE
+            {
+                return None;
+            }
+
+            return Some(self.moves.remove(best_index));
+        }
+    }
+
+    /// Scores the moves in `moves[start..end]`, given the information in
+    /// `search_info` and the current height.
+    ///
+    /// The slice does not bounds check: if `moves[start..end]` would have
+    /// panicked, this function will have undefined behaviour.
+    pub unsafe fn score<Type: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
+        // SAFETY: it's up to the caller to make sure this index is safe
+        let moves = unsafe { self.moves.get_unchecked_mut(start..end).iter_mut() };
+        for mv in moves {
+            mv.score::<Type>(board);
+        }
     }
 }

@@ -19,9 +19,9 @@
 use super::{movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker};
 use crate::{
     board::Board,
-    defs::MoveType,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
     lookups::base_reductions,
+    movegen::{AllMoves, CapturesOnly, Evasions},
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
@@ -157,10 +157,10 @@ impl Worker<'_> {
         let mut best_score = -INF_EVAL;
         let mut best_move = None;
         let mut new_pv = Pv::new();
-        let movepicker = MovePicker::new::<{ MoveType::ALL }>(board, tt_move);
+        let mut movepicker = MovePicker::new::<AllMoves>(tt_move);
 
         let mut total_moves: u8 = 0;
-        for mv in movepicker {
+        while let Some(mv) = movepicker.next(board) {
             let mut copy = *board;
             if !copy.make_move(mv) {
                 continue;
@@ -328,13 +328,13 @@ impl Worker<'_> {
             return alpha;
         }
 
-        let movepicker = if is_in_check {
-            MovePicker::new::<{ MoveType::EVASIONS }>(board, None)
+        let mut movepicker = if is_in_check {
+            MovePicker::new::<Evasions>(None)
         } else {
-            MovePicker::new::<{ MoveType::CAPTURES }>(board, None)
+            MovePicker::new::<CapturesOnly>(None)
         };
 
-        for mv in movepicker {
+        while let Some(mv) = movepicker.next(board) {
             let mut copy = *board;
             if !copy.make_move(mv) {
                 continue;

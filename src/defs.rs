@@ -34,9 +34,6 @@ pub struct Direction(pub i8);
 #[derive(Clone, Copy)]
 pub struct File(pub u8);
 
-/// A certain type of move. See associated constants.
-pub struct MoveType;
-
 /// A piece, containing the type of piece and side.
 ///
 /// The internal order of pieces is the same as [`PieceType`], but the exact
@@ -106,16 +103,6 @@ impl File {
     pub const FILE7: Self = Self(6);
     pub const FILE8: Self = Self(7);
     pub const TOTAL: usize = 8;
-}
-
-#[allow(dead_code, clippy::missing_docs_in_private_items)]
-impl MoveType {
-    /// All moves.
-    pub const ALL: u8 = 0;
-    /// Captures only.
-    pub const CAPTURES: u8 = 1;
-    /// Check evasions: king moves and/or captures of checkers.
-    pub const EVASIONS: u8 = 2;
 }
 
 /// Piece enumerations for White and Black.

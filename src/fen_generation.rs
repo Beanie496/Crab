@@ -27,9 +27,9 @@ use oorandom::Rand64;
 
 use crate::{
     board::{Board, STARTPOS},
-    defs::{MoveType, Side},
+    defs::Side,
     evaluation::Eval,
-    movegen::generate_moves,
+    movegen::{generate_moves, AllMoves, Moves},
     search::{aspiration::AspirationWindow, Depth, Limits, Pv, RootNode, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
@@ -197,9 +197,10 @@ fn generate_openings_for_board(
         return required_openings - 1;
     }
 
-    let mut all_moves = generate_moves::<{ MoveType::ALL }>(board);
+    let mut all_moves = Moves::new();
+    generate_moves::<AllMoves>(board, &mut all_moves);
 
-    while let Some(mv) = all_moves.pop_random(rng) {
+    while let Some(mv) = all_moves.pop_random(rng).map(|scored_move| scored_move.mv) {
         let mut board_copy = *board;
         if !board_copy.make_move(mv) {
             continue;

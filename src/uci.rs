@@ -31,9 +31,8 @@ use std::{
 use crate::{
     bench::bench,
     board::Board,
-    defs::{MoveType, PieceType, Side, Square},
-    movegen::generate_moves,
-    movegen::magic::find_magics,
+    defs::{PieceType, Side, Square},
+    movegen::{generate_moves, magic::find_magics, AllMoves, Moves},
     perft::perft,
     search::{Limits, SharedState, Worker, ZobristKeyStack},
     transposition_table::TranspositionTable,
@@ -315,6 +314,7 @@ pub fn set_position<'b, T>(mut tokens: T, old_keys: &mut ZobristKeyStack, old_bo
 where
     T: Iterator<Item = &'b str>,
 {
+    let mut moves = Moves::new();
     let mut board = Board::new();
     let mut keys = ZobristKeyStack::new();
 
@@ -352,7 +352,7 @@ where
 
     // if there are no moves to begin with, this loop will just be skipped
     for mv in tokens {
-        let moves = generate_moves::<{ MoveType::ALL }>(&board);
+        generate_moves::<AllMoves>(&board, &mut moves);
 
         let Some(start) = mv.get(0..=1) else {
             return;
@@ -393,6 +393,7 @@ where
         }
 
         keys.push(board.key());
+        moves.clear();
     }
 
     *old_board = board;
