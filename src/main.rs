@@ -44,12 +44,12 @@
 //! instead of the UCI look. Accepted command-line arguments:
 //! - `bench`: this is the same as the regular `bench` command
 //! - `genfens <N> seed <S> book <None|path/to/some_book.epd> [T]`: see
-//! [`generate_fens()`] for more detail. Note that this is **one** argument
-//! because that's how OpenBench will run the argument.
+//!   [`generate_fens()`] for more detail. Note that this is **one** argument
+//!   because that's how OpenBench will run the argument.
 //! - `sample <path/to/some_book.epd>`: see module-level documentation of
-//! `game_sampler`. Requires the `sample` feature.
+//!   `game_sampler`. Requires the `sample` feature.
 //! - `tune <path/to/positions.fen> [learning rate]`: see module-level
-//! documentation of `tune`. Requires the `tune` feature.
+//!   documentation of `tune`. Requires the `tune` feature.
 
 use std::{env::args, sync::mpsc::RecvError};
 

@@ -618,7 +618,7 @@ impl<'a> Worker<'a> {
     }
 
     /// Returns if the root node should print extra information.
-    fn should_print(&mut self) -> bool {
+    fn should_print(&self) -> bool {
         self.start.elapsed() > Duration::from_millis(3000) && self.can_print
     }
 
