@@ -759,9 +759,9 @@ fn generate_pawn_moves<Type: MovesType, const IS_WHITE: bool>(
         promotion_pawns.south().west() & them_bb
     };
 
-    for dest_pawn in single_push {
-        let origin = dest_pawn - forward;
-        if Type::NON_KING_QUIETS {
+    if Type::NON_KING_QUIETS {
+        for dest_pawn in single_push {
+            let origin = dest_pawn - forward;
             moves.push(Move::new_promo::<{ PieceType::KNIGHT.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::BISHOP.0 }>(origin, dest_pawn));
             moves.push(Move::new_promo::<{ PieceType::ROOK.0 }>(origin, dest_pawn));
