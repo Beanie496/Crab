@@ -143,7 +143,7 @@ impl MovePicker {
             let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
 
             if Some(scored_move.mv) == self.tt_move {
-                self.moves.remove(best_index);
+                self.moves.swap_remove(best_index);
                 continue;
             }
 
@@ -160,7 +160,7 @@ impl MovePicker {
                 return None;
             }
 
-            return Some(self.moves.remove(best_index));
+            return Some(self.moves.swap_remove(best_index));
         }
     }
 
