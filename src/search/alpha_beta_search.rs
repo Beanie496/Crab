@@ -323,6 +323,10 @@ impl Worker<'_> {
             evaluate(board)
         };
 
+        if height == Depth::MAX {
+            return best_score;
+        }
+
         alpha = alpha.max(best_score);
         if alpha >= beta {
             return alpha;
