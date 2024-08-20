@@ -37,8 +37,6 @@ enum Stage {
     GenerateRemaining,
     /// Return all remaining moves (bad captures and quiets).
     Remaining,
-    /// There is nothing left to return.
-    Completed,
 }
 
 /// A selector of the next best move in a position.
@@ -76,6 +74,7 @@ impl MovePicker {
                 return self.tt_move;
             }
         }
+
         if self.stage == Stage::GenerateCaptures {
             self.stage = Stage::GoodCaptures;
             generate_moves::<CapturesOnly>(board, &mut self.moves);
@@ -84,6 +83,7 @@ impl MovePicker {
             // empty array
             unsafe { self.score::<CapturesOnly>(board, 0, self.moves.len()) };
         }
+
         if self.stage == Stage::GoodCaptures {
             if let Some(scored_move) = self.find_next_best(board) {
                 return Some(scored_move.mv);
@@ -94,6 +94,7 @@ impl MovePicker {
                 self.stage = Stage::GenerateRemaining;
             }
         }
+
         if self.stage == Stage::GenerateRemaining {
             self.stage = Stage::Remaining;
             let total_non_quiets = self.moves.len();
@@ -113,13 +114,9 @@ impl MovePicker {
                 }
             }
         }
-        if self.stage == Stage::Remaining {
-            if let Some(scored_move) = self.find_next_best(board) {
-                return Some(scored_move.mv);
-            }
-            self.stage = Stage::Completed;
-        }
-        None
+
+        debug_assert!(self.stage == Stage::Remaining, "unhandled stage");
+        self.find_next_best(board).map(|scored_move| scored_move.mv)
     }
 
     /// Find the next best move in the current list of generated moves.
