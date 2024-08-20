@@ -88,8 +88,9 @@ impl MovePicker {
             if let Some(scored_move) = self.find_next_best(board) {
                 return Some(scored_move.mv);
             }
+            // this also skips bad captures
             if self.skip_non_king_quiets && self.skip_king_quiets {
-                self.stage = Stage::Remaining;
+                return None;
             } else {
                 self.stage = Stage::GenerateRemaining;
             }
