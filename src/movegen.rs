@@ -230,9 +230,7 @@ impl Move {
 
 impl ScoredMove {
     /// The score of a capture with a winning static exchange evaluation.
-    pub const WINNING_CAPTURE_SCORE: Eval = 0x2000;
-    /// The score of a quiet move.
-    pub const QUIET_SCORE: Eval = 0x1000;
+    pub const WINNING_CAPTURE_SCORE: Eval = 0x1000;
 }
 
 impl Display for Move {
@@ -625,7 +623,6 @@ impl ScoredMove {
     #[allow(clippy::assertions_on_constants)]
     pub fn score<Type: MovesType>(&mut self, board: &Board) {
         if !Type::CAPTURES {
-            self.score += Self::QUIET_SCORE;
             return;
         }
 
@@ -639,19 +636,13 @@ impl ScoredMove {
 
         // Pre-emptively give the capture a winning score - it can be
         // checked later.
-        // This outer if statement has odd but intentional behaviour - if a
-        // move doesn't capture anything but this function is being told it's a
+        // This if statement has odd but intentional behaviour - if a move
+        // doesn't capture anything but this function is being told it's a
         // capture, it will treat it as a capture, but if it's told it's
         // scoring any type of move, it will treat it as a quiet. This is so
         // queen promotions (even quiet ones) can be treated as captures.
-        if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
+        if !Type::KING_QUIETS && !Type::NON_KING_QUIETS || captured_piece != PieceType::NONE {
             self.score += Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
-        } else {
-            self.score += if captured_piece == PieceType::NONE {
-                Self::QUIET_SCORE
-            } else {
-                Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus()
-            };
         }
     }
 }

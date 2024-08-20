@@ -91,9 +91,8 @@ impl MovePicker {
             // this also skips bad captures
             if self.skip_non_king_quiets && self.skip_king_quiets {
                 return None;
-            } else {
-                self.stage = Stage::GenerateRemaining;
             }
+            self.stage = Stage::GenerateRemaining;
         }
 
         if self.stage == Stage::GenerateRemaining {
