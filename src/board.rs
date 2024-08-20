@@ -788,6 +788,9 @@ impl Board {
     /// Performs Static Exchange Evaluation (SEE) on the destination square of
     /// the given move. Returns whether or not the resulting exchange is a net
     /// material win.
+    ///
+    /// If the move isn't capturing anything, it will return `true` even if
+    /// would be a losing exchange.
     pub fn is_winning_exchange(&self, mv: Move) -> bool {
         let origin = mv.start();
         let target = mv.end();
@@ -796,9 +799,14 @@ impl Board {
         let mut see_value = if mv.is_en_passant() {
             PieceType::PAWN
         } else {
-            PieceType::from(self.piece_on(target))
+            let captured_piece = PieceType::from(self.piece_on(target));
+            if captured_piece == PieceType::NONE {
+                return true;
+            }
+            captured_piece
         }
         .see_bonus();
+
         if mv.is_promotion() {
             // swap the pawn vaue with the promotion piece value
             see_value += mv.promotion_piece().see_bonus() - PieceType::PAWN.see_bonus();
