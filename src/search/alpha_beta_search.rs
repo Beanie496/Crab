@@ -89,6 +89,8 @@ impl Worker<'_> {
             evaluate(board)
         };
 
+        self.killers.clear_next(height);
+
         if !NodeType::IS_PV && !is_in_check {
             // Null move pruning: if we can give the opponent a free move (by
             // not moving a piece this move) and the resulting evaluation on a
@@ -157,7 +159,8 @@ impl Worker<'_> {
         let mut best_score = -INF_EVAL;
         let mut best_move = None;
         let mut new_pv = Pv::new();
-        let mut movepicker = MovePicker::new::<AllMoves>(tt_move);
+        let killers = self.killers.current(height);
+        let mut movepicker = MovePicker::new::<AllMoves>(tt_move, killers);
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
@@ -279,6 +282,10 @@ impl Worker<'_> {
             };
         }
 
+        if let Some(best_move) = best_move {
+            self.killers.insert(height, best_move);
+        }
+
         // store into tt
         let bound = if best_score >= beta {
             Bound::Lower
@@ -333,9 +340,9 @@ impl Worker<'_> {
         }
 
         let mut movepicker = if is_in_check {
-            MovePicker::new::<Evasions>(None)
+            MovePicker::new::<Evasions>(None, [None; 2])
         } else {
-            MovePicker::new::<CapturesOnly>(None)
+            MovePicker::new::<CapturesOnly>(None, [None; 2])
         };
 
         while let Some(mv) = movepicker.next(board) {

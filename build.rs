@@ -31,9 +31,15 @@ type Depth = u8;
 ///
 /// Indexed by the depth then number of legal moves.
 type BaseReductions = [[Depth; 128]; 64];
+/// A table of rays between two squares;
+type RaysBetween = [[u64; 64]; 64];
 
 fn main() -> io::Result<()> {
+    if !Path::new("binaries").exists() {
+        fs::create_dir("binaries")?;
+    }
     create_base_reductions()?;
+    create_rays_between()?;
 
     println!("cargo::rerun-if-changed=build.rs");
 
@@ -58,8 +64,94 @@ fn create_base_reductions() -> io::Result<()> {
 
     // SAFETY: there are no invalid bit patterns for a `u8`
     let reductions_bytes = unsafe { transmute::<BaseReductions, [u8; SIZE]>(base_reductions) };
-    if !Path::new("binaries").exists() {
-        fs::create_dir("binaries")?;
-    }
     fs::write("binaries/base_reductions.bin", reductions_bytes)
+}
+
+/// Creates a table of bitboard rays between two squares (exclusive).
+///
+/// If the squares are not orthogonal or diagonal to each other, the bitboard
+/// will be empty.
+#[allow(clippy::missing_docs_in_private_items, clippy::items_after_statements)]
+fn create_rays_between() -> io::Result<()> {
+    let mut rays_between: RaysBetween = [[0; 64]; 64];
+    const SIZE: usize = size_of::<RaysBetween>();
+
+    for start in 0..64 {
+        for end in (start + 1)..64 {
+            if let Some(direction) = direction_of_dest(start, end) {
+                let ray = flood_fill(start, end, direction);
+                rays_between[usize::from(start)][usize::from(end)] = ray;
+                rays_between[usize::from(end)][usize::from(start)] = ray;
+            }
+        }
+    }
+
+    // SAFETY: there are no invalid bit patterns for a `u8`
+    let rays_bytes = unsafe { transmute::<RaysBetween, [u8; SIZE]>(rays_between) };
+    fs::write("binaries/rays_between.bin", rays_bytes)
+}
+
+/// Calculates which direction `dest` is from `square` as an offset.
+///
+/// If `dest` is not orthogonal or diagonal from `square`, it will return
+/// `None`.
+const fn direction_of_dest(square: u8, dest: u8) -> Option<u8> {
+    // north: difference is divisible by 8
+    if (dest - square) % 8 == 0 {
+        return Some(8);
+    }
+
+    // east: both on same rank
+    if square >> 3 == dest >> 3 {
+        return Some(1);
+    }
+
+    // north-west
+    let mut current = square;
+    loop {
+        if is_illegal_step(current, current + 7) {
+            break;
+        }
+        current += 7;
+        if current == dest {
+            return Some(7);
+        }
+    }
+
+    // north-east
+    let mut current = square;
+    loop {
+        if is_illegal_step(current, current + 9) {
+            break;
+        }
+        current += 9;
+        if current == dest {
+            return Some(9);
+        }
+    }
+
+    None
+}
+
+/// Returns a ray in the given direction from `start` until it reaches `end` or
+/// a side of the board.
+const fn flood_fill(mut start: u8, end: u8, direction: u8) -> u64 {
+    let mut ret = 0;
+
+    loop {
+        let next = start + direction;
+        if is_illegal_step(start, next) || next == end {
+            break;
+        }
+        start = next;
+        ret |= 1 << start;
+    }
+
+    ret
+}
+
+/// Checks if `step` is a valid king move from `current`.
+const fn is_illegal_step(current: u8, step: u8) -> bool {
+    // if step is outside the board or has wrapped round the side
+    step >= 64 || (step & 7).abs_diff(current & 7) > 1
 }

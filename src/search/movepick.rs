@@ -18,7 +18,9 @@
 
 use crate::{
     board::Board,
+    defs::{Piece, PieceType, Side, Square},
     evaluation::Eval,
+    lookups::ray_between,
     movegen::{
         generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
     },
@@ -33,6 +35,10 @@ enum Stage {
     GenerateCaptures,
     /// Return all good captures.
     GoodCaptures,
+    /// Return the first killer.
+    FirstKiller,
+    /// Return the second killer.
+    SecondKiller,
     /// Generate all remaining moves (i.e. quiets).
     GenerateRemaining,
     /// Return all remaining moves (bad captures and quiets).
@@ -43,6 +49,7 @@ enum Stage {
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct MovePicker {
     tt_move: Option<Move>,
+    killers: [Option<Move>; 2],
     stage: Stage,
     moves: Moves,
     skip_non_king_quiets: bool,
@@ -52,13 +59,14 @@ pub struct MovePicker {
 impl MovePicker {
     /// Creates a new [`MovePicker`] based on the information in `board` and
     /// `tt_move`.
-    pub fn new<Type: MovesType>(tt_move: Option<Move>) -> Self {
+    pub fn new<Type: MovesType>(tt_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
         assert!(
             Type::CAPTURES,
             "the movepicker relies on always generating captures"
         );
         Self {
             tt_move,
+            killers,
             stage: Stage::TtMove,
             moves: Moves::new(),
             skip_non_king_quiets: !Type::NON_KING_QUIETS,
@@ -92,7 +100,29 @@ impl MovePicker {
             if self.skip_non_king_quiets && self.skip_king_quiets {
                 return None;
             }
+            self.stage = Stage::FirstKiller;
+        }
+
+        if self.stage == Stage::FirstKiller {
+            self.stage = Stage::SecondKiller;
+            if self.killers[0] != self.tt_move {
+                if let Some(mv) = self.killers[0] {
+                    if is_pseudolegal_killer(board, mv) {
+                        return Some(mv);
+                    }
+                }
+            }
+        }
+
+        if self.stage == Stage::SecondKiller {
             self.stage = Stage::GenerateRemaining;
+            if self.killers[1] != self.tt_move {
+                if let Some(mv) = self.killers[1] {
+                    if is_pseudolegal_killer(board, mv) {
+                        return Some(mv);
+                    }
+                }
+            }
         }
 
         if self.stage == Stage::GenerateRemaining {
@@ -139,7 +169,10 @@ impl MovePicker {
             // must be valid
             let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
 
-            if Some(scored_move.mv) == self.tt_move {
+            if self.tt_move == Some(scored_move.mv)
+                || self.killers[0] == Some(scored_move.mv)
+                || self.killers[1] == Some(scored_move.mv)
+            {
                 self.moves.remove(best_index);
                 continue;
             }
@@ -166,11 +199,88 @@ impl MovePicker {
     ///
     /// The slice does not bounds check: if `moves[start..end]` would have
     /// panicked, this function will have undefined behaviour.
-    pub unsafe fn score<Type: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
+    unsafe fn score<Type: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
         // SAFETY: it's up to the caller to make sure this index is safe
         let moves = unsafe { self.moves.get_unchecked_mut(start..end).iter_mut() };
         for mv in moves {
             mv.score::<Type>(board);
         }
     }
+}
+
+/// Checks if `mv` is a legal killer on `board`, assuming it was legal in
+/// the previous same-depth search.
+fn is_pseudolegal_killer(board: &Board, mv: Move) -> bool {
+    let start = mv.start();
+    let end = mv.end();
+
+    let piece = board.piece_on(start);
+    let piece_type = PieceType::from(piece);
+    // this might be wrong so it needs to be checked before it's used
+    let piece_side = Side::from(piece);
+    let captured = board.piece_on(end);
+    let captured_type = PieceType::from(captured);
+    // this also might be wrong
+    let captured_side = Side::from(captured);
+
+    // check the piece still exists (en passant can delete it) and hasn't been
+    // captured
+    if piece == Piece::NONE || piece_side != board.side_to_move() {
+        return false;
+    }
+
+    // check we aren't capturing a friendly piece
+    if captured != Piece::NONE && captured_side == board.side_to_move() {
+        return false;
+    }
+
+    // check we weren't blocked
+    if !(ray_between(start, end) & board.occupancies()).is_empty() {
+        return false;
+    }
+
+    // check we aren't capturing a king
+    if captured_type == PieceType::KING {
+        return false;
+    }
+
+    // if the piece is a pawn, do some additional checks
+    if piece_type == PieceType::PAWN && !is_pseudolegal_pawn_killer(board, mv) {
+        return false;
+    }
+
+    if mv.is_castling() {
+        let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
+        if !(ray_between(start, rook_start) & board.side_any(captured_side)).is_empty() {
+            return false;
+        }
+        if board.piece_on(rook_start) != Piece::from_piecetype(PieceType::ROOK, piece_side) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Checks if `mv` is a legal pawn killer, given the same assumptions as
+/// [`is_pseudolegal_killer()`] and assuming the move is a pawn move.
+fn is_pseudolegal_pawn_killer(board: &Board, mv: Move) -> bool {
+    // small optimisation: if the best response to the first move was en
+    // passant, it is impossible for that same en passant move to be legal
+    // after any other move
+    if mv.is_en_passant() {
+        return false;
+    }
+
+    let start = mv.start();
+    let end = mv.end();
+    let diff = start.0.abs_diff(end.0);
+    // a piece getting between the start and end of a double push was already
+    // checked
+    let is_push = diff == 8 || diff == 16;
+    let is_piece_on_end = board.piece_on(end) != Piece::NONE;
+
+    // check that there isn't a piece blocking us if we're pushing or that
+    // there is a piece if we're capturing
+    is_push && !is_piece_on_end || !is_push && is_piece_on_end
 }
