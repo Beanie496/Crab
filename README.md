@@ -15,6 +15,7 @@ Features:
 - Move ordering:
   - TT-move
   - MVV + SEE captures
+  - Killer moves
 - Extensions:
   - Check extensions
 - Late move reductions
