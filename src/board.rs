@@ -559,7 +559,7 @@ impl Board {
     ///
     /// `piece == Piece::from_piecetype(piece_type, side)`. Having the two
     /// redundant arguments is faster though.
-    fn move_piece(
+    pub fn move_piece(
         &mut self,
         start: Square,
         end: Square,
@@ -583,7 +583,7 @@ impl Board {
     /// Adds a piece to square `square` for side `side`.
     ///
     /// Assumes there is no piece on the square to be written to.
-    fn add_piece(&mut self, square: Square, piece: Piece) {
+    pub fn add_piece(&mut self, square: Square, piece: Piece) {
         let square_bb = Bitboard::from(square);
         let side = Side::from(piece);
         self.set_mailbox_piece(square, piece);
@@ -597,7 +597,13 @@ impl Board {
     /// Technically most of these parameters could be calculated instead of
     /// passed by argument, but it resulted in a noticeable slowdown when they
     /// were removed.
-    fn remove_piece(&mut self, square: Square, piece: Piece, piece_type: PieceType, side: Side) {
+    pub fn remove_piece(
+        &mut self,
+        square: Square,
+        piece: Piece,
+        piece_type: PieceType,
+        side: Side,
+    ) {
         let bb = Bitboard::from(square);
         self.unset_mailbox_piece(square);
         self.toggle_piece_bb(piece_type, bb);

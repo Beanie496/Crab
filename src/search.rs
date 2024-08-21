@@ -19,6 +19,7 @@
 use std::{
     fmt::{self, Display, Formatter, Write},
     mem::MaybeUninit,
+    ops::{Index, IndexMut},
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
@@ -116,6 +117,13 @@ enum SearchStatus {
     Quit,
 }
 
+/// The killer moves for a given depth: the best move from the previous search
+/// at the same depth.
+#[allow(clippy::missing_docs_in_private_items)]
+struct Killers {
+    killers: [[Option<Move>; 2]; Depth::MAX as usize + 1],
+}
+
 /// Whether White, Black or both sides can do a null move within a search.
 #[allow(clippy::missing_docs_in_private_items)]
 struct NmpRights {
@@ -167,6 +175,8 @@ pub struct Worker<'a> {
     status: SearchStatus,
     /// Which side (if at all) null move pruning is allowed for.
     nmp_rights: NmpRights,
+    /// The table of killer moves used throughout the search.
+    killers: Killers,
     /// If the search is allowed to print to stdout.
     can_print: bool,
     /// The limits of the search.
@@ -203,6 +213,27 @@ impl NmpRights {
 impl Default for Limits {
     fn default() -> Self {
         Self::Infinite
+    }
+}
+
+impl Index<usize> for Killers {
+    type Output = [Option<Move>; 2];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        get_unchecked(&self.killers, index)
+    }
+}
+
+impl IndexMut<usize> for Killers {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(
+            index < self.killers.len(),
+            "Attempted to index out of bounds: {} >= {}",
+            index,
+            self.killers.len()
+        );
+        // SAFETY: we just checked `index` is valid
+        unsafe { self.killers.get_unchecked_mut(index) }
     }
 }
 
@@ -341,6 +372,35 @@ impl Limits {
     }
 }
 
+impl Killers {
+    /// Creates new, empty [`Killers`].
+    const fn new() -> Self {
+        Self {
+            killers: [[None; 2]; Depth::MAX as usize + 1],
+        }
+    }
+
+    /// Replace the second killer of the current height with the given move.
+    fn insert(&mut self, height: Depth, mv: Move) {
+        let height = usize::from(height);
+        if self[height][0] == Some(mv) {
+            return;
+        }
+        self[height][1] = self[height][0];
+        self[height][0] = Some(mv);
+    }
+
+    /// Return the killers of the current height.
+    fn current(&self, height: Depth) -> [Option<Move>; 2] {
+        self[usize::from(height)]
+    }
+
+    /// Clear the killers of the next height.
+    fn clear_next(&mut self, height: Depth) {
+        self[usize::from(height) + 1] = [None; 2];
+    }
+}
+
 impl NmpRights {
     /// Creates new [`NmpRights`] with both rights being enabled.
     const fn new() -> Self {
@@ -468,6 +528,7 @@ impl<'a> Worker<'a> {
             root_pv: Pv::new(),
             status: SearchStatus::Continue,
             nmp_rights: NmpRights::new(),
+            killers: Killers::new(),
             can_print: true,
             limits: Limits::default(),
             allocated: Duration::MAX,
@@ -533,6 +594,7 @@ impl<'a> Worker<'a> {
         self.nodes = 0;
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
+        self.killers[0] = [None; 2];
         self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
 
         self.iterative_deepening();
