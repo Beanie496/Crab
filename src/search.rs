@@ -143,6 +143,7 @@ pub struct Pv {
     first_empty: u8,
 }
 
+/// An iterater over the elements of a [`Pv`].
 struct PvIter<'a> {
     /// A slice of moves to iterate over.
     moves: &'a [MaybeUninit<Move>],
