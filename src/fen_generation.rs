@@ -201,16 +201,14 @@ fn generate_openings_for_board(
     generate_moves::<AllMoves>(board, &mut all_moves);
 
     while let Some(mv) = all_moves.pop_random(rng).map(|scored_move| scored_move.mv) {
-        let mut board_copy = *board;
-        if !board_copy.make_move(mv) {
+        let mut copy = *board;
+        if !worker.make_move(&mut copy, mv) {
             continue;
         }
 
-        worker.push_key(board_copy.key());
+        let score = -worker.search::<RootNode>(pv, &copy, -beta, -alpha, SEARCH_DEPTH, 0);
 
-        let score = -worker.search::<RootNode>(pv, &board_copy, -beta, -alpha, SEARCH_DEPTH, 0);
-
-        worker.pop_key();
+        worker.unmake_move();
 
         if score <= alpha || score >= beta {
             continue;
@@ -219,7 +217,7 @@ fn generate_openings_for_board(
         required_openings = generate_openings_for_board(
             worker,
             pv,
-            &board_copy,
+            &copy,
             required_openings,
             depth - 1,
             -beta,

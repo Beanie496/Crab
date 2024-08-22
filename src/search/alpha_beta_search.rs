@@ -62,7 +62,7 @@ impl Worker<'_> {
             }
 
             // draw by repetition or 50mr
-            if self.is_draw(board.halfmoves()) {
+            if self.is_draw(board.halfmoves(), board.key()) {
                 return DRAW;
             }
         }
@@ -89,7 +89,7 @@ impl Worker<'_> {
             evaluate(board)
         };
 
-        self.killers.clear_next(height);
+        self.histories.killers.clear_next(height);
 
         if !NodeType::IS_PV && !is_in_check {
             // Null move pruning: if we can give the opponent a free move (by
@@ -105,13 +105,8 @@ impl Worker<'_> {
             {
                 let reduction = null_move_reduction(static_eval, beta, depth);
 
-                self.nmp_rights.remove_right(board.side_to_move());
                 let mut copy = *board;
-                copy.make_null_move();
-                // SAFETY: we will push once per recursive call and the maximum
-                // number of recursive calls is equal to the length of
-                // past_keys
-                unsafe { self.past_keys.push_unchecked(copy.key()) };
+                self.make_null_move(&mut copy);
 
                 let mut new_pv = Pv::new();
                 let mut score = -self.search::<NonPvNode>(
@@ -123,8 +118,7 @@ impl Worker<'_> {
                     height + 1,
                 );
 
-                self.nmp_rights.add_right(board.side_to_move());
-                self.past_keys.pop();
+                self.unmake_null_move(board);
 
                 if score >= beta && score < MATE_BOUND {
                     if depth <= 8 {
@@ -164,18 +158,15 @@ impl Worker<'_> {
         let mut best_score = -INF_EVAL;
         let mut best_move = None;
         let mut new_pv = Pv::new();
-        let killers = self.killers.current(height);
+        let killers = self.histories.killers.current(height);
         let mut movepicker = MovePicker::new::<AllMoves>(tt_move, killers);
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
             let mut copy = *board;
-            if !copy.make_move(mv) {
+            if !self.make_move(&mut copy, mv) {
                 continue;
             }
-            // SAFETY: we will push once per recursive call and the maximum
-            // number of recursive calls is equal to the length of past_keys
-            unsafe { self.past_keys.push_unchecked(copy.key()) };
             total_moves += 1;
 
             if NodeType::IS_ROOT && self.should_print() {
@@ -232,7 +223,7 @@ impl Worker<'_> {
                 );
             }
 
-            self.past_keys.pop();
+            self.unmake_move();
 
             // if the search was stopped early, we can't trust its results
             if self.check_status() != SearchStatus::Continue {
@@ -288,7 +279,7 @@ impl Worker<'_> {
         }
 
         if let Some(best_move) = best_move {
-            self.killers.insert(height, best_move);
+            self.histories.killers.insert(height, best_move);
         }
 
         // store into tt

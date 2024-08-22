@@ -34,7 +34,7 @@ use crate::{
     defs::{PieceType, Side, Square},
     movegen::{generate_moves, magic::find_magics, AllMoves, Moves},
     perft::perft,
-    search::{Limits, SharedState, Worker, ZobristKeyStack},
+    search::{BoardHistory, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -173,12 +173,12 @@ pub fn main_loop() -> Result<(), RecvError> {
 
     let mut options = UciOptions::new();
     let mut board = Board::new();
-    let mut past_keys = ZobristKeyStack::new();
+    let mut board_history = BoardHistory::new();
     let tt = TranspositionTable::with_capacity(options.hash());
     let mut state = SharedState::new(Mutex::new(uci_rx), tt);
     let mut workers = create_workers(
         &state,
-        &past_keys,
+        &board_history,
         &board,
         options.threads(),
         options.move_overhead(),
@@ -207,10 +207,10 @@ pub fn main_loop() -> Result<(), RecvError> {
                 board.pretty_print();
             }
             Some("position") => {
-                set_position(tokens, &mut past_keys, &mut board);
+                set_position(tokens, &mut board_history, &mut board);
                 workers = create_workers(
                     &state,
-                    &past_keys,
+                    &board_history,
                     &board,
                     options.threads(),
                     options.move_overhead(),
@@ -220,7 +220,7 @@ pub fn main_loop() -> Result<(), RecvError> {
                 set_option(tokens, &mut options, &mut state);
                 workers = create_workers(
                     &state,
-                    &past_keys,
+                    &board_history,
                     &board,
                     options.threads(),
                     options.move_overhead(),
@@ -232,12 +232,11 @@ pub fn main_loop() -> Result<(), RecvError> {
             }
             Some("ucinewgame") => {
                 board.set_startpos();
-                past_keys.clear();
-                past_keys.push(board.key());
+                board_history.clear();
                 state.tt.clear();
                 workers = create_workers(
                     &state,
-                    &past_keys,
+                    &board_history,
                     &board,
                     options.threads(),
                     options.move_overhead(),
@@ -334,13 +333,13 @@ where
 ///
 /// Will not change anything if the command fails to get parsed
 /// successfully.
-pub fn set_position<'b, T>(mut tokens: T, old_keys: &mut ZobristKeyStack, old_board: &mut Board)
+pub fn set_position<'b, T>(mut tokens: T, old_history: &mut BoardHistory, old_board: &mut Board)
 where
     T: Iterator<Item = &'b str>,
 {
     let mut moves = Moves::new();
     let mut board = Board::new();
-    let mut keys = ZobristKeyStack::new();
+    let mut board_history = BoardHistory::new();
 
     match tokens.next() {
         Some("startpos") => board.set_startpos(),
@@ -372,7 +371,6 @@ where
             return;
         }
     }
-    keys.push(board.key());
 
     // if there are no moves to begin with, this loop will just be skipped
     for mv in tokens {
@@ -407,21 +405,22 @@ where
             return;
         };
 
+        board_history.push(board.key());
+
         if !board.make_move(mv) {
             return;
         }
 
         // we can safely discard all moves before an irreversible move
         if board.halfmoves() == 0 {
-            keys.clear();
+            board_history.clear();
         }
 
-        keys.push(board.key());
         moves.clear();
     }
 
     *old_board = board;
-    *old_keys = keys;
+    old_history.set_to(&board_history);
 }
 
 /// Sets a UCI option from a `setoption` command.
@@ -478,7 +477,7 @@ where
 /// Creates `threads` [`Worker`]s.
 fn create_workers<'a>(
     state: &'a SharedState,
-    past_keys: &ZobristKeyStack,
+    past_keys: &BoardHistory,
     board: &Board,
     threads: usize,
     move_overhead: Duration,
@@ -486,7 +485,7 @@ fn create_workers<'a>(
     let mut workers = Vec::with_capacity(threads);
     for _ in 0..workers.capacity() {
         let worker = Worker::new(state)
-            .with_board(past_keys.clone(), board)
+            .with_board(past_keys, board)
             .with_printing(true)
             .with_move_overhead(move_overhead);
         workers.push(worker);

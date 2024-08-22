@@ -23,7 +23,7 @@ use std::{
 
 use crate::{
     board::Board,
-    search::{Limits, SharedState, Worker, ZobristKeyStack},
+    search::{BoardHistory, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -75,10 +75,8 @@ where
 
         let board = position.parse::<Board>().expect("Malformed test position");
 
-        let mut stack = ZobristKeyStack::new();
-        stack.push(board.key());
         let mut worker = Worker::new(&state)
-            .with_board(stack, &board)
+            .with_board(&BoardHistory::new(), &board)
             .with_limits(limits);
         worker.start_search();
         let elapsed = worker.elapsed_time();

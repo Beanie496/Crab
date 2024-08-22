@@ -19,7 +19,7 @@
 use std::{
     fmt::{self, Display, Formatter, Write},
     mem::MaybeUninit,
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
@@ -50,8 +50,6 @@ pub mod time;
 /// The difference between the root or leaf node (for height or depth
 /// respectively) and the current node.
 pub type Depth = u8;
-/// A stack of zobrist keys.
-pub type ZobristKeyStack = ArrayVec<Key, { Depth::MAX as usize }>;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -117,6 +115,28 @@ enum SearchStatus {
     Quit,
 }
 
+/// The history of a board, excluding the current state of the board.
+///
+/// Each item corresponds to a previous state of the board. Each item is the
+/// previous item with a single move applied to it. Applying a move to the most
+/// recent item would get the current board state.
+#[allow(clippy::missing_docs_in_private_items)]
+pub struct BoardHistory {
+    history: ArrayVec<Key, { Depth::MAX as usize }>,
+}
+
+/// A struct containing various histories relating to the board.
+struct Histories {
+    /// Killer moves.
+    killers: Killers,
+    /// A stack of keys of previous board states, beginning from the initial
+    /// `position fen ...` command.
+    ///
+    /// The first (bottom) element is the initial board and the top element is
+    /// the current board.
+    board_history: BoardHistory,
+}
+
 /// The killer moves for a given depth: the best move from the previous search
 /// at the same depth.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -176,8 +196,8 @@ pub struct Worker<'a> {
     status: SearchStatus,
     /// Which side (if at all) null move pruning is allowed for.
     nmp_rights: NmpRights,
-    /// The table of killer moves used throughout the search.
-    killers: Killers,
+    /// The histories used exlusively within the search.
+    histories: Histories,
     /// If the search is allowed to print to stdout.
     can_print: bool,
     /// The limits of the search.
@@ -192,12 +212,6 @@ pub struct Worker<'a> {
     ///
     /// See [`Board`].
     board: Board,
-    /// A stack of keys of previous board states, beginning from the initial
-    /// `position fen ...` command.
-    ///
-    /// The first (bottom) element is the initial board and the top element is
-    /// the current board.
-    past_keys: ZobristKeyStack,
     /// State that all threads have access to.
     state: &'a SharedState,
 }
@@ -214,6 +228,20 @@ impl NmpRights {
 impl Default for Limits {
     fn default() -> Self {
         Self::Infinite
+    }
+}
+
+impl Deref for BoardHistory {
+    type Target = ArrayVec<Key, { Depth::MAX as usize }>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.history
+    }
+}
+
+impl DerefMut for BoardHistory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.history
     }
 }
 
@@ -307,6 +335,42 @@ impl Limits {
             inc: Duration::ZERO,
             moves_to_go: u8::MAX,
         }
+    }
+}
+
+impl BoardHistory {
+    /// Creates a new, empty [`BoardHistory`].
+    pub fn new() -> Self {
+        Self {
+            history: ArrayVec::new(),
+        }
+    }
+
+    /// Sets the items of `self` to `other`.
+    pub fn set_to(&mut self, other: &Self) {
+        self.clear();
+
+        for &item in other.iter() {
+            // SAFETY: `other.len() <= self.capacity()`
+            unsafe {
+                self.push_unchecked(item);
+            }
+        }
+    }
+}
+
+impl Histories {
+    /// Creates new, empty [`Histories`].
+    fn new() -> Self {
+        Self {
+            killers: Killers::new(),
+            board_history: BoardHistory::new(),
+        }
+    }
+
+    /// Clears all the histories apart from the board history.
+    fn clear(&mut self) {
+        self.killers[0] = [None; 2];
     }
 }
 
@@ -466,20 +530,19 @@ impl<'a> Worker<'a> {
             root_pv: Pv::new(),
             status: SearchStatus::Continue,
             nmp_rights: NmpRights::new(),
-            killers: Killers::new(),
+            histories: Histories::new(),
             can_print: true,
             limits: Limits::default(),
             allocated: Duration::MAX,
             move_overhead: Duration::ZERO,
             board: Board::new(),
-            past_keys: ZobristKeyStack::new(),
             state,
         }
     }
 
     /// Calls [`Self::set_board()`] on `self`.
-    pub fn with_board(mut self, past_keys: ZobristKeyStack, board: &Board) -> Self {
-        self.set_board(past_keys, board);
+    pub fn with_board(mut self, board_history: &BoardHistory, board: &Board) -> Self {
+        self.set_board(board_history, board);
         self
     }
 
@@ -506,20 +569,15 @@ impl<'a> Worker<'a> {
         self.limits = limits;
     }
 
-    /// Sets the board of the worker to the given board and zobrist key
-    /// stack.
-    ///
-    /// The top entry of `past_keys` is assumed to be the key of `board`.
-    pub fn set_board(&mut self, past_keys: ZobristKeyStack, board: &Board) {
-        self.past_keys = past_keys;
+    /// Sets the board of the worker to the given board and board history.
+    pub fn set_board(&mut self, board_history: &BoardHistory, board: &Board) {
+        self.histories.board_history.set_to(board_history);
         self.board = *board;
     }
 
-    /// Clears the key stack, sets the board to `board` and adds the key of the
-    /// board to the stack.
+    /// Clears the board history and sets the board to `board`.
     pub fn reset_board(&mut self, board: &Board) {
-        self.past_keys.clear();
-        self.past_keys.push(board.key());
+        self.histories.board_history.clear();
         self.board = *board;
     }
 
@@ -532,7 +590,7 @@ impl<'a> Worker<'a> {
         self.nodes = 0;
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
-        self.killers[0] = [None; 2];
+        self.histories.clear();
         self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
 
         self.iterative_deepening();
@@ -554,19 +612,49 @@ impl<'a> Worker<'a> {
         self.start.elapsed()
     }
 
-    /// Adds a zobrist key to the stack.
-    pub fn push_key(&mut self, key: Key) {
+    /// Makes `mv` on `board` and returns whether or not the move was legal.
+    pub fn make_move(&mut self, board: &mut Board, mv: Move) -> bool {
+        let old_key = board.key();
+
+        if !board.make_move(mv) {
+            return false;
+        }
+
+        self.push_board_history(old_key);
+        true
+    }
+
+    /// Makes a null move on `board`.
+    fn make_null_move(&mut self, board: &mut Board) {
+        self.nmp_rights.remove_right(board.side_to_move());
+        self.push_board_history(board.key());
+        board.make_null_move();
+    }
+
+    /// Unmakes the most recent move.
+    pub fn unmake_move(&mut self) {
+        self.pop_board_history();
+    }
+
+    /// Unmakes a null move, assuming `board` was the original board.
+    fn unmake_null_move(&mut self, board: &Board) {
+        self.nmp_rights.add_right(board.side_to_move());
+        self.pop_board_history();
+    }
+
+    /// Adds a history item to the stack.
+    fn push_board_history(&mut self, key: Key) {
         debug_assert!(
-            self.past_keys.len() < self.past_keys.capacity(),
+            self.histories.board_history.len() < self.histories.board_history.capacity(),
             "stack overflow"
         );
         // SAFETY: we just checked that we can push
-        unsafe { self.past_keys.push_unchecked(key) };
+        unsafe { self.histories.board_history.push_unchecked(key) };
     }
 
-    /// Pops a zobrist key off the stack.
-    pub fn pop_key(&mut self) -> Option<Key> {
-        self.past_keys.pop()
+    /// Pops a history item off the stack.
+    fn pop_board_history(&mut self) -> Option<Key> {
+        self.histories.board_history.pop()
     }
 
     /// Check the status of the search.
@@ -657,28 +745,27 @@ impl<'a> Worker<'a> {
 
     /// Checks if the position is drawn, either because of repetition or
     /// because of the fifty-move rule.
-    fn is_draw(&self, halfmoves: u8) -> bool {
+    fn is_draw(&self, halfmoves: u8, current_key: Key) -> bool {
         // 50mr
         if halfmoves >= 100 {
             return true;
         }
 
-        // SAFETY: there is always at least 1 key
-        let current_key = unsafe { self.past_keys.get_unchecked(self.past_keys.len() - 1) };
-
         // check if any past position's key is the same as the current key
-        self.past_keys
+        self.histories
+            .board_history
             .iter()
-            // most recent position is last
+            // the previous position is last
             .rev()
-            // it is impossible to get a repetition within the past 4 halfmoves
-            .skip(4)
+            // it is impossible to get a repetition within the past 4
+            // halfmoves, so skip the previous 3
+            .skip(3)
             // stop after an irreversible position, or stop immediately for
             // halfmoves < 4
             .take(usize::from(halfmoves).saturating_sub(3))
             // skip positions with the wrong stm
             .step_by(2)
-            .any(|key| key == current_key)
+            .any(|key| *key == current_key)
     }
 
     /// Prints information about a completed search iteration.
