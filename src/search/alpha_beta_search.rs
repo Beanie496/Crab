@@ -108,6 +108,10 @@ impl Worker<'_> {
                 self.nmp_rights.remove_right(board.side_to_move());
                 let mut copy = *board;
                 copy.make_null_move();
+                // SAFETY: we will push once per recursive call and the maximum
+                // number of recursive calls is equal to the length of
+                // past_keys
+                unsafe { self.past_keys.push_unchecked(copy.key()) };
 
                 let mut new_pv = Pv::new();
                 let mut score = -self.search::<NonPvNode>(
@@ -120,6 +124,7 @@ impl Worker<'_> {
                 );
 
                 self.nmp_rights.add_right(board.side_to_move());
+                self.past_keys.pop();
 
                 if score >= beta && score < MATE_BOUND {
                     if depth <= 8 {
