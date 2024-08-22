@@ -271,100 +271,37 @@ impl<'a> Iterator for PvIter<'a> {
 }
 
 impl Limits {
-    /// Sets the allocated time to the value in `time`.
-    ///
-    /// If `self` is not already [`Timed`](Self::Timed), it will be set to
-    /// [`Timed`](Self::Timed) with the given time. If `time` is [`None`], the
-    /// variant of `self` will be set to [`Infinite`](Self::Infinite).
-    pub fn set_time(&mut self, time: Option<Duration>) {
-        if let Some(t) = time {
-            if let &mut Self::Timed { ref mut time, .. } = self {
-                *time = t;
-            } else {
-                *self = Self::new_timed(t);
-            }
-        } else {
-            self.set_infinite();
-        }
-    }
-
-    /// Sets the increment to the value in `inc`.
+    /// Sets the increment.
     ///
     /// If `self` is not [`Timed`](Self::Timed), it will be set to
-    /// [`Infinite`](Self::Infinite). If `inc` is [`None`], it will be ignored.
-    pub fn set_inc(&mut self, inc: Option<Duration>) {
-        if let Some(i) = inc {
-            if let &mut Self::Timed { ref mut inc, .. } = self {
-                *inc = i;
-            } else {
-                self.set_infinite();
-            }
+    /// [`Infinite`](Self::Infinite).
+    pub fn set_inc(&mut self, increment: Duration) {
+        if let &mut Self::Timed { ref mut inc, .. } = self {
+            *inc = increment;
+        } else {
+            *self = Self::Infinite;
         }
     }
 
-    /// Sets the moves to go to the value in `moves_to_go`.
+    /// Sets the moves to go until the next time control.
     ///
     /// If `self` is not [`Timed`](Self::Timed), it will be set to
-    /// [`Infinite`](Self::Infinite). If `moves_to_go` is [`None`], it will be
-    /// ignored.
-    pub fn set_moves_to_go(&mut self, moves_to_go: Option<Depth>) {
-        if let Some(mtg) = moves_to_go {
-            if let &mut Self::Timed {
-                ref mut moves_to_go,
-                ..
-            } = self
-            {
-                *moves_to_go = mtg;
-            } else {
-                self.set_infinite();
-            }
-        }
-    }
-
-    /// Sets `self` to [`Depth(depth)`](Self::Depth).
-    ///
-    /// If `depth` is [`None`], `self` will be set to
     /// [`Infinite`](Self::Infinite).
-    pub fn set_depth(&mut self, depth: Option<Depth>) {
-        if let Some(depth) = depth {
-            *self = Self::Depth(depth);
+    pub fn set_moves_to_go(&mut self, mtg: Depth) {
+        if let &mut Self::Timed {
+            ref mut moves_to_go,
+            ..
+        } = self
+        {
+            *moves_to_go = mtg;
         } else {
-            self.set_infinite();
+            *self = Self::Infinite;
         }
-    }
-
-    /// Sets `self` to [`Nodes(nodes)`](Self::Nodes).
-    ///
-    /// If `nodes` is [`None`], `self` will be set to
-    /// [`Infinite`](Self::Infinite).
-    pub fn set_nodes(&mut self, nodes: Option<u64>) {
-        if let Some(nodes) = nodes {
-            *self = Self::Nodes(nodes);
-        } else {
-            self.set_infinite();
-        }
-    }
-
-    /// Sets `self` to [`Movetime(movetime)`](Self::Movetime).
-    ///
-    /// If `nodes` is [`None`], `self` will be set to
-    /// [`Infinite`](Self::Infinite).
-    pub fn set_movetime(&mut self, movetime: Option<Duration>) {
-        if let Some(mt) = movetime {
-            *self = Self::Movetime(mt);
-        } else {
-            self.set_infinite();
-        }
-    }
-
-    /// Sets `self` to [`Infinite`](Self::Infinite).
-    pub fn set_infinite(&mut self) {
-        *self = Self::Infinite;
     }
 
     /// Constructs a new [`Limits::Timed`] variant with the given time, no
     /// increment and the maximum moves to go.
-    const fn new_timed(time: Duration) -> Self {
+    pub const fn new_timed(time: Duration) -> Self {
         Self::Timed {
             time,
             inc: Duration::ZERO,

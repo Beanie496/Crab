@@ -51,19 +51,18 @@ where
         .unwrap_or(LIMIT);
     let limit_type = options.next().unwrap_or(LIMIT_TYPE);
 
-    let mut limits = Limits::default();
-    match limit_type {
+    let limits = match limit_type {
         "depth" => {
             if let Ok(limit) = u8::try_from(limit) {
-                limits.set_depth(Some(limit));
+                Limits::Depth(limit)
             } else {
                 return;
             }
         }
-        "nodes" => limits.set_nodes(Some(limit)),
-        "movetime" => limits.set_movetime(Some(Duration::from_millis(limit))),
+        "nodes" => Limits::Nodes(limit),
+        "movetime" => Limits::Movetime(Duration::from_millis(limit)),
         _ => return,
-    }
+    };
     let rx = Mutex::new(channel().1);
     let tt = TranspositionTable::with_capacity(tt_size);
     let mut state = SharedState::new(rx, tt);

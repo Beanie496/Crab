@@ -266,22 +266,46 @@ where
 
         match token {
             "wtime" if board.side_to_move() == Side::WHITE => {
-                limits.set_time(parse_time(next));
+                if let Some(time) = parse_time(next) {
+                    limits = Limits::new_timed(time);
+                }
             }
             "btime" if board.side_to_move() == Side::BLACK => {
-                limits.set_time(parse_time(next));
+                if let Some(time) = parse_time(next) {
+                    limits = Limits::new_timed(time);
+                }
             }
             "winc" if board.side_to_move() == Side::WHITE => {
-                limits.set_inc(parse_time(next));
+                if let Some(time) = parse_time(next) {
+                    limits.set_inc(time);
+                }
             }
             "binc" if board.side_to_move() == Side::BLACK => {
-                limits.set_inc(parse_time(next));
+                if let Some(time) = parse_time(next) {
+                    limits.set_inc(time);
+                }
             }
-            "movestogo" => limits.set_moves_to_go(parse_into_nonzero_option(next)),
-            "depth" => limits.set_depth(parse_into_nonzero_option(next)),
-            "nodes" => limits.set_nodes(parse_into_nonzero_option(next)),
-            "movetime" => limits.set_movetime(parse_time(next)),
-            "infinite" => limits.set_infinite(),
+            "movestogo" => {
+                if let Some(time) = parse_into_nonzero_option(next) {
+                    limits.set_moves_to_go(time);
+                }
+            }
+            "depth" => {
+                if let Some(depth) = parse_into_nonzero_option(next) {
+                    limits = Limits::Depth(depth);
+                }
+            }
+            "nodes" => {
+                if let Some(nodes) = parse_into_nonzero_option(next) {
+                    limits = Limits::Nodes(nodes);
+                }
+            }
+            "movetime" => {
+                if let Some(movetime) = parse_time(next) {
+                    limits = Limits::Movetime(movetime);
+                }
+            }
+            "infinite" => limits = Limits::Infinite,
             "perft" => {
                 if let Some(depth) = parse_into_nonzero_option(next) {
                     perft::<true, true>(board, depth);
