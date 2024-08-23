@@ -18,9 +18,7 @@
 
 use crate::{
     board::Board,
-    defs::{Piece, PieceType, Side, Square},
     evaluation::Eval,
-    lookups::ray_between,
     movegen::{
         generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
     },
@@ -107,7 +105,7 @@ impl MovePicker {
             self.stage = Stage::SecondKiller;
             if self.killers[0] != self.tt_move {
                 if let Some(mv) = self.killers[0] {
-                    if is_pseudolegal_killer(board, mv) {
+                    if board.is_pseudolegal_killer(mv) {
                         return Some(mv);
                     }
                 }
@@ -118,7 +116,7 @@ impl MovePicker {
             self.stage = Stage::GenerateRemaining;
             if self.killers[1] != self.tt_move {
                 if let Some(mv) = self.killers[1] {
-                    if is_pseudolegal_killer(board, mv) {
+                    if board.is_pseudolegal_killer(mv) {
                         return Some(mv);
                     }
                 }
@@ -206,81 +204,4 @@ impl MovePicker {
             mv.score::<Type>(board);
         }
     }
-}
-
-/// Checks if `mv` is a legal killer on `board`, assuming it was legal in
-/// the previous same-depth search.
-fn is_pseudolegal_killer(board: &Board, mv: Move) -> bool {
-    let start = mv.start();
-    let end = mv.end();
-
-    let piece = board.piece_on(start);
-    let piece_type = PieceType::from(piece);
-    // this might be wrong so it needs to be checked before it's used
-    let piece_side = Side::from(piece);
-    let captured = board.piece_on(end);
-    let captured_type = PieceType::from(captured);
-    // this also might be wrong
-    let captured_side = Side::from(captured);
-
-    // check the piece still exists (en passant can delete it) and hasn't been
-    // captured
-    if piece == Piece::NONE || piece_side != board.side_to_move() {
-        return false;
-    }
-
-    // check we aren't capturing a friendly piece
-    if captured != Piece::NONE && captured_side == board.side_to_move() {
-        return false;
-    }
-
-    // check we weren't blocked
-    if !(ray_between(start, end) & board.occupancies()).is_empty() {
-        return false;
-    }
-
-    // check we aren't capturing a king
-    if captured_type == PieceType::KING {
-        return false;
-    }
-
-    // if the piece is a pawn, do some additional checks
-    if piece_type == PieceType::PAWN && !is_pseudolegal_pawn_killer(board, mv) {
-        return false;
-    }
-
-    if mv.is_castling() {
-        let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
-        if !(ray_between(start, rook_start) & board.side_any(captured_side)).is_empty() {
-            return false;
-        }
-        if board.piece_on(rook_start) != Piece::from_piecetype(PieceType::ROOK, piece_side) {
-            return false;
-        }
-    }
-
-    true
-}
-
-/// Checks if `mv` is a legal pawn killer, given the same assumptions as
-/// [`is_pseudolegal_killer()`] and assuming the move is a pawn move.
-fn is_pseudolegal_pawn_killer(board: &Board, mv: Move) -> bool {
-    // small optimisation: if the best response to the first move was en
-    // passant, it is impossible for that same en passant move to be legal
-    // after any other move
-    if mv.is_en_passant() {
-        return false;
-    }
-
-    let start = mv.start();
-    let end = mv.end();
-    let diff = start.0.abs_diff(end.0);
-    // a piece getting between the start and end of a double push was already
-    // checked
-    let is_push = diff == 8 || diff == 16;
-    let is_piece_on_end = board.piece_on(end) != Piece::NONE;
-
-    // check that there isn't a piece blocking us if we're pushing or that
-    // there is a piece if we're capturing
-    is_push && !is_piece_on_end || !is_push && is_piece_on_end
 }
