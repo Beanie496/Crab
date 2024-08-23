@@ -35,7 +35,9 @@ use crate::{
     lookups::magic::find_magics,
     movegen::{generate_moves, AllMoves, Moves},
     perft::perft,
-    search::{BoardHistory, CompressedDepth, Limits, SharedState, Worker},
+    search::{
+        BoardHistory, CompressedDepth, CounterMoveInfo, HistoryItem, Limits, SharedState, Worker,
+    },
     transposition_table::TranspositionTable,
 };
 
@@ -406,7 +408,10 @@ where
             return;
         };
 
-        board_history.push(board.key());
+        let dest = mv.end();
+        let piece = board.piece_on(mv.start());
+        let counter_move_info = CounterMoveInfo::new(piece, dest);
+        board_history.push(HistoryItem::new(board.key(), Some(counter_move_info)));
 
         if !board.make_move(mv) {
             return;

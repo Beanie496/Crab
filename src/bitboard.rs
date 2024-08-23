@@ -244,9 +244,9 @@ impl Bitboard {
         Self(excluded_ranks_bb | excluded_files_bb)
     }
 
-    /// Calculates if there are no blocking pieces between the king and rook,
-    /// given the side to move and castling direction.
-    pub fn is_clear_to_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>(
+    /// Same as [`Self::is_clear_to_castle()`] but with the location as generic
+    /// parameters.
+    pub fn is_clear_to_castle_const<const IS_WHITE: bool, const IS_KINGSIDE: bool>(
         occupancies: Self,
     ) -> bool {
         #[allow(clippy::collapsible_else_if)]
@@ -258,6 +258,26 @@ impl Bitboard {
             }
         } else {
             if IS_KINGSIDE {
+                Self::CASTLING_SPACE_BK
+            } else {
+                Self::CASTLING_SPACE_BQ
+            }
+        };
+        (occupancies & castling_space).is_empty()
+    }
+
+    /// Calculates if there are no blocking pieces between the king and rook,
+    /// given the side to move and castling direction.
+    pub fn is_clear_to_castle(occupancies: Self, is_white: bool, is_kingside: bool) -> bool {
+        #[allow(clippy::collapsible_else_if)]
+        let castling_space = if is_white {
+            if is_kingside {
+                Self::CASTLING_SPACE_WK
+            } else {
+                Self::CASTLING_SPACE_WQ
+            }
+        } else {
+            if is_kingside {
                 Self::CASTLING_SPACE_BK
             } else {
                 Self::CASTLING_SPACE_BQ

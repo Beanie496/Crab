@@ -28,7 +28,7 @@ use arrayvec::ArrayVec;
 
 use crate::{
     board::{Board, Key},
-    defs::Side,
+    defs::{Piece, Side, Square},
     evaluation::Evaluation,
     movegen::Move,
     transposition_table::TranspositionTable,
@@ -120,7 +120,27 @@ enum SearchStatus {
 /// recent item would get the current board state.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct BoardHistory {
-    history: ArrayVec<Key, { Depth::MAX.to_index() }>,
+    history: ArrayVec<HistoryItem, { Depth::MAX.to_index() }>,
+}
+
+/// Information needed for indexing into counter moves.
+#[derive(Clone, Copy)]
+pub struct CounterMoveInfo {
+    /// The piece being moved.
+    piece: Piece,
+    /// The destination square of that piece.
+    dest: Square,
+}
+
+/// An item of the board history.
+#[derive(Clone, Copy)]
+pub struct HistoryItem {
+    /// The key of the item.
+    key: Key,
+    /// Information for counter moves.
+    ///
+    /// It's an [`Option`] because of null moves.
+    counter_move_info: Option<CounterMoveInfo>,
 }
 
 /// A struct containing various histories relating to the board.
@@ -136,6 +156,11 @@ struct Histories {
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     board_history: BoardHistory,
+    /// Counter moves.
+    ///
+    /// The previous best response to a certain piece landing on a certain
+    /// square.
+    counter_moves: [[Option<Move>; Square::TOTAL]; Piece::TOTAL],
 }
 
 /// Whether White, Black or both sides can do a null move within a search.
@@ -212,7 +237,7 @@ impl Default for Limits {
 }
 
 impl Deref for BoardHistory {
-    type Target = ArrayVec<Key, { Depth::MAX.to_index() }>;
+    type Target = ArrayVec<HistoryItem, { Depth::MAX.to_index() }>;
 
     fn deref(&self) -> &Self::Target {
         &self.history
@@ -297,18 +322,37 @@ impl BoardHistory {
     }
 }
 
+impl CounterMoveInfo {
+    /// Creates new [`CounterMoveInfo`].
+    pub const fn new(piece: Piece, dest: Square) -> Self {
+        Self { piece, dest }
+    }
+}
+
+impl HistoryItem {
+    /// Creates a new [`HistoryItem`] with the given fields.
+    pub const fn new(key: Key, counter_move_info: Option<CounterMoveInfo>) -> Self {
+        Self {
+            key,
+            counter_move_info,
+        }
+    }
+}
+
 impl Histories {
     /// Creates new, empty [`Histories`].
     fn new() -> Self {
         Self {
             killers: [[None; 2]; Depth::MAX.to_index() + 1],
             board_history: BoardHistory::new(),
+            counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
         }
     }
 
     /// Clears all the histories apart from the board history.
     fn clear(&mut self) {
         self.killers[0] = [None; 2];
+        self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
     }
 
     /// Replace the second killer of the current height with the given move.
@@ -329,6 +373,25 @@ impl Histories {
     /// Clear the killers of the next height.
     fn clear_next_killers(&mut self, height: Height) {
         self.killers[height.to_index() + 1] = [None; 2];
+    }
+
+    /// Inserts `mv` into the table as given by `history_item`.
+    fn insert_into_counter_moves(&mut self, history_item: HistoryItem, mv: Move) {
+        if let Some(counter_move_info) = history_item.counter_move_info {
+            let piece = counter_move_info.piece.to_index();
+            let square = counter_move_info.dest.to_index();
+
+            self.counter_moves[piece][square] = Some(mv);
+        }
+    }
+
+    /// Gets the counter move as indexed by `history_item`.
+    fn get_counter_move(&self, history_item: HistoryItem) -> Option<Move> {
+        history_item.counter_move_info.and_then(|info| {
+            let piece = info.piece.to_index();
+            let square = info.dest.to_index();
+            self.counter_moves[piece][square]
+        })
     }
 }
 
@@ -521,14 +584,17 @@ impl<'a> Worker<'a> {
             return false;
         }
 
-        self.push_board_history(old_key);
+        let dest = mv.end();
+        let piece = board.piece_on(dest);
+        let counter_move_info = CounterMoveInfo::new(piece, dest);
+        self.push_board_history(HistoryItem::new(old_key, Some(counter_move_info)));
         true
     }
 
     /// Makes a null move on `board`.
     fn make_null_move(&mut self, board: &mut Board) {
         self.nmp_rights.remove_right(board.side_to_move());
-        self.push_board_history(board.key());
+        self.push_board_history(HistoryItem::new(board.key(), None));
         board.make_null_move();
     }
 
@@ -544,17 +610,17 @@ impl<'a> Worker<'a> {
     }
 
     /// Adds a history item to the stack.
-    fn push_board_history(&mut self, key: Key) {
+    fn push_board_history(&mut self, item: HistoryItem) {
         debug_assert!(
             self.histories.board_history.len() < self.histories.board_history.capacity(),
             "stack overflow"
         );
         // SAFETY: we just checked that we can push
-        unsafe { self.histories.board_history.push_unchecked(key) };
+        unsafe { self.histories.board_history.push_unchecked(item) };
     }
 
     /// Pops a history item off the stack.
-    fn pop_board_history(&mut self) -> Option<Key> {
+    fn pop_board_history(&mut self) -> Option<HistoryItem> {
         self.histories.board_history.pop()
     }
 
@@ -666,7 +732,7 @@ impl<'a> Worker<'a> {
             .take(usize::from(halfmoves).saturating_sub(3))
             // skip positions with the wrong stm
             .step_by(2)
-            .any(|key| *key == current_key)
+            .any(|item| item.key == current_key)
     }
 
     /// Prints information about a completed search iteration.
