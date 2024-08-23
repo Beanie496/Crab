@@ -21,7 +21,7 @@ use crate::{
     board::Board,
     evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
     lookups::base_reductions,
-    movegen::{AllMoves, CapturesOnly, Evasions},
+    movegen::AllMoves,
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
@@ -159,7 +159,9 @@ impl Worker<'_> {
         let mut best_move = None;
         let mut new_pv = Pv::new();
         let killers = self.histories.killers.current(height);
-        let mut movepicker = MovePicker::new::<AllMoves>(tt_move, killers);
+        let last_history_item = self.histories.board_history.last();
+        let counter_move = last_history_item.and_then(|item| self.histories.counter_moves.get(*item));
+        let mut movepicker = MovePicker::new::<AllMoves>(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
@@ -280,6 +282,9 @@ impl Worker<'_> {
 
         if let Some(best_move) = best_move {
             self.histories.killers.insert(height, best_move);
+            if let Some(&last_item) = self.histories.board_history.last() {
+                self.histories.counter_moves.insert(last_item, best_move);
+            }
         }
 
         // store into tt
@@ -336,9 +341,9 @@ impl Worker<'_> {
         }
 
         let mut movepicker = if is_in_check {
-            MovePicker::new::<Evasions>(None, [None; 2])
+            MovePicker::new_evasions()
         } else {
-            MovePicker::new::<CapturesOnly>(None, [None; 2])
+            MovePicker::new_captures()
         };
 
         while let Some(mv) = movepicker.next(board) {

@@ -20,7 +20,8 @@ use crate::{
     board::Board,
     evaluation::Eval,
     movegen::{
-        generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
+        generate_moves, CapturesOnly, Evasions, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
+        ScoredMove,
     },
 };
 
@@ -37,6 +38,8 @@ enum Stage {
     FirstKiller,
     /// Return the second killer.
     SecondKiller,
+    /// Return the counter move.
+    CounterMove,
     /// Generate all remaining moves (i.e. quiets).
     GenerateRemaining,
     /// Return all remaining moves (bad captures and quiets).
@@ -48,6 +51,7 @@ enum Stage {
 pub struct MovePicker {
     tt_move: Option<Move>,
     killers: [Option<Move>; 2],
+    counter_move: Option<Move>,
     stage: Stage,
     moves: Moves,
     skip_non_king_quiets: bool,
@@ -57,7 +61,11 @@ pub struct MovePicker {
 impl MovePicker {
     /// Creates a new [`MovePicker`] based on the information in `board` and
     /// `tt_move`.
-    pub fn new<Type: MovesType>(tt_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
+    pub fn new<Type: MovesType>(
+        tt_move: Option<Move>,
+        killers: [Option<Move>; 2],
+        counter_move: Option<Move>,
+    ) -> Self {
         assert!(
             Type::CAPTURES,
             "the movepicker relies on always generating captures"
@@ -65,11 +73,24 @@ impl MovePicker {
         Self {
             tt_move,
             killers,
+            counter_move,
             stage: Stage::TtMove,
             moves: Moves::new(),
             skip_non_king_quiets: !Type::NON_KING_QUIETS,
             skip_king_quiets: !Type::KING_QUIETS,
         }
+    }
+
+    /// A shortcut for creating a movepicker for [`Evasions`] with no extra
+    /// information.
+    pub fn new_evasions() -> Self {
+        Self::new::<Evasions>(None, [None; 2], None)
+    }
+
+    /// A shortcut for creating a movepicker for [`CapturesOnly`] with no extra
+    /// information.
+    pub fn new_captures() -> Self {
+        Self::new::<CapturesOnly>(None, [None; 2], None)
     }
 
     /// Return the next best [`Move`] in the list of legal moves.
@@ -113,10 +134,24 @@ impl MovePicker {
         }
 
         if self.stage == Stage::SecondKiller {
-            self.stage = Stage::GenerateRemaining;
+            self.stage = Stage::CounterMove;
             if self.killers[1] != self.tt_move {
                 if let Some(mv) = self.killers[1] {
                     if board.is_pseudolegal_killer(mv) {
+                        return Some(mv);
+                    }
+                }
+            }
+        }
+
+        if self.stage == Stage::CounterMove {
+            self.stage = Stage::GenerateRemaining;
+            if self.counter_move != self.tt_move
+                && self.counter_move != self.killers[0]
+                && self.counter_move != self.killers[1]
+            {
+                if let Some(mv) = self.counter_move {
+                    if board.is_pseudolegal(mv) {
                         return Some(mv);
                     }
                 }
@@ -170,6 +205,7 @@ impl MovePicker {
             if self.tt_move == Some(scored_move.mv)
                 || self.killers[0] == Some(scored_move.mv)
                 || self.killers[1] == Some(scored_move.mv)
+                || self.counter_move == Some(scored_move.mv)
             {
                 self.moves.remove(best_index);
                 continue;

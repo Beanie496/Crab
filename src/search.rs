@@ -28,7 +28,7 @@ use arrayvec::ArrayVec;
 
 use crate::{
     board::{Board, Key},
-    defs::Side,
+    defs::{Piece, Side, Square},
     evaluation::{is_mate, moves_to_mate, Eval},
     movegen::Move,
     transposition_table::TranspositionTable,
@@ -122,7 +122,33 @@ enum SearchStatus {
 /// recent item would get the current board state.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct BoardHistory {
-    history: ArrayVec<Key, { Depth::MAX as usize }>,
+    history: ArrayVec<HistoryItem, { Depth::MAX as usize }>,
+}
+
+/// The piece being moved and the destination square of that piece.
+#[allow(clippy::missing_docs_in_private_items)]
+#[derive(Clone, Copy)]
+pub struct CounterMoveInfo {
+    piece: Piece,
+    dest: Square,
+}
+
+/// A table of counter moves: the previous best response to a certain piece
+/// landing on a certain square.
+#[allow(clippy::missing_docs_in_private_items)]
+struct CounterMoves {
+    counter_moves: [[Option<Move>; Square::TOTAL]; Piece::TOTAL],
+}
+
+/// An item of the board history.
+#[derive(Clone, Copy)]
+pub struct HistoryItem {
+    /// The key of the item.
+    key: Key,
+    /// Information needed for indexing counter moves.
+    ///
+    /// It's an [`Option`] because of null moves.
+    counter_move_info: Option<CounterMoveInfo>,
 }
 
 /// A struct containing various histories relating to the board.
@@ -135,6 +161,8 @@ struct Histories {
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     board_history: BoardHistory,
+    /// Counter moves.
+    counter_moves: CounterMoves,
 }
 
 /// The killer moves for a given depth: the best move from the previous search
@@ -232,7 +260,7 @@ impl Default for Limits {
 }
 
 impl Deref for BoardHistory {
-    type Target = ArrayVec<Key, { Depth::MAX as usize }>;
+    type Target = ArrayVec<HistoryItem, { Depth::MAX as usize }>;
 
     fn deref(&self) -> &Self::Target {
         &self.history
@@ -359,18 +387,81 @@ impl BoardHistory {
     }
 }
 
+impl CounterMoveInfo {
+    /// Creates new [`CounterMoveInfo`].
+    pub const fn new(piece: Piece, dest: Square) -> Self {
+        Self { piece, dest }
+    }
+}
+
+impl CounterMoves {
+    /// Creates new, empty [`CounterMoves`].
+    const fn new() -> Self {
+        Self {
+            counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
+        }
+    }
+
+    /// Inserts `mv` into the table as given by `history_item`.
+    fn insert(&mut self, history_item: HistoryItem, mv: Move) {
+        if let Some(counter_move_info) = history_item.counter_move_info {
+            let piece = counter_move_info.piece.to_index();
+            let square = counter_move_info.dest.to_index();
+
+            debug_assert!(
+                piece < self.counter_moves.len(),
+                "piece index out of range: {piece} >= {}",
+                self.counter_moves.len()
+            );
+            // SAFETY: we just checked it's ok to index
+            let counter_moves_for_piece = unsafe { self.counter_moves.get_unchecked_mut(piece) };
+
+            debug_assert!(
+                square < counter_moves_for_piece.len(),
+                "square index out of range: {square} >= {}",
+                counter_moves_for_piece.len(),
+            );
+            // SAFETY: we just checked it's ok to index
+            let counter_move = unsafe { counter_moves_for_piece.get_unchecked_mut(square) };
+            *counter_move = Some(mv);
+        }
+    }
+
+    /// Gets the counter move as indexed by `history_item`.
+    fn get(&self, history_item: HistoryItem) -> Option<Move> {
+        history_item.counter_move_info.and_then(|info| {
+            let piece = info.piece.to_index();
+            let square = info.dest.to_index();
+            let counter_moves_for_piece = get_unchecked(&self.counter_moves, piece);
+            *get_unchecked(counter_moves_for_piece, square)
+        })
+    }
+}
+
+impl HistoryItem {
+    /// Creates a new [`HistoryItem`] with the given fields.
+    pub const fn new(key: Key, counter_move_info: Option<CounterMoveInfo>) -> Self {
+        Self {
+            key,
+            counter_move_info,
+        }
+    }
+}
+
 impl Histories {
     /// Creates new, empty [`Histories`].
     fn new() -> Self {
         Self {
             killers: Killers::new(),
             board_history: BoardHistory::new(),
+            counter_moves: CounterMoves::new(),
         }
     }
 
     /// Clears all the histories apart from the board history.
     fn clear(&mut self) {
         self.killers[0] = [None; 2];
+        self.counter_moves = CounterMoves::new();
     }
 }
 
@@ -620,14 +711,17 @@ impl<'a> Worker<'a> {
             return false;
         }
 
-        self.push_board_history(old_key);
+        let dest = mv.end();
+        let piece = board.piece_on(dest);
+        let counter_move_info = CounterMoveInfo::new(piece, dest);
+        self.push_board_history(HistoryItem::new(old_key, Some(counter_move_info)));
         true
     }
 
     /// Makes a null move on `board`.
     fn make_null_move(&mut self, board: &mut Board) {
         self.nmp_rights.remove_right(board.side_to_move());
-        self.push_board_history(board.key());
+        self.push_board_history(HistoryItem::new(board.key(), None));
         board.make_null_move();
     }
 
@@ -643,17 +737,17 @@ impl<'a> Worker<'a> {
     }
 
     /// Adds a history item to the stack.
-    fn push_board_history(&mut self, key: Key) {
+    fn push_board_history(&mut self, item: HistoryItem) {
         debug_assert!(
             self.histories.board_history.len() < self.histories.board_history.capacity(),
             "stack overflow"
         );
         // SAFETY: we just checked that we can push
-        unsafe { self.histories.board_history.push_unchecked(key) };
+        unsafe { self.histories.board_history.push_unchecked(item) };
     }
 
     /// Pops a history item off the stack.
-    fn pop_board_history(&mut self) -> Option<Key> {
+    fn pop_board_history(&mut self) -> Option<HistoryItem> {
         self.histories.board_history.pop()
     }
 
@@ -765,7 +859,7 @@ impl<'a> Worker<'a> {
             .take(usize::from(halfmoves).saturating_sub(3))
             // skip positions with the wrong stm
             .step_by(2)
-            .any(|key| *key == current_key)
+            .any(|item| item.key == current_key)
     }
 
     /// Prints information about a completed search iteration.
