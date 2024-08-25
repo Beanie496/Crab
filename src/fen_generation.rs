@@ -28,19 +28,21 @@ use oorandom::Rand64;
 use crate::{
     board::{Board, STARTPOS},
     defs::Side,
-    evaluation::Eval,
+    evaluation::Evaluation,
     movegen::{generate_moves, AllMoves, Moves},
-    search::{aspiration::AspirationWindow, Depth, Limits, Pv, RootNode, SharedState, Worker},
+    search::{
+        aspiration::AspirationWindow, Depth, Height, Limits, Pv, RootNode, SharedState, Worker,
+    },
     transposition_table::TranspositionTable,
 };
 
 /// The closest an opening's score can be to 0 while still being discarded.
-const MAX_SCORE: Eval = 120;
+const MAX_SCORE: Evaluation = Evaluation(120);
 /// The furthest an opening's score can be away from 0 while still being
 /// discarded.
-const MIN_SCORE: Eval = 80;
+const MIN_SCORE: Evaluation = Evaluation(80);
 /// How deeply each position should be searched to get an evaluation.
-const SEARCH_DEPTH: Depth = 3;
+const SEARCH_DEPTH: Depth = Depth(3);
 
 /// Generate a set of FEN strings to be used as openings given `args`.
 ///
@@ -120,7 +122,7 @@ where
                 this_iteration_openings,
                 // make the function play more and more random moves into the
                 // future as the openings required increases
-                2 + f32::ln(this_iteration_openings as f32).ceil() as Depth,
+                Depth(2 + f32::ln(this_iteration_openings as f32).ceil() as i16),
                 alpha,
                 beta,
                 &mut rng,
@@ -188,8 +190,8 @@ fn generate_openings_for_board(
     board: &Board,
     mut required_openings: usize,
     depth: Depth,
-    alpha: Eval,
-    beta: Eval,
+    alpha: Evaluation,
+    beta: Evaluation,
     rng: &mut Rand64,
 ) -> usize {
     if depth == 0 {
@@ -206,7 +208,8 @@ fn generate_openings_for_board(
             continue;
         }
 
-        let score = -worker.search::<RootNode>(pv, &copy, -beta, -alpha, SEARCH_DEPTH, 0);
+        let score =
+            -worker.search::<RootNode>(pv, &copy, -beta, -alpha, SEARCH_DEPTH, Height::default());
 
         worker.unmake_move();
 

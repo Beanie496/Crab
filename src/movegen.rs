@@ -31,7 +31,7 @@ use crate::{
     board::Board,
     cfor,
     defs::{Direction, PieceType, Rank, Side, Square},
-    evaluation::Eval,
+    evaluation::Evaluation,
     util::get_unchecked,
 };
 use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
@@ -141,7 +141,7 @@ pub struct Move {
 #[derive(Clone, Copy)]
 pub struct ScoredMove {
     pub mv: Move,
-    pub score: Eval,
+    pub score: Evaluation,
 }
 
 /// An stack of [`Move`]s.
@@ -230,9 +230,9 @@ impl Move {
 
 impl ScoredMove {
     /// The score of a capture with a winning static exchange evaluation.
-    pub const WINNING_CAPTURE_SCORE: Eval = 0x2000;
+    pub const WINNING_CAPTURE_SCORE: Evaluation = Evaluation(0x2000);
     /// The score of a quiet move.
-    pub const QUIET_SCORE: Eval = 0x1000;
+    pub const QUIET_SCORE: Evaluation = Evaluation(0x1000);
 }
 
 impl Display for Move {
@@ -617,8 +617,11 @@ impl Moves {
 
 impl ScoredMove {
     /// Creates a new [`ScoredMove`] with a score of `0`.
-    const fn new(mv: Move) -> Self {
-        Self { mv, score: 0 }
+    fn new(mv: Move) -> Self {
+        Self {
+            mv,
+            score: Evaluation::default(),
+        }
     }
 
     /// Scores `self.mv`.

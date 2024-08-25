@@ -18,7 +18,7 @@
 
 use crate::{
     board::Board,
-    evaluation::Eval,
+    evaluation::Evaluation,
     movegen::{
         generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
     },
@@ -154,7 +154,7 @@ impl MovePicker {
                 return None;
             }
 
-            let mut best_score = -Eval::MAX;
+            let mut best_score = -Evaluation::INFINITY;
             let mut best_index = 0;
             for (index, scored_move) in self.moves.iter().enumerate() {
                 if scored_move.score > best_score {

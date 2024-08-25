@@ -18,7 +18,7 @@
 
 use std::process::exit;
 
-use super::{aspiration::AspirationWindow, Depth, Pv, SearchStatus, Worker};
+use super::{aspiration::AspirationWindow, Depth, Height, Pv, SearchStatus, Worker};
 
 impl Worker<'_> {
     /// Performs iterative deepening on the given board.
@@ -28,8 +28,11 @@ impl Worker<'_> {
         let mut asp_window = AspirationWindow::new();
         let mut pv = Pv::new();
 
-        for depth in 1..Depth::MAX {
-            self.seldepth = 0;
+        // `Step` is unstable
+        for depth in 1..Depth::MAX.0 {
+            let depth = Depth(depth);
+
+            self.seldepth = Height::default();
             self.status = SearchStatus::Continue;
 
             let score = self.aspiration_loop(&mut pv, &mut asp_window, depth);

@@ -29,27 +29,26 @@ use arrayvec::ArrayVec;
 use crate::{
     board::{Board, Key},
     defs::Side,
-    evaluation::{is_mate, moves_to_mate, Eval},
+    evaluation::Evaluation,
     movegen::Move,
     transposition_table::TranspositionTable,
     util::{get_unchecked, insert_unchecked},
 };
+pub use depth::{CompressedDepth, Depth, Height};
 use time::calculate_time_window;
 
 /// For running the main alpha-beta search.
 pub mod alpha_beta_search;
 /// For running the aspiration loop.
 pub mod aspiration;
+/// Items related to [`Depth`] and [`Height`], separated for neatness.
+mod depth;
 /// For running the iterative deepening loop.
 pub mod iterative_deepening;
 /// For selecting which order moves are searched in.
 mod movepick;
 /// Time management.
 pub mod time;
-
-/// The difference between the root or leaf node (for height or depth
-/// respectively) and the current node.
-pub type Depth = u8;
 
 /// A marker for a type of node to allow searches with generic node types.
 #[allow(clippy::missing_docs_in_private_items)]
@@ -91,11 +90,11 @@ pub enum Limits {
         inc: Duration,
         /// Moves until the next time control.
         ///
-        /// This is set to [`u8::MAX`] if not given as a parameter.
-        moves_to_go: u8,
+        /// This is set to [`Depth::MAX`] if not given as a parameter.
+        moves_to_go: CompressedDepth,
     },
     /// Go to an exact depth.
-    Depth(u8),
+    Depth(CompressedDepth),
     /// Go to an an exact number of nodes.
     Nodes(u64),
     /// Go for an exact amount of time.
@@ -122,7 +121,7 @@ enum SearchStatus {
 /// recent item would get the current board state.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct BoardHistory {
-    history: ArrayVec<Key, { Depth::MAX as usize }>,
+    history: ArrayVec<Key, { Depth::MAX.to_index() }>,
 }
 
 /// A struct containing various histories relating to the board.
@@ -141,7 +140,7 @@ struct Histories {
 /// at the same depth.
 #[allow(clippy::missing_docs_in_private_items)]
 struct Killers {
-    killers: [[Option<Move>; 2]; Depth::MAX as usize + 1],
+    killers: [[Option<Move>; 2]; Depth::MAX.to_index() + 1],
 }
 
 /// Whether White, Black or both sides can do a null move within a search.
@@ -154,7 +153,7 @@ struct NmpRights {
 #[derive(Clone)]
 pub struct Pv {
     /// A non-circular queue of moves.
-    moves: [MaybeUninit<Move>; Depth::MAX as usize],
+    moves: [MaybeUninit<Move>; Depth::MAX.to_index()],
     /// Index of the first [`Move`].
     ///
     /// This will be equal to `first_empty` if there are no [`Move`]s.
@@ -187,7 +186,7 @@ pub struct Worker<'a> {
     /// The moment the search started.
     start: Instant,
     /// The maximum depth reached.
-    seldepth: Depth,
+    seldepth: Height,
     /// How many positions have been searched.
     nodes: u64,
     /// The final PV from the initial position.
@@ -232,7 +231,7 @@ impl Default for Limits {
 }
 
 impl Deref for BoardHistory {
-    type Target = ArrayVec<Key, { Depth::MAX as usize }>;
+    type Target = ArrayVec<Key, { Depth::MAX.to_index() }>;
 
     fn deref(&self) -> &Self::Target {
         &self.history
@@ -315,7 +314,7 @@ impl Limits {
     ///
     /// If `self` is not [`Timed`](Self::Timed), it will be set to
     /// [`Infinite`](Self::Infinite).
-    pub fn set_moves_to_go(&mut self, mtg: Depth) {
+    pub fn set_moves_to_go(&mut self, mtg: CompressedDepth) {
         if let &mut Self::Timed {
             ref mut moves_to_go,
             ..
@@ -329,11 +328,11 @@ impl Limits {
 
     /// Constructs a new [`Limits::Timed`] variant with the given time, no
     /// increment and the maximum moves to go.
-    pub const fn new_timed(time: Duration) -> Self {
+    pub fn new_timed(time: Duration) -> Self {
         Self::Timed {
             time,
             inc: Duration::ZERO,
-            moves_to_go: u8::MAX,
+            moves_to_go: Depth::MAX.into(),
         }
     }
 }
@@ -378,13 +377,13 @@ impl Killers {
     /// Creates new, empty [`Killers`].
     const fn new() -> Self {
         Self {
-            killers: [[None; 2]; Depth::MAX as usize + 1],
+            killers: [[None; 2]; Depth::MAX.to_index() + 1],
         }
     }
 
     /// Replace the second killer of the current height with the given move.
-    fn insert(&mut self, height: Depth, mv: Move) {
-        let height = usize::from(height);
+    fn insert(&mut self, height: Height, mv: Move) {
+        let height = height.to_index();
         if self[height][0] == Some(mv) {
             return;
         }
@@ -393,13 +392,13 @@ impl Killers {
     }
 
     /// Return the killers of the current height.
-    fn current(&self, height: Depth) -> [Option<Move>; 2] {
-        self[usize::from(height)]
+    fn current(&self, height: Height) -> [Option<Move>; 2] {
+        self[height.to_index()]
     }
 
     /// Clear the killers of the next height.
-    fn clear_next(&mut self, height: Depth) {
-        self[usize::from(height) + 1] = [None; 2];
+    fn clear_next(&mut self, height: Height) {
+        self[height.to_index() + 1] = [None; 2];
     }
 }
 
@@ -447,7 +446,7 @@ impl Pv {
     /// Returns a new 0-initialised [`Pv`].
     pub const fn new() -> Self {
         Self {
-            moves: [MaybeUninit::uninit(); Depth::MAX as usize],
+            moves: [MaybeUninit::uninit(); Depth::MAX.to_index()],
             first_item: 0,
             first_empty: 0,
         }
@@ -525,7 +524,7 @@ impl<'a> Worker<'a> {
     pub fn new(state: &'a SharedState) -> Self {
         Self {
             start: Instant::now(),
-            seldepth: 0,
+            seldepth: Height::default(),
             nodes: 0,
             root_pv: Pv::new(),
             status: SearchStatus::Continue,
@@ -586,7 +585,7 @@ impl<'a> Worker<'a> {
     /// Each necessary field is reset.
     pub fn start_search(&mut self) {
         self.start = Instant::now();
-        self.seldepth = 0;
+        self.seldepth = Height::default();
         self.nodes = 0;
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
@@ -721,7 +720,7 @@ impl<'a> Worker<'a> {
         #[allow(clippy::wildcard_enum_match_arm)]
         match self.limits {
             Limits::Depth(d) => {
-                if depth >= d {
+                if depth >= Depth::from(d) {
                     self.status = SearchStatus::Stop;
                 }
             }
@@ -769,26 +768,23 @@ impl<'a> Worker<'a> {
     }
 
     /// Prints information about a completed search iteration.
-    fn print_report(&self, score: Eval, pv: &Pv, depth: Depth) {
+    fn print_report(&self, score: Evaluation, pv: &Pv, depth: Depth) {
         let time = self.start.elapsed();
         let nps = 1_000_000 * self.nodes / time.as_micros().max(1) as u64;
 
         #[allow(clippy::unwrap_used)]
-        let score_str = if is_mate(score) {
-            format!("score mate {}", moves_to_mate(score))
+        let score_str = if score.is_mate() {
+            format!("score mate {}", score.moves_to_mate())
         } else {
             format!("score cp {score}")
         };
 
         println!(
-            "info depth {} seldepth {} {score_str} hashfull {} nodes {} time {} nps {} pv {}",
-            depth,
-            self.seldepth,
+            "info depth {depth} seldepth {} {score_str} hashfull {} nodes {} time {} nps {nps} pv {pv}",
+            self.seldepth.0,
             self.state.tt.estimate_hashfull(),
             self.nodes,
             time.as_millis(),
-            nps,
-            pv,
         );
     }
 }

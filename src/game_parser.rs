@@ -41,7 +41,7 @@ use crate::{
     board::{Board, STARTPOS},
     defs::{self, Piece, PieceType, Side},
     movegen::{Move, LOOKUPS},
-    search::{Depth, Limits, SharedState, Worker},
+    search::{CompressedDepth, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -71,7 +71,7 @@ impl GameSampler {
     /// The hash size (in MiB) of the transposition table.
     const HASH_SIZE_MIB: usize = 16;
     /// The depth to which each position is searched.
-    const SEARCH_DEPTH: Depth = 10;
+    const SEARCH_DEPTH: CompressedDepth = CompressedDepth(10);
 }
 
 impl From<pgn_reader::File> for defs::File {

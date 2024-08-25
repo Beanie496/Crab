@@ -16,10 +16,12 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{movepick::MovePicker, Depth, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker};
+use super::{
+    movepick::MovePicker, Depth, Height, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker,
+};
 use crate::{
     board::Board,
-    evaluation::{evaluate, mate_in, mated_in, Eval, DRAW, INF_EVAL, MATE_BOUND},
+    evaluation::{evaluate, Evaluation},
     lookups::base_reductions,
     movegen::{AllMoves, CapturesOnly, Evasions},
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
@@ -36,12 +38,12 @@ impl Worker<'_> {
         &mut self,
         pv: &mut Pv,
         board: &Board,
-        mut alpha: Eval,
-        mut beta: Eval,
+        mut alpha: Evaluation,
+        mut beta: Evaluation,
         mut depth: Depth,
-        height: Depth,
-    ) -> Eval {
-        if depth == 0 {
+        height: Height,
+    ) -> Evaluation {
+        if depth <= 0 {
             return self.quiescence_search(board, alpha, beta, height);
         }
 
@@ -51,19 +53,20 @@ impl Worker<'_> {
 
         if !NodeType::IS_ROOT {
             // mate distance pruning
-            // if the score of mating in the next move (`mate_in(height + 1)`) is
-            // still unable to exceed alpha, we can prune. Likewise, if we're
-            // getting mated right now (`mated_in(height)`) and we're still
-            // exceeding beta, we can prune.
-            alpha = alpha.max(mated_in(height));
-            beta = beta.min(mate_in(height + 1));
+            // if the score of mating in the next move
+            // (`mate_after(height + 1)`) is still unable to exceed alpha, we
+            // can prune. Likewise, if we're getting mated right now
+            // (`mated_after(height)`) and we're still exceeding beta, we can
+            // prune.
+            alpha = alpha.max(Evaluation::mated_after(height));
+            beta = beta.min(Evaluation::mate_after(height + 1));
             if alpha >= beta {
                 return alpha;
             }
 
             // draw by repetition or 50mr
             if self.is_draw(board.halfmoves(), board.key()) {
-                return DRAW;
+                return Evaluation::DRAW;
             }
         }
 
@@ -82,7 +85,7 @@ impl Worker<'_> {
         let tt_move = tt_hit.and_then(TranspositionHit::mv);
 
         let static_eval = if is_in_check {
-            -INF_EVAL
+            -Evaluation::INFINITY
         } else if let Some(h) = tt_hit {
             h.static_eval()
         } else {
@@ -100,7 +103,7 @@ impl Worker<'_> {
             if self.nmp_rights.can_make_null_move(board.side_to_move())
                 && depth >= 3
                 && static_eval >= beta
-                && beta > -MATE_BOUND
+                && beta > -Evaluation::MATE_BOUND
                 && board.has_non_pawn_pieces()
             {
                 let reduction = null_move_reduction(static_eval, beta, depth);
@@ -114,13 +117,13 @@ impl Worker<'_> {
                     &copy,
                     -beta,
                     -alpha,
-                    depth.saturating_sub(reduction),
+                    depth - reduction,
                     height + 1,
                 );
 
                 self.unmake_null_move(board);
 
-                if score >= beta && score < MATE_BOUND {
+                if score >= beta && score < Evaluation::MATE_BOUND {
                     if depth <= 8 {
                         return score;
                     }
@@ -134,7 +137,7 @@ impl Worker<'_> {
                         board,
                         alpha,
                         beta,
-                        depth.saturating_sub(reduction),
+                        depth - reduction,
                         height,
                     );
 
@@ -155,7 +158,7 @@ impl Worker<'_> {
             depth -= 1;
         }
 
-        let mut best_score = -INF_EVAL;
+        let mut best_score = -Evaluation::INFINITY;
         let mut best_move = None;
         let mut new_pv = Pv::new();
         let killers = self.histories.killers.current(height);
@@ -187,7 +190,7 @@ impl Worker<'_> {
             // to exceed -alpha - 1, but could have exceeded the old beta, so we
             // must do a research without reducing and with a full window. (If that
             // then exceeds alpha, then great: we've found a better move.)
-            let mut score = 0;
+            let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
                 let reduction = late_move_reduction(depth, total_moves);
 
@@ -196,7 +199,7 @@ impl Worker<'_> {
                     &copy,
                     -alpha - 1,
                     -alpha,
-                    new_depth.saturating_sub(reduction),
+                    new_depth - reduction,
                     height + 1,
                 );
 
@@ -233,7 +236,11 @@ impl Worker<'_> {
                 if NodeType::IS_ROOT && pv.len() == 0 {
                     pv.enqueue(mv);
                 }
-                return if NodeType::IS_ROOT { alpha } else { 0 };
+                return if NodeType::IS_ROOT {
+                    alpha
+                } else {
+                    Evaluation::default()
+                };
             }
 
             best_score = best_score.max(score);
@@ -272,9 +279,9 @@ impl Worker<'_> {
 
         if !NodeType::IS_ROOT && total_moves == 0 {
             return if board.is_in_check() {
-                mated_in(height)
+                Evaluation::mated_after(height)
             } else {
-                DRAW
+                Evaluation::DRAW
             };
         }
 
@@ -312,21 +319,21 @@ impl Worker<'_> {
     fn quiescence_search(
         &mut self,
         board: &Board,
-        mut alpha: Eval,
-        beta: Eval,
-        height: Depth,
-    ) -> Eval {
+        mut alpha: Evaluation,
+        beta: Evaluation,
+        height: Height,
+    ) -> Evaluation {
         self.seldepth = self.seldepth.max(height);
         self.nodes += 1;
 
         let is_in_check = board.is_in_check();
         let mut best_score = if is_in_check {
-            mated_in(height)
+            Evaluation::mated_after(height)
         } else {
             evaluate(board)
         };
 
-        if height == Depth::MAX {
+        if height.is_maximum() {
             return best_score;
         }
 
@@ -350,7 +357,7 @@ impl Worker<'_> {
             let score = -self.quiescence_search(&copy, -beta, -alpha, height + 1);
 
             if self.check_status() != SearchStatus::Continue {
-                return 0;
+                return Evaluation::default();
             }
 
             best_score = best_score.max(score);
@@ -365,14 +372,14 @@ impl Worker<'_> {
 }
 
 /// Calculates the reduction for a move.
-fn null_move_reduction(static_eval: Eval, beta: Eval, depth: Depth) -> Depth {
-    (static_eval.saturating_sub(beta) / 200).min(6) as Depth + depth / 3 + 3
+fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) -> Depth {
+    Depth::from(((static_eval - beta) / 200).min(Evaluation(6))) + depth / 3 + 3
 }
 
 /// Calculates how much to extend the search by.
-const fn extension(is_in_check: bool) -> Depth {
+fn extension(is_in_check: bool) -> Depth {
     // more to come of course...
-    let mut extension = 0;
+    let mut extension = Depth::default();
     if is_in_check {
         extension += 1;
     }
@@ -384,6 +391,6 @@ fn late_move_reduction(depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
         base_reductions(depth, total_moves)
     } else {
-        0
+        Depth::default()
     }
 }

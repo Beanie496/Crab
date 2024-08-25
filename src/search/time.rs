@@ -19,6 +19,7 @@
 use std::time::{Duration, Instant};
 
 use super::Limits;
+use crate::search::CompressedDepth;
 
 impl Limits {
     /// The maximum number of effective moves to go until the next time
@@ -26,7 +27,7 @@ impl Limits {
     ///
     /// In other words, the time manager treats the moves until the next time
     /// control as `moves_to_go.min(MAX_MOVES_TO_GO)`.
-    const MAX_MOVES_TO_GO: u8 = 20;
+    const MAX_MOVES_TO_GO: CompressedDepth = CompressedDepth(20);
 }
 
 /// Calculates the maximum window of time that should be used for the next
@@ -43,7 +44,7 @@ pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Dura
         // to avoid allocating too little time
         let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
 
-        (time / u32::from(moves_to_go) + inc).saturating_sub(start.elapsed() + move_overhead)
+        (time / moves_to_go.0.into() + inc).saturating_sub(start.elapsed() + move_overhead)
     } else {
         Duration::MAX
     }

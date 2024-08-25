@@ -40,7 +40,7 @@ static RAYS_BETWEEN: [[Bitboard; Square::TOTAL]; Square::TOTAL] =
 /// Finds the base late move reduction for the given number of moves and the
 /// given depth.
 pub fn base_reductions(depth: Depth, total_moves: u8) -> Depth {
-    let move_table = get_unchecked(&BASE_REDUCTIONS, usize::from(depth).min(63));
+    let move_table = get_unchecked(&BASE_REDUCTIONS, depth.to_index().min(63));
     *get_unchecked(move_table, usize::from(total_moves).min(127))
 }
 

@@ -76,8 +76,8 @@ use crate::{
     defs::{self, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
     evaluation::{
-        values::{BASE_PIECE_VALUES, INITIAL_PIECE_SQUARE_TABLES},
-        Eval, Score,
+        values::{RawScore, BASE_PIECE_VALUES, INITIAL_PIECE_SQUARE_TABLES},
+        Evaluation,
     },
 };
 
@@ -99,7 +99,7 @@ struct Coefficient {
     weight_index: usize,
 }
 
-/// A [`Score`] but with [`f64`]s.
+/// A [`RawScore`] but with [`f64`]s.
 #[derive(Clone, Copy)]
 struct ScoreF64(pub f64, pub f64);
 
@@ -109,7 +109,7 @@ struct TuneEntry {
     /// Black winning.
     result: f64,
     /// The static evaluation of the position.
-    eval: Eval,
+    eval: Evaluation,
     /// The phase of the game: see [`Phase`](crate::evaluation::Phase).
     phase: f64,
     /// The non-zero integer coefficients of the position.
@@ -122,9 +122,9 @@ struct TuneEntry {
 /// pieces.
 const TOTAL_WEIGHTS: usize = PieceType::TOTAL * Square::TOTAL + PieceType::TOTAL;
 
-impl From<ScoreF64> for Score {
+impl From<ScoreF64> for RawScore {
     fn from(score: ScoreF64) -> Self {
-        Self(score.0.round() as Eval, score.1.round() as Eval)
+        Self(score.0.round() as i32, score.1.round() as i32)
     }
 }
 
@@ -159,8 +159,8 @@ impl Div for ScoreF64 {
     }
 }
 
-impl From<Score> for ScoreF64 {
-    fn from(score: Score) -> Self {
+impl From<RawScore> for ScoreF64 {
+    fn from(score: RawScore) -> Self {
         Self(f64::from(score.0), f64::from(score.1))
     }
 }
@@ -218,7 +218,7 @@ impl FromStr for TuneEntry {
         let board = fen.parse::<Board>()?;
         let phase = board.phase();
         let eval = board.score().lerp_to(phase);
-        let phase = f64::from(phase.min(24)) / 24.0;
+        let phase = f64::from(phase.inner()) / 24.0;
         let coefficients = initialise_coefficients(&board);
 
         Ok(Self {
@@ -442,8 +442,9 @@ fn calculate_optimal_k(tune_entries: &TuneEntries) -> (f64, f64) {
 
         // range `[start, end]` with step `delta`. `epsilon` makes sure `end`
         // is included.
+        #[allow(clippy::while_float)]
         while current_value < end + epsilon {
-            let error = total_error(tune_entries, current_value, |entry| f64::from(entry.eval));
+            let error = total_error(tune_entries, current_value, |entry| f64::from(entry.eval.0));
 
             if error < best_error {
                 best_error = error;
@@ -561,7 +562,7 @@ fn sigmoid(eval: f64, k: f64) -> f64 {
 /// source of [`crate::evaluation::values`].
 #[allow(clippy::use_debug)]
 fn print_weights(weights: &Weights) {
-    let mut iter = weights.iter().map(|&w| Score::from(w));
+    let mut iter = weights.iter().map(|&w| RawScore::from(w));
 
     println!("pub const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [");
     print!("   ");

@@ -23,9 +23,9 @@ use std::{
 
 use crate::{
     board::Key,
-    evaluation::{Eval, MATE_BOUND},
+    evaluation::{CompressedEvaluation, Evaluation},
     movegen::Move,
-    search::Depth,
+    search::{CompressedDepth, Depth, Height},
     util::get_unchecked,
 };
 
@@ -50,13 +50,13 @@ pub struct TranspositionEntry {
     /// The key, used as a checksum.
     key: Key,
     /// The static evaluation of the position.
-    static_eval: Eval,
+    static_eval: CompressedEvaluation,
     /// The score of the position.
-    score: Eval,
+    score: CompressedEvaluation,
     /// The best move in the position.
     mv: Option<Move>,
     /// The depth at which the score was obtained.
-    depth: Depth,
+    depth: CompressedDepth,
     /// The bound of the score.
     bound: Bound,
 }
@@ -65,9 +65,9 @@ pub struct TranspositionEntry {
 #[derive(Clone, Copy)]
 pub struct TranspositionHit {
     /// The static evaluation of the position.
-    static_eval: Eval,
+    static_eval: Evaluation,
     /// The score of the position.
-    score: Eval,
+    score: Evaluation,
     /// The best move in the position.
     mv: Option<Move>,
     /// The depth at which the score was obtained.
@@ -102,19 +102,19 @@ impl TranspositionEntry {
     /// Creates a new [`TranspositionEntry`] with the given attributes.
     pub fn new(
         key: Key,
-        static_eval: Eval,
-        score: Eval,
+        static_eval: Evaluation,
+        score: Evaluation,
         mv: Option<Move>,
         depth: Depth,
         bound: Bound,
-        height: Depth,
+        height: Height,
     ) -> Self {
         Self {
             key,
-            static_eval,
-            score: normalise(score, height),
+            static_eval: static_eval.into(),
+            score: normalise(score, height).into(),
             mv,
-            depth,
+            depth: depth.into(),
             bound,
         }
     }
@@ -128,12 +128,12 @@ impl TranspositionEntry {
 impl TranspositionHit {
     /// Creates a new [`TranspositionHit`].
     fn new(
-        static_eval: Eval,
-        score: Eval,
+        static_eval: Evaluation,
+        score: Evaluation,
         mv: Option<Move>,
         depth: Depth,
         bound: Bound,
-        height: Depth,
+        height: Height,
     ) -> Self {
         Self {
             static_eval,
@@ -145,12 +145,12 @@ impl TranspositionHit {
     }
 
     /// Returns the static evaluation.
-    pub const fn static_eval(self) -> Eval {
+    pub const fn static_eval(self) -> Evaluation {
         self.static_eval
     }
 
     /// Returns the score.
-    pub const fn score(self) -> Eval {
+    pub const fn score(self) -> Evaluation {
         self.score
     }
 
@@ -202,7 +202,7 @@ impl TranspositionTable {
     }
 
     /// Returns the entry with the given key, or [`None`] if it doesn't exist.
-    pub fn load(&self, key: Key, height: Depth) -> Option<TranspositionHit> {
+    pub fn load(&self, key: Key, height: Height) -> Option<TranspositionHit> {
         let atomic_entry = get_unchecked(self.tt(), self.index(key));
         let upper_bits = atomic_entry[0].load(Ordering::Relaxed);
         let lower_bits = atomic_entry[1].load(Ordering::Relaxed);
@@ -210,10 +210,10 @@ impl TranspositionTable {
         let entry = TranspositionEntry::from([upper_bits ^ lower_bits, lower_bits]);
 
         entry.matches(key).then_some(TranspositionHit::new(
-            entry.static_eval,
-            entry.score,
+            entry.static_eval.into(),
+            entry.score.into(),
             entry.mv,
-            entry.depth,
+            entry.depth.into(),
             entry.bound,
             height,
         ))
@@ -267,11 +267,11 @@ impl TranspositionTable {
 
 /// If `score` is a mate score, assume it is a mate score relative to the root
 /// node and turn it in to a mate score relative to the current node.
-fn normalise(score: Eval, height: Depth) -> Eval {
-    if score <= -MATE_BOUND {
-        score - Eval::from(height)
-    } else if score >= MATE_BOUND {
-        score + Eval::from(height)
+fn normalise(score: Evaluation, height: Height) -> Evaluation {
+    if score <= -Evaluation::MATE_BOUND {
+        score - Evaluation::from(height)
+    } else if score >= Evaluation::MATE_BOUND {
+        score + Evaluation::from(height)
     } else {
         score
     }
@@ -279,11 +279,11 @@ fn normalise(score: Eval, height: Depth) -> Eval {
 
 /// If `score` is a mate score, assume it is a mate score relative to the
 /// current node and turn it into a mate score relative to the root node.
-fn denormalise(score: Eval, height: Depth) -> Eval {
-    if score <= -MATE_BOUND {
-        score + Eval::from(height)
-    } else if score >= MATE_BOUND {
-        score - Eval::from(height)
+fn denormalise(score: Evaluation, height: Height) -> Evaluation {
+    if score <= -Evaluation::MATE_BOUND {
+        score + Evaluation::from(height)
+    } else if score >= Evaluation::MATE_BOUND {
+        score - Evaluation::from(height)
     } else {
         score
     }

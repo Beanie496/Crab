@@ -16,99 +16,87 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::mem::size_of;
-
-use super::{Depth, Eval, Pv, RootNode, SearchStatus, Worker};
-use crate::evaluation::INF_EVAL;
+use super::{Depth, Height, Pv, RootNode, SearchStatus, Worker};
+use crate::evaluation::Evaluation;
 
 /// An aspiration window: a set of bounds used for the search and updated if
 /// the returned score fails high or low.
 pub struct AspirationWindow {
     /// The lower bound.
-    alpha: Eval,
+    alpha: Evaluation,
     /// The upper bound.
-    beta: Eval,
+    beta: Evaluation,
     /// How much higher or lower the bounds should be set above the returned
     /// score (if the score is a bound).
-    margin: Eval,
+    margin: Evaluation,
 }
 
 impl AspirationWindow {
     /// The highest a margin can be before it increases.
-    const MARGIN_LIMIT: Eval = 700;
+    const MARGIN_LIMIT: Evaluation = Evaluation(700);
 }
 
 impl AspirationWindow {
     /// Returns a new [`AspirationWindow`] with infinite bounds and no margin.
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            alpha: -INF_EVAL,
-            beta: INF_EVAL,
-            margin: 0,
+            alpha: -Evaluation::INFINITY,
+            beta: Evaluation::INFINITY,
+            margin: Evaluation::default(),
         }
     }
 
     /// Adjusts the aspiration window around the score.
-    pub fn adjust_around(&mut self, score: Eval, depth: Depth) {
-        // let very small depths have a higher margin and high scores have a
-        // much higher margin
-        // `widening_mul()` is still nightly unfortunately
-        assert!(
-            size_of::<Eval>() * 2 == size_of::<i32>(),
-            "an Eval must be half the size of an i32 or the following calculation could overflow"
-        );
+    pub fn adjust_around(&mut self, score: Evaluation, depth: Depth) {
         let unbounded_margin =
-            60 / i32::from(depth).min(3) + i32::from(score) * i32::from(score) / 3_000;
+            Evaluation(60) / Evaluation::from(depth.min(Depth(3))) + score * score / 3_000;
 
-        self.margin = Eval::try_from(unbounded_margin).unwrap_or(INF_EVAL);
-        // same as `score.saturating_sub(self.margin)`, but saturates at
-        // `-Eval::MAX` instead of `Eval::MIN`
-        self.alpha = -(-score).saturating_add(self.margin);
-        self.beta = score.saturating_add(self.margin);
+        self.margin = unbounded_margin;
+        self.alpha = score - self.margin;
+        self.beta = score + self.margin;
     }
 
     /// Returns the lower bound.
-    const fn alpha(&self) -> Eval {
-        self.alpha
+    fn alpha(&self) -> Evaluation {
+        self.alpha.max(-Evaluation::INFINITY)
     }
 
     /// Returns the upper bound.
-    const fn beta(&self) -> Eval {
-        self.beta
+    fn beta(&self) -> Evaluation {
+        self.beta.min(Evaluation::INFINITY)
     }
 
     /// Increases the upper bound to above the given score.
-    fn widen_up(&mut self, score: Eval) {
+    fn widen_up(&mut self, score: Evaluation) {
         if self.margin > Self::MARGIN_LIMIT {
-            self.beta = INF_EVAL;
+            self.beta = Evaluation::INFINITY;
             return;
         }
         self.margin *= 2;
 
-        self.beta = score.saturating_add(self.margin);
+        self.beta = score + self.margin;
     }
 
     /// Checks if the upper bound can be increased.
-    const fn can_widen_up(&self) -> bool {
-        self.beta() < INF_EVAL
+    fn can_widen_up(&self) -> bool {
+        self.beta() < Evaluation::INFINITY
     }
 
     /// Lowers the lower bound to below the given score.
-    fn widen_down(&mut self, score: Eval) {
+    fn widen_down(&mut self, score: Evaluation) {
         if self.margin > Self::MARGIN_LIMIT {
-            self.alpha = -INF_EVAL;
+            self.alpha = -Evaluation::INFINITY;
             return;
         }
         self.margin *= 2;
 
         self.beta = (self.alpha + self.beta) / 2;
-        // see comments of `Self::adjust_around()`
-        self.alpha = -(-score).saturating_add(self.margin);
+        self.alpha = score - self.margin;
     }
 
     /// Checks if the lower bound can be lowered.
-    const fn can_widen_down(&self) -> bool {
-        self.alpha() > -INF_EVAL
+    fn can_widen_down(&self) -> bool {
+        self.alpha() > -Evaluation::INFINITY
     }
 }
 
@@ -122,7 +110,7 @@ impl Worker<'_> {
         pv: &mut Pv,
         asp_window: &mut AspirationWindow,
         depth: Depth,
-    ) -> Eval {
+    ) -> Evaluation {
         let board = self.board;
 
         loop {
@@ -132,7 +120,7 @@ impl Worker<'_> {
                 asp_window.alpha(),
                 asp_window.beta(),
                 depth,
-                0,
+                Height::default(),
             );
 
             if self.can_print {

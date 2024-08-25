@@ -16,12 +16,16 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::ops::{Add, AddAssign, Neg, SubAssign};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Display, Formatter},
+    ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 use crate::{
     board::Board,
     defs::{Piece, Side, Square},
-    search::Depth,
+    search::{Depth, Height},
     util::get_unchecked,
 };
 
@@ -30,25 +34,30 @@ use values::create_piece_square_tables;
 /// Values related to evaluation.
 pub mod values;
 
-/// The result of an evaluation.
-pub type Eval = i16;
+/// An [`Evaluation`] with half the size.
+#[derive(Clone, Copy)]
+pub struct CompressedEvaluation(pub i16);
+
+/// An evaluation.
+///
+/// When converting to a [`CompressedEvaluation`] or compared against mate scores,
+/// this should always be in the range
+/// `-`[`Self::INFINITY`]`..=`[`Self::INFINITY`].
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Evaluation(pub i32);
+
 /// The phase of the game, represented by the sum of the weights of the pieces
 /// of the board.
 ///
 /// `0` is the endgame (because fewer pieces is closer to an endgame) and `24`
 /// is the middlegame (because the sum of the weights of the pieces of the
-/// starting position is 24). `> 24` is allowed: it happens with early
-/// promotion. It should be treated as 24.
-pub type Phase = u8;
+/// starting position is 24).
+#[derive(Clone, Copy, Default)]
+pub struct Phase(u8);
 
-/// The highest possible (positive) evaluation.
-pub const INF_EVAL: Eval = Eval::MAX;
-/// The evaluation of a mate.
-pub const MATE: Eval = INF_EVAL;
-/// The lowest score a mate can have.
-pub const MATE_BOUND: Eval = MATE - Depth::MAX as Eval;
-/// The evaluation of a draw.
-pub const DRAW: Eval = 0;
+/// A blend between a middlegame and endgame value.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Score(pub Evaluation, pub Evaluation);
 
 /// The piece-square tables for White and black, with an extra table of 0's to
 /// allow [`Piece::NONE`] to index into it. The piece values are baked in.
@@ -63,17 +72,170 @@ static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 /// one per side. The order of those two values depends on the order of
 /// [`Side::WHITE`] and [`Side::BLACK`]. An extra `0` is added at the end to
 /// allow [`Piece::NONE`] to index into it.
-static PHASE_WEIGHTS: [Phase; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+static PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
-/// A blend between a middlegame and endgame value.
-#[derive(Clone, Copy, Debug)]
-pub struct Score(pub Eval, pub Eval);
+impl Evaluation {
+    /// The highest possible (positive) evaluation.
+    pub const INFINITY: Self = Self(i16::MAX as i32);
+    /// The evaluation of a mate.
+    pub const MATE: Self = Self::INFINITY;
+    /// The lowest score a mate can have.
+    pub const MATE_BOUND: Self = Self(Self::MATE.0 - Depth::MAX.0 as i32);
+    /// The evaluation of a draw.
+    pub const DRAW: Self = Self(0);
+}
 
-impl Add for Score {
+impl From<Evaluation> for CompressedEvaluation {
+    fn from(eval: Evaluation) -> Self {
+        debug_assert!(
+            eval >= -Evaluation::INFINITY && eval <= Evaluation::INFINITY,
+            "converting an Evaluation ({eval}) outside the permissible range for a CompressedEvaluation",
+        );
+        Self(eval.0 as i16)
+    }
+}
+
+impl Add for Evaluation {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0, self.1 + rhs.1)
+    fn add(self, other: Self) -> Self::Output {
+        Self(self.0 + other.0)
+    }
+}
+
+impl Add<i16> for Evaluation {
+    type Output = Self;
+
+    fn add(self, other: i16) -> Self::Output {
+        self + Self(other.into())
+    }
+}
+
+impl AddAssign for Evaluation {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+impl Display for Evaluation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Div for Evaluation {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self::Output {
+        Self(self.0 / other.0)
+    }
+}
+
+impl Div<i16> for Evaluation {
+    type Output = Self;
+
+    fn div(self, other: i16) -> Self::Output {
+        self / Self(other.into())
+    }
+}
+
+impl From<CompressedEvaluation> for Evaluation {
+    fn from(eval: CompressedEvaluation) -> Self {
+        Self(eval.0.into())
+    }
+}
+
+impl From<Depth> for Evaluation {
+    fn from(eval: Depth) -> Self {
+        Self(eval.0.into())
+    }
+}
+
+impl From<Height> for Evaluation {
+    fn from(eval: Height) -> Self {
+        Self(eval.0.into())
+    }
+}
+
+impl Mul for Evaluation {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self::Output {
+        Self(self.0 * other.0)
+    }
+}
+
+impl Mul<Phase> for Evaluation {
+    type Output = Self;
+
+    fn mul(self, other: Phase) -> Self::Output {
+        self * Self(other.inner().into())
+    }
+}
+
+impl MulAssign for Evaluation {
+    fn mul_assign(&mut self, other: Self) {
+        self.0 *= other.0;
+    }
+}
+
+impl MulAssign<i16> for Evaluation {
+    fn mul_assign(&mut self, other: i16) {
+        *self *= Self(other.into());
+    }
+}
+
+impl Neg for Evaluation {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(-self.0)
+    }
+}
+
+impl PartialEq<i16> for Evaluation {
+    fn eq(&self, other: &i16) -> bool {
+        self.0 == (*other).into()
+    }
+}
+
+impl PartialOrd<i16> for Evaluation {
+    fn partial_cmp(&self, other: &i16) -> Option<Ordering> {
+        Some(self.0.cmp(&(*other).into()))
+    }
+}
+
+impl Sub for Evaluation {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self(self.0 - other.0)
+    }
+}
+
+impl Sub<i16> for Evaluation {
+    type Output = Self;
+
+    fn sub(self, other: i16) -> Self::Output {
+        self - Self(other.into())
+    }
+}
+
+impl SubAssign for Evaluation {
+    fn sub_assign(&mut self, other: Self) {
+        self.0 -= other.0;
+    }
+}
+
+impl AddAssign for Phase {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+impl SubAssign for Phase {
+    fn sub_assign(&mut self, other: Self) {
+        self.0 -= other.0;
     }
 }
 
@@ -84,16 +246,6 @@ impl AddAssign for Score {
     }
 }
 
-impl Neg for Score {
-    type Output = Self;
-
-    fn neg(mut self) -> Self {
-        self.0 = -self.0;
-        self.1 = -self.1;
-        self
-    }
-}
-
 impl SubAssign for Score {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
@@ -101,18 +253,56 @@ impl SubAssign for Score {
     }
 }
 
+impl Evaluation {
+    /// Checks if the score is low or high enough to be a mate score.
+    pub fn is_mate(self) -> bool {
+        self >= Self::MATE_BOUND || self <= -Self::MATE_BOUND
+    }
+
+    /// Calculates the number of fullmoves to a mate.
+    ///
+    /// A positive number represents fullmoves to performing a mate and a negative
+    /// number means fullmoves to being mated.
+    pub fn moves_to_mate(self) -> i32 {
+        if self > 0 {
+            (Self::MATE - self + 1) / 2
+        } else {
+            (-Self::MATE - self) / 2
+        }
+        .0
+    }
+
+    /// Calculates the evaluation if we're mating after `height` halfmoves.
+    pub fn mate_after(height: Height) -> Self {
+        Self::MATE - Self::from(height)
+    }
+
+    /// Calculates the evaluation if we're getting mated after `height` halfmoves.
+    pub fn mated_after(height: Height) -> Self {
+        -Self::MATE + Self::from(height)
+    }
+}
+
+impl Phase {
+    /// Returns the phase.
+    ///
+    /// The maximum is 24, even with early promotion.
+    pub fn inner(self) -> u8 {
+        self.0.min(24)
+    }
+}
+
 impl Score {
     /// Lerps the score between its middlegame and endgame value depending on
     /// the phase.
-    pub fn lerp_to(self, phase: Phase) -> Eval {
-        let phase = Eval::from(phase.min(24));
+    pub fn lerp_to(self, phase: Phase) -> Evaluation {
         let diff = self.1 - self.0;
         self.1 - (diff * phase) / 24
     }
 }
 
 /// Calculates a static evaluation of the current board.
-pub fn evaluate(board: &Board) -> Eval {
+pub fn evaluate(board: &Board) -> Evaluation {
     let phase = board.phase();
     let score = board.score();
 
@@ -122,33 +312,6 @@ pub fn evaluate(board: &Board) -> Eval {
         eval
     } else {
         -eval
-    }
-}
-
-/// Calculates the evaluation if we're mating in `depth` halfmoves.
-pub fn mate_in(depth: Depth) -> Eval {
-    MATE - Eval::from(depth)
-}
-
-/// Calculates the evaluation if we're getting mated in `depth` halfmoves.
-pub fn mated_in(depth: Depth) -> Eval {
-    -MATE + Eval::from(depth)
-}
-
-/// Checks if the score is low or high enough to be a mate score.
-pub const fn is_mate(score: Eval) -> bool {
-    score >= MATE_BOUND || score <= -MATE_BOUND
-}
-
-/// Calculates the number of fullmoves to a mate.
-///
-/// A positive number represents fullmoves to performing a mate and a negative
-/// number means fullmoves to being mated.
-pub const fn moves_to_mate(score: Eval) -> i16 {
-    if score > 0 {
-        (MATE - score + 1) / 2
-    } else {
-        (-MATE - score) / 2
     }
 }
 
@@ -165,5 +328,5 @@ pub fn piece_score(square: Square, piece: Piece) -> Score {
 ///
 /// The piece can be any type (even [`Piece::NONE`]).
 pub fn piece_phase(piece: Piece) -> Phase {
-    *get_unchecked(&PHASE_WEIGHTS, piece.to_index())
+    Phase(*get_unchecked(&PHASE_WEIGHTS, piece.to_index()))
 }

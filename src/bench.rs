@@ -23,7 +23,7 @@ use std::{
 
 use crate::{
     board::Board,
-    search::{BoardHistory, Limits, SharedState, Worker},
+    search::{BoardHistory, CompressedDepth, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -54,7 +54,7 @@ where
     let limits = match limit_type {
         "depth" => {
             if let Ok(limit) = u8::try_from(limit) {
-                Limits::Depth(limit)
+                Limits::Depth(CompressedDepth(limit))
             } else {
                 return;
             }

@@ -34,7 +34,7 @@ use crate::{
     defs::{PieceType, Side, Square},
     movegen::{generate_moves, magic::find_magics, AllMoves, Moves},
     perft::perft,
-    search::{BoardHistory, Limits, SharedState, Worker},
+    search::{BoardHistory, CompressedDepth, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -285,13 +285,13 @@ where
                 }
             }
             "movestogo" => {
-                if let Some(time) = parse_into_nonzero_option(next) {
-                    limits.set_moves_to_go(time);
+                if let Some(moves) = parse_into_nonzero_option(next) {
+                    limits.set_moves_to_go(CompressedDepth(moves));
                 }
             }
             "depth" => {
                 if let Some(depth) = parse_into_nonzero_option(next) {
-                    limits = Limits::Depth(depth);
+                    limits = Limits::Depth(CompressedDepth(depth));
                 }
             }
             "nodes" => {

@@ -24,9 +24,8 @@ use std::{
     path::Path,
 };
 
-/// The difference between the root or leaf node (for height or depth
-/// respectively) and the current node.
-type Depth = u8;
+/// The difference between the leaf node and the current node.
+type Depth = i16;
 /// A table of base late move reductions.
 ///
 /// Indexed by the depth then number of legal moves.

@@ -16,18 +16,25 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::Score;
+use super::{Evaluation, Score};
 use crate::{
     cfor,
     defs::{Piece, PieceType, Side, Square},
 };
 
+/// A [`Score`].
+///
+/// Used to avoid wrapping every single number in this file inside an
+/// [`Evaluation`].
+#[derive(Debug)]
+pub struct RawScore(pub i32, pub i32);
+
 /// Values in centipawns for each piece.
 ///
 /// Order: pawn, knight, bishop, rook, queen, king.
 #[rustfmt::skip]
-pub const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [
-    Score(77, 106), Score(254, 273), Score(278, 296), Score(393, 482), Score(955, 867), Score(10000, 10000),
+pub const BASE_PIECE_VALUES: [RawScore; PieceType::TOTAL] = [
+    RawScore(77, 106), RawScore(254, 273), RawScore(278, 296), RawScore(393, 482), RawScore(955, 867), RawScore(10000, 10000),
 ];
 
 /// Piece-square tables, copied verbatim from
@@ -35,66 +42,66 @@ pub const BASE_PIECE_VALUES: [Score; PieceType::TOTAL] = [
 ///
 /// Order: pawn, knight, bishop, rook, queen, king.
 #[rustfmt::skip]
-pub const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL] = [
+pub const INITIAL_PIECE_SQUARE_TABLES: [[RawScore; Square::TOTAL]; PieceType::TOTAL] = [
     [
-        Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0),
-        Score(-32, 26), Score(-2, 20), Score(-32, 21), Score(-37, 14), Score(-33, 15), Score(18, 6), Score(48, -4), Score(-17, -10),
-        Score(-24, 20), Score(-4, 18), Score(-11, 4), Score(-14, 13), Score(-3, 1), Score(-12, 3), Score(35, -6), Score(-8, -5),
-        Score(-22, 22), Score(-7, 22), Score(-11, -3), Score(6, -5), Score(8, -11), Score(5, -12), Score(2, 2), Score(-26, 2),
-        Score(-9, 50), Score(8, 37), Score(3, 16), Score(11, 8), Score(15, -3), Score(4, -3), Score(7, 13), Score(-22, 17),
-        Score(14, 107), Score(3, 110), Score(54, 80), Score(50, 66), Score(66, 40), Score(61, 31), Score(-10, 57), Score(4, 69),
-        Score(109, 167), Score(131, 170), Score(103, 167), Score(109, 136), Score(72, 147), Score(115, 116), Score(17, 179), Score(-7, 182),
-        Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0), Score(0, 0),
+        RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0),
+        RawScore(-32, 26), RawScore(-2, 20), RawScore(-32, 21), RawScore(-37, 14), RawScore(-33, 15), RawScore(18, 6), RawScore(48, -4), RawScore(-17, -10),
+        RawScore(-24, 20), RawScore(-4, 18), RawScore(-11, 4), RawScore(-14, 13), RawScore(-3, 1), RawScore(-12, 3), RawScore(35, -6), RawScore(-8, -5),
+        RawScore(-22, 22), RawScore(-7, 22), RawScore(-11, -3), RawScore(6, -5), RawScore(8, -11), RawScore(5, -12), RawScore(2, 2), RawScore(-26, 2),
+        RawScore(-9, 50), RawScore(8, 37), RawScore(3, 16), RawScore(11, 8), RawScore(15, -3), RawScore(4, -3), RawScore(7, 13), RawScore(-22, 17),
+        RawScore(14, 107), RawScore(3, 110), RawScore(54, 80), RawScore(50, 66), RawScore(66, 40), RawScore(61, 31), RawScore(-10, 57), RawScore(4, 69),
+        RawScore(109, 167), RawScore(131, 170), RawScore(103, 167), RawScore(109, 136), RawScore(72, 147), RawScore(115, 116), RawScore(17, 179), RawScore(-7, 182),
+        RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0), RawScore(0, 0),
     ],
     [
-        Score(-103, -33), Score(-57, -79), Score(-76, -43), Score(-44, -14), Score(-47, -36), Score(-41, -36), Score(-35, -57), Score(-58, -74),
-        Score(-62, -54), Score(-70, -21), Score(-35, -15), Score(-26, -4), Score(-34, -14), Score(1, -25), Score(-52, -37), Score(-43, -53),
-        Score(-63, -38), Score(-34, -7), Score(-12, 3), Score(-16, 17), Score(-5, 21), Score(-7, 14), Score(3, -28), Score(-50, -27),
-        Score(-45, -28), Score(-3, -20), Score(5, 28), Score(-15, 36), Score(1, 36), Score(3, 27), Score(19, 8), Score(-35, -28),
-        Score(-16, -19), Score(0, 12), Score(9, 43), Score(37, 33), Score(11, 41), Score(69, 21), Score(15, 16), Score(5, -19),
-        Score(-66, -29), Score(40, -14), Score(4, 24), Score(65, 31), Score(29, 13), Score(85, 0), Score(52, -27), Score(41, -38),
-        Score(-61, -22), Score(-43, -3), Score(70, -27), Score(27, 4), Score(20, -1), Score(65, -25), Score(3, -17), Score(-10, -60),
-        Score(-180, -54), Score(-85, -33), Score(-39, -21), Score(-65, -36), Score(46, -44), Score(-107, -33), Score(-15, -62), Score(-97, -99),
+        RawScore(-103, -33), RawScore(-57, -79), RawScore(-76, -43), RawScore(-44, -14), RawScore(-47, -36), RawScore(-41, -36), RawScore(-35, -57), RawScore(-58, -74),
+        RawScore(-62, -54), RawScore(-70, -21), RawScore(-35, -15), RawScore(-26, -4), RawScore(-34, -14), RawScore(1, -25), RawScore(-52, -37), RawScore(-43, -53),
+        RawScore(-63, -38), RawScore(-34, -7), RawScore(-12, 3), RawScore(-16, 17), RawScore(-5, 21), RawScore(-7, 14), RawScore(3, -28), RawScore(-50, -27),
+        RawScore(-45, -28), RawScore(-3, -20), RawScore(5, 28), RawScore(-15, 36), RawScore(1, 36), RawScore(3, 27), RawScore(19, 8), RawScore(-35, -28),
+        RawScore(-16, -19), RawScore(0, 12), RawScore(9, 43), RawScore(37, 33), RawScore(11, 41), RawScore(69, 21), RawScore(15, 16), RawScore(5, -19),
+        RawScore(-66, -29), RawScore(40, -14), RawScore(4, 24), RawScore(65, 31), RawScore(29, 13), RawScore(85, 0), RawScore(52, -27), RawScore(41, -38),
+        RawScore(-61, -22), RawScore(-43, -3), RawScore(70, -27), RawScore(27, 4), RawScore(20, -1), RawScore(65, -25), RawScore(3, -17), RawScore(-10, -60),
+        RawScore(-180, -54), RawScore(-85, -33), RawScore(-39, -21), RawScore(-65, -36), RawScore(46, -44), RawScore(-107, -33), RawScore(-15, -62), RawScore(-97, -99),
     ],
     [
-        Score(-53, -38), Score(-12, -24), Score(-35, -49), Score(-25, -14), Score(-39, -24), Score(-38, -43), Score(-37, -1), Score(-50, -34),
-        Score(-7, -28), Score(-8, -28), Score(3, -16), Score(-16, -6), Score(-17, 6), Score(28, -22), Score(18, -25), Score(-18, -49),
-        Score(-16, -25), Score(0, -5), Score(-1, 17), Score(-6, 17), Score(-1, 30), Score(2, 8), Score(11, -20), Score(0, -19),
-        Score(3, -25), Score(-4, 5), Score(1, 21), Score(8, 42), Score(10, 16), Score(-5, 17), Score(-4, -3), Score(-4, -8),
-        Score(-20, -8), Score(3, 9), Score(6, 31), Score(44, 18), Score(44, 30), Score(17, 26), Score(1, 20), Score(3, -1),
-        Score(-24, 10), Score(27, 13), Score(17, 17), Score(44, 15), Score(-9, -6), Score(28, 32), Score(36, 14), Score(5, -7),
-        Score(-29, -13), Score(-2, 6), Score(-51, 12), Score(-36, -11), Score(20, 8), Score(49, -2), Score(-37, 9), Score(-63, -31),
-        Score(-27, -15), Score(3, -20), Score(-94, -14), Score(-49, -9), Score(-32, -13), Score(-60, -13), Score(7, -21), Score(-10, -24),
+        RawScore(-53, -38), RawScore(-12, -24), RawScore(-35, -49), RawScore(-25, -14), RawScore(-39, -24), RawScore(-38, -43), RawScore(-37, -1), RawScore(-50, -34),
+        RawScore(-7, -28), RawScore(-8, -28), RawScore(3, -16), RawScore(-16, -6), RawScore(-17, 6), RawScore(28, -22), RawScore(18, -25), RawScore(-18, -49),
+        RawScore(-16, -25), RawScore(0, -5), RawScore(-1, 17), RawScore(-6, 17), RawScore(-1, 30), RawScore(2, 8), RawScore(11, -20), RawScore(0, -19),
+        RawScore(3, -25), RawScore(-4, 5), RawScore(1, 21), RawScore(8, 42), RawScore(10, 16), RawScore(-5, 17), RawScore(-4, -3), RawScore(-4, -8),
+        RawScore(-20, -8), RawScore(3, 9), RawScore(6, 31), RawScore(44, 18), RawScore(44, 30), RawScore(17, 26), RawScore(1, 20), RawScore(3, -1),
+        RawScore(-24, 10), RawScore(27, 13), RawScore(17, 17), RawScore(44, 15), RawScore(-9, -6), RawScore(28, 32), RawScore(36, 14), RawScore(5, -7),
+        RawScore(-29, -13), RawScore(-2, 6), RawScore(-51, 12), RawScore(-36, -11), RawScore(20, 8), RawScore(49, -2), RawScore(-37, 9), RawScore(-63, -31),
+        RawScore(-27, -15), RawScore(3, -20), RawScore(-94, -14), RawScore(-49, -9), RawScore(-32, -13), RawScore(-60, -13), RawScore(7, -21), RawScore(-10, -24),
     ],
     [
-        Score(-29, -18), Score(-28, -7), Score(-18, 3), Score(-4, 4), Score(-1, -4), Score(-15, -15), Score(-49, -8), Score(-30, -47),
-        Score(-68, -43), Score(-41, -23), Score(-44, -11), Score(-44, -6), Score(-30, -7), Score(-5, -13), Score(-19, -32), Score(-64, -10),
-        Score(-51, -15), Score(-46, -1), Score(-42, -28), Score(-52, -17), Score(-17, -13), Score(-24, -24), Score(-4, -15), Score(-44, -30),
-        Score(-34, -15), Score(-22, 8), Score(-18, 8), Score(-12, 1), Score(6, -11), Score(-34, 6), Score(18, -22), Score(-29, -17),
-        Score(-39, 6), Score(-16, 6), Score(10, 18), Score(29, 8), Score(19, 1), Score(35, 9), Score(-4, 3), Score(0, -7),
-        Score(-8, 22), Score(35, 4), Score(17, 16), Score(53, 13), Score(33, 17), Score(75, -5), Score(71, 8), Score(28, -2),
-        Score(37, 18), Score(26, 26), Score(54, 31), Score(75, 26), Score(94, 12), Score(71, 14), Score(32, 20), Score(54, 11),
-        Score(41, 13), Score(52, 8), Score(25, 26), Score(32, 29), Score(41, 24), Score(2, 12), Score(37, 19), Score(49, 9),
+        RawScore(-29, -18), RawScore(-28, -7), RawScore(-18, 3), RawScore(-4, 4), RawScore(-1, -4), RawScore(-15, -15), RawScore(-49, -8), RawScore(-30, -47),
+        RawScore(-68, -43), RawScore(-41, -23), RawScore(-44, -11), RawScore(-44, -6), RawScore(-30, -7), RawScore(-5, -13), RawScore(-19, -32), RawScore(-64, -10),
+        RawScore(-51, -15), RawScore(-46, -1), RawScore(-42, -28), RawScore(-52, -17), RawScore(-17, -13), RawScore(-24, -24), RawScore(-4, -15), RawScore(-44, -30),
+        RawScore(-34, -15), RawScore(-22, 8), RawScore(-18, 8), RawScore(-12, 1), RawScore(6, -11), RawScore(-34, 6), RawScore(18, -22), RawScore(-29, -17),
+        RawScore(-39, 6), RawScore(-16, 6), RawScore(10, 18), RawScore(29, 8), RawScore(19, 1), RawScore(35, 9), RawScore(-4, 3), RawScore(0, -7),
+        RawScore(-8, 22), RawScore(35, 4), RawScore(17, 16), RawScore(53, 13), RawScore(33, 17), RawScore(75, -5), RawScore(71, 8), RawScore(28, -2),
+        RawScore(37, 18), RawScore(26, 26), RawScore(54, 31), RawScore(75, 26), RawScore(94, 12), RawScore(71, 14), RawScore(32, 20), RawScore(54, 11),
+        RawScore(41, 13), RawScore(52, 8), RawScore(25, 26), RawScore(32, 29), RawScore(41, 24), RawScore(2, 12), RawScore(37, 19), RawScore(49, 9),
     ],
     [
-        Score(-12, -47), Score(-40, -34), Score(-20, -36), Score(4, -43), Score(-29, -22), Score(-36, -39), Score(-42, -25), Score(-48, -44),
-        Score(-39, -25), Score(-29, -29), Score(6, -30), Score(-5, -30), Score(1, -16), Score(11, -51), Score(-29, -48), Score(-13, -39),
-        Score(-26, -28), Score(-4, -34), Score(-18, 13), Score(-11, 4), Score(-18, 0), Score(-5, 12), Score(14, -7), Score(-24, 2),
-        Score(-3, -34), Score(-17, 23), Score(-11, 19), Score(-6, 62), Score(-6, 30), Score(-22, 42), Score(3, 34), Score(-6, 19),
-        Score(-32, 0), Score(-14, 29), Score(-9, 26), Score(-9, 54), Score(11, 60), Score(23, 41), Score(-6, 60), Score(1, 41),
-        Score(-30, -24), Score(-12, 3), Score(12, 15), Score(20, 52), Score(44, 41), Score(68, 40), Score(71, 35), Score(55, 0),
-        Score(-23, -21), Score(-30, 27), Score(-7, 41), Score(5, 45), Score(-14, 61), Score(73, 39), Score(24, 25), Score(52, 2),
-        Score(-21, -3), Score(17, 24), Score(28, 18), Score(19, 36), Score(69, 45), Score(44, 21), Score(47, 6), Score(47, 16),
+        RawScore(-12, -47), RawScore(-40, -34), RawScore(-20, -36), RawScore(4, -43), RawScore(-29, -22), RawScore(-36, -39), RawScore(-42, -25), RawScore(-48, -44),
+        RawScore(-39, -25), RawScore(-29, -29), RawScore(6, -30), RawScore(-5, -30), RawScore(1, -16), RawScore(11, -51), RawScore(-29, -48), RawScore(-13, -39),
+        RawScore(-26, -28), RawScore(-4, -34), RawScore(-18, 13), RawScore(-11, 4), RawScore(-18, 0), RawScore(-5, 12), RawScore(14, -7), RawScore(-24, 2),
+        RawScore(-3, -34), RawScore(-17, 23), RawScore(-11, 19), RawScore(-6, 62), RawScore(-6, 30), RawScore(-22, 42), RawScore(3, 34), RawScore(-6, 19),
+        RawScore(-32, 0), RawScore(-14, 29), RawScore(-9, 26), RawScore(-9, 54), RawScore(11, 60), RawScore(23, 41), RawScore(-6, 60), RawScore(1, 41),
+        RawScore(-30, -24), RawScore(-12, 3), RawScore(12, 15), RawScore(20, 52), RawScore(44, 41), RawScore(68, 40), RawScore(71, 35), RawScore(55, 0),
+        RawScore(-23, -21), RawScore(-30, 27), RawScore(-7, 41), RawScore(5, 45), RawScore(-14, 61), RawScore(73, 39), RawScore(24, 25), RawScore(52, 2),
+        RawScore(-21, -3), RawScore(17, 24), RawScore(28, 18), RawScore(19, 36), RawScore(69, 45), RawScore(44, 21), RawScore(47, 6), RawScore(47, 16),
     ],
     [
-        Score(-63, -72), Score(19, -33), Score(-16, -16), Score(-100, -19), Score(-22, -35), Score(-68, -16), Score(60, -41), Score(32, -69),
-        Score(-20, -29), Score(-25, -11), Score(-42, 5), Score(-101, 9), Score(-78, 17), Score(-26, 2), Score(35, -17), Score(26, -36),
-        Score(-19, -27), Score(-13, -2), Score(-24, 12), Score(-60, 18), Score(-68, 33), Score(-30, 16), Score(-21, 8), Score(-34, -17),
-        Score(-49, -15), Score(-1, -2), Score(-23, 27), Score(-44, 36), Score(-36, 32), Score(-48, 29), Score(-45, 18), Score(-49, -12),
-        Score(-14, -8), Score(-21, 8), Score(-8, 20), Score(-25, 20), Score(-26, 35), Score(-16, 46), Score(-5, 41), Score(-34, 18),
-        Score(-10, 8), Score(24, 23), Score(7, 8), Score(-13, 29), Score(-19, 28), Score(14, 46), Score(23, 41), Score(-18, 14),
-        Score(29, -15), Score(2, 20), Score(-20, 19), Score(-3, 29), Score(-3, 36), Score(2, 43), Score(-34, 44), Score(-27, 19),
-        Score(-66, -77), Score(23, -30), Score(16, -18), Score(-14, -15), Score(-55, -7), Score(-33, 21), Score(2, 9), Score(11, -25),
+        RawScore(-63, -72), RawScore(19, -33), RawScore(-16, -16), RawScore(-100, -19), RawScore(-22, -35), RawScore(-68, -16), RawScore(60, -41), RawScore(32, -69),
+        RawScore(-20, -29), RawScore(-25, -11), RawScore(-42, 5), RawScore(-101, 9), RawScore(-78, 17), RawScore(-26, 2), RawScore(35, -17), RawScore(26, -36),
+        RawScore(-19, -27), RawScore(-13, -2), RawScore(-24, 12), RawScore(-60, 18), RawScore(-68, 33), RawScore(-30, 16), RawScore(-21, 8), RawScore(-34, -17),
+        RawScore(-49, -15), RawScore(-1, -2), RawScore(-23, 27), RawScore(-44, 36), RawScore(-36, 32), RawScore(-48, 29), RawScore(-45, 18), RawScore(-49, -12),
+        RawScore(-14, -8), RawScore(-21, 8), RawScore(-8, 20), RawScore(-25, 20), RawScore(-26, 35), RawScore(-16, 46), RawScore(-5, 41), RawScore(-34, 18),
+        RawScore(-10, 8), RawScore(24, 23), RawScore(7, 8), RawScore(-13, 29), RawScore(-19, 28), RawScore(14, 46), RawScore(23, 41), RawScore(-18, 14),
+        RawScore(29, -15), RawScore(2, 20), RawScore(-20, 19), RawScore(-3, 29), RawScore(-3, 36), RawScore(2, 43), RawScore(-34, 44), RawScore(-27, 19),
+        RawScore(-66, -77), RawScore(23, -30), RawScore(16, -18), RawScore(-14, -15), RawScore(-55, -7), RawScore(-33, 21), RawScore(2, 9), RawScore(11, -25),
     ],
 ];
 
@@ -102,18 +109,18 @@ pub const INITIAL_PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; PieceType::TOTAL
 /// table of 0's at the end to allow [`Piece::NONE`] to index into it.
 #[allow(clippy::similar_names)]
 pub const fn create_piece_square_tables() -> [[Score; Square::TOTAL]; Piece::TOTAL + 1] {
-    let mut psqt = [[Score(0, 0); Square::TOTAL]; Piece::TOTAL + 1];
+    let mut psqt = [[Score(Evaluation(0), Evaluation(0)); Square::TOTAL]; Piece::TOTAL + 1];
     cfor!(let mut piece = 0; piece < PieceType::TOTAL; piece += 1; {
         let w_piece = Piece::from_piecetype(PieceType(piece as u8), Side::WHITE);
         let b_piece = Piece::from_piecetype(PieceType(piece as u8), Side::BLACK);
         cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
             let flipped_square = square ^ 56;
-            let Score(mut mg, mut eg) = BASE_PIECE_VALUES[piece];
-            let Score(mg_psq, eg_psq) = INITIAL_PIECE_SQUARE_TABLES[piece][square];
+            let RawScore(mut mg, mut eg) = BASE_PIECE_VALUES[piece];
+            let RawScore(mg_psq, eg_psq) = INITIAL_PIECE_SQUARE_TABLES[piece][square];
             mg += mg_psq;
             eg += eg_psq;
-            psqt[w_piece.to_index()][square] = Score(mg, eg);
-            psqt[b_piece.to_index()][flipped_square] = Score(-mg, -eg);
+            psqt[w_piece.to_index()][square] = Score(Evaluation(mg), Evaluation(eg));
+            psqt[b_piece.to_index()][flipped_square] = Score(Evaluation(-mg), Evaluation(-eg));
         });
     });
     psqt

@@ -311,7 +311,7 @@ impl Shl<u8> for CastlingRights {
 
 impl Board {
     /// Creates a new, empty [`Board`].
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             mailbox: [Piece::NONE; Square::TOTAL],
             pieces: [Bitboard::empty(); PieceType::TOTAL],
@@ -321,8 +321,8 @@ impl Board {
             ep_square: Square::NONE,
             halfmoves: 0,
             fullmoves: 1,
-            phase: 0,
-            score: Score(0, 0),
+            phase: Phase::default(),
+            score: Score::default(),
             key: 0,
         }
     }
