@@ -19,5 +19,6 @@ Features:
 - Extensions:
   - Check extensions
 - Late move reductions
+- Futility pruning
 - Quiescence
 - Piece-square tables

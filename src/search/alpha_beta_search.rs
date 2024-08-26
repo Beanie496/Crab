@@ -395,7 +395,7 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 
 /// Calculates the margin for futility pruning.
 fn futility_margin(depth: Depth) -> Evaluation {
-    Evaluation::from(depth) * 80 + 70
+    Evaluation::from(depth) * 100 + 100
 }
 
 /// Calculates how much to extend the search by.
