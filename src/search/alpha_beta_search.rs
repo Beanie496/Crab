@@ -192,7 +192,9 @@ impl Worker<'_> {
                     && lmr_depth <= 8
                     && static_eval + futility_margin(lmr_depth) <= alpha
                 {
+                    self.unmake_move();
                     movepicker.skip_quiets();
+                    continue;
                 }
             }
 
