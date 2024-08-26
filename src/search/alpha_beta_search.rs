@@ -17,13 +17,14 @@
  */
 
 use super::{
-    movepick::MovePicker, Depth, Height, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker,
+    movepick::{AllMovesPicker, QuiescenceMovePicker},
+    Depth, Height, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker,
 };
 use crate::{
     board::Board,
     evaluation::{evaluate, Evaluation},
     lookups::base_reductions,
-    movegen::{AllMoves, CapturesOnly, Evasions},
+    movegen::{CapturesOnly, Evasions},
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
@@ -162,7 +163,7 @@ impl Worker<'_> {
         let mut best_move = None;
         let mut new_pv = Pv::new();
         let killers = self.histories.killers.current(height);
-        let mut movepicker = MovePicker::new::<AllMoves>(tt_move, killers);
+        let mut movepicker = AllMovesPicker::new(tt_move, killers);
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
@@ -343,9 +344,9 @@ impl Worker<'_> {
         }
 
         let mut movepicker = if is_in_check {
-            MovePicker::new::<Evasions>(None, [None; 2])
+            QuiescenceMovePicker::new::<Evasions>()
         } else {
-            MovePicker::new::<CapturesOnly>(None, [None; 2])
+            QuiescenceMovePicker::new::<CapturesOnly>()
         };
 
         while let Some(mv) = movepicker.next(board) {

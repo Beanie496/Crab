@@ -16,13 +16,25 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::marker::PhantomData;
+
 use crate::{
     board::Board,
     evaluation::Evaluation,
     movegen::{
-        generate_moves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly, ScoredMove,
+        generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
+        ScoredMove,
     },
 };
+
+/// A [`MovePicker`] for the main search that searches all moves.
+pub type AllMovesPicker = MovePicker<AllMoves>;
+/// A [`MovePicker`] for the quiescence search that searches only captures
+/// and/or evasions.
+///
+/// Whether or not it generates king quiet moves is given by the type parameter
+/// to `new`.
+pub type QuiescenceMovePicker = MovePicker<CapturesOnly>;
 
 /// The stage of move picking.
 #[derive(PartialEq)]
@@ -45,33 +57,20 @@ enum Stage {
 
 /// A selector of the next best move in a position.
 #[allow(clippy::missing_docs_in_private_items)]
-pub struct MovePicker {
+pub struct MovePicker<Type: MovesType> {
     tt_move: Option<Move>,
     killers: [Option<Move>; 2],
     stage: Stage,
     moves: Moves,
-    skip_non_king_quiets: bool,
-    skip_king_quiets: bool,
+    /// `Type::KING_QUIETS` will always be false for quiescence moves. To see
+    /// if a quiescence move picker generates king quiet moves, this parameter
+    /// is used instead. `!Type::NON_KING_QUIETS && self.do_quiets` means
+    /// generate king quiets but not regular quiets.
+    do_quiets: bool,
+    _type: PhantomData<Type>,
 }
 
-impl MovePicker {
-    /// Creates a new [`MovePicker`] based on the information in `board` and
-    /// `tt_move`.
-    pub fn new<Type: MovesType>(tt_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
-        assert!(
-            Type::CAPTURES,
-            "the movepicker relies on always generating captures"
-        );
-        Self {
-            tt_move,
-            killers,
-            stage: Stage::TtMove,
-            moves: Moves::new(),
-            skip_non_king_quiets: !Type::NON_KING_QUIETS,
-            skip_king_quiets: !Type::KING_QUIETS,
-        }
-    }
-
+impl<Type: MovesType> MovePicker<Type> {
     /// Return the next best [`Move`] in the list of legal moves.
     pub fn next(&mut self, board: &Board) -> Option<Move> {
         if self.stage == Stage::TtMove {
@@ -94,10 +93,15 @@ impl MovePicker {
             if let Some(scored_move) = self.find_next_best(board) {
                 return Some(scored_move.mv);
             }
+
             // this also skips bad captures
-            if self.skip_non_king_quiets && self.skip_king_quiets {
+            if !Type::NON_KING_QUIETS && !self.do_quiets {
                 return None;
             }
+
+            // it's actually faster to do this (~1%) instead of going straight
+            // to `GenerateRemaining` for `QuiescenceMovePicker`. Why? I don't
+            // know. Branch predictor shenanigans.
             self.stage = Stage::FirstKiller;
         }
 
@@ -126,19 +130,19 @@ impl MovePicker {
         if self.stage == Stage::GenerateRemaining {
             self.stage = Stage::Remaining;
             let total_non_quiets = self.moves.len();
-            if self.skip_non_king_quiets {
-                generate_moves::<KingMovesOnly>(board, &mut self.moves);
-                // SAFETY: `total_non_quiets..self.moves.len()` is
-                // always valid
-                unsafe {
-                    self.score::<KingMovesOnly>(board, total_non_quiets, self.moves.len());
-                }
-            } else {
+            if Type::NON_KING_QUIETS {
                 generate_moves::<QuietsOnly>(board, &mut self.moves);
                 // SAFETY: `total_non_quiets..self.moves.len()` is
                 // always valid
                 unsafe {
                     self.score::<QuietsOnly>(board, total_non_quiets, self.moves.len());
+                }
+            } else {
+                generate_moves::<KingMovesOnly>(board, &mut self.moves);
+                // SAFETY: `total_non_quiets..self.moves.len()` is
+                // always valid
+                unsafe {
+                    self.score::<KingMovesOnly>(board, total_non_quiets, self.moves.len());
                 }
             }
         }
@@ -197,11 +201,46 @@ impl MovePicker {
     ///
     /// The slice does not bounds check: if `moves[start..end]` would have
     /// panicked, this function will have undefined behaviour.
-    unsafe fn score<Type: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
+    unsafe fn score<T: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
         // SAFETY: it's up to the caller to make sure this index is safe
         let moves = unsafe { self.moves.get_unchecked_mut(start..end).iter_mut() };
         for mv in moves {
-            mv.score::<Type>(board);
+            mv.score::<T>(board);
+        }
+    }
+}
+
+impl AllMovesPicker {
+    /// Creates a new [`MovePicker`] for all moves based on the information in
+    /// `board` and `tt_move`.
+    pub fn new(tt_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
+        Self {
+            tt_move,
+            killers,
+            stage: Stage::TtMove,
+            moves: Moves::new(),
+            do_quiets: true,
+            _type: PhantomData,
+        }
+    }
+}
+
+impl QuiescenceMovePicker {
+    /// Creates a new [`MovePicker`] for captures only (and optionally king
+    /// quiet moves).
+    pub fn new<Type: MovesType>() -> Self {
+        assert!(
+            !Type::NON_KING_QUIETS,
+            "generating quiet moves for a quiescence move picker"
+        );
+
+        Self {
+            tt_move: None,
+            killers: [None; 2],
+            stage: Stage::GenerateCaptures,
+            moves: Moves::new(),
+            do_quiets: Type::KING_QUIETS,
+            _type: PhantomData,
         }
     }
 }
