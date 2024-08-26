@@ -181,7 +181,7 @@ impl Worker<'_> {
             let reduction = late_move_reduction(depth, total_moves);
             let mut new_depth = depth - 1;
 
-            if !NodeType::IS_PV {
+            if !NodeType::IS_PV && !is_in_check {
                 let lmr_depth = new_depth - reduction;
 
                 // Futility pruning: if the static evaluation is too bad, it's
