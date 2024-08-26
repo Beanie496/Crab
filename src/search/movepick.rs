@@ -71,6 +71,11 @@ pub struct MovePicker<Type: MovesType> {
 }
 
 impl<Type: MovesType> MovePicker<Type> {
+    /// Skip any future quiets.
+    pub fn skip_quiets(&mut self) {
+        self.do_quiets = false;
+    }
+
     /// Return the next best [`Move`] in the list of legal moves.
     pub fn next(&mut self, board: &Board) -> Option<Move> {
         if self.stage == Stage::TtMove {
@@ -94,20 +99,21 @@ impl<Type: MovesType> MovePicker<Type> {
                 return Some(scored_move.mv);
             }
 
-            // this also skips bad captures
-            if !Type::NON_KING_QUIETS && !self.do_quiets {
-                return None;
-            }
+            if Type::NON_KING_QUIETS {
+                self.stage = Stage::FirstKiller;
+            } else {
+                // this also skips bad captures
+                if !self.do_quiets {
+                    return None;
+                }
 
-            // it's actually faster to do this (~1%) instead of going straight
-            // to `GenerateRemaining` for `QuiescenceMovePicker`. Why? I don't
-            // know. Branch predictor shenanigans.
-            self.stage = Stage::FirstKiller;
+                self.stage = Stage::GenerateRemaining;
+            }
         }
 
         if self.stage == Stage::FirstKiller {
             self.stage = Stage::SecondKiller;
-            if self.killers[0] != self.tt_move {
+            if self.do_quiets && self.killers[0] != self.tt_move {
                 if let Some(mv) = self.killers[0] {
                     if board.is_pseudolegal_killer(mv) {
                         return Some(mv);
@@ -118,7 +124,7 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::SecondKiller {
             self.stage = Stage::GenerateRemaining;
-            if self.killers[1] != self.tt_move {
+            if self.do_quiets && self.killers[1] != self.tt_move {
                 if let Some(mv) = self.killers[1] {
                     if board.is_pseudolegal_killer(mv) {
                         return Some(mv);
@@ -137,7 +143,7 @@ impl<Type: MovesType> MovePicker<Type> {
                 unsafe {
                     self.score::<QuietsOnly>(board, total_non_quiets, self.moves.len());
                 }
-            } else {
+            } else if self.do_quiets {
                 generate_moves::<KingMovesOnly>(board, &mut self.moves);
                 // SAFETY: `total_non_quiets..self.moves.len()` is
                 // always valid
@@ -148,7 +154,11 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         debug_assert!(self.stage == Stage::Remaining, "unhandled stage");
-        self.find_next_best(board).map(|scored_move| scored_move.mv)
+        if self.do_quiets {
+            self.find_next_best(board).map(|scored_move| scored_move.mv)
+        } else {
+            None
+        }
     }
 
     /// Find the next best move in the current list of generated moves.

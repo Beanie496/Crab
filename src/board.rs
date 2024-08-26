@@ -783,6 +783,16 @@ impl Board {
             | orthogonal_attacks & (rooks | queens)
     }
 
+    /// Checks if the given move is quiet.
+    ///
+    /// This means it's not capturing any piece (this includes en passant) and
+    /// it's not a queen promotion.
+    pub fn is_quiet(&self, mv: Move) -> bool {
+        self.piece_on(mv.end()) == Piece::NONE
+            && !mv.is_en_passant()
+            && !(mv.is_promotion() && mv.promotion_piece() == PieceType::QUEEN)
+    }
+
     /// Tests if `square` is attacked by an enemy piece.
     fn is_square_attacked(&self, square: Square) -> bool {
         let us = self.side_to_move();
