@@ -189,7 +189,7 @@ impl Worker<'_> {
                 // exceeds/can exceed alpha
                 if is_quiet
                     && !best_score.is_mate()
-                    && lmr_depth <= 8
+                    && lmr_depth <= 5
                     && static_eval + futility_margin(lmr_depth) <= alpha
                 {
                     movepicker.skip_quiets();
