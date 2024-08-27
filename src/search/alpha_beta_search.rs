@@ -187,7 +187,7 @@ impl Worker<'_> {
 
                 // Late move pruning (LMP): moves later in the movepicker are
                 // unlikely to be best, so we can skip them.
-                if lmr_depth <= 6 && total_moves >= late_move_threshold {
+                if lmr_depth <= 3 && total_moves >= late_move_threshold {
                     movepicker.skip_quiets();
                 }
 
@@ -399,7 +399,8 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 /// Calculates how many moves need to have been made before late move pruning
 /// applies.
 fn late_move_threshold(depth: Depth) -> u8 {
-    3 + (depth * depth / 2).0 as u8
+    let depth = f32::from(depth.0);
+    3 + (depth * depth / 1.5) as u8
 }
 
 /// Calculates the margin for futility pruning.
