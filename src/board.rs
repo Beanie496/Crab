@@ -27,8 +27,8 @@ use crate::{
     defs::{File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
     evaluation::{Phase, Score},
-    lookups::ray_between,
-    movegen::{Move, LOOKUPS},
+    lookups::{ray_between, ATTACK_LOOKUPS},
+    movegen::Move,
     util::{get_unchecked, insert_unchecked, is_double_pawn_push},
 };
 
@@ -763,11 +763,11 @@ impl Board {
     fn square_attackers(&self, side_to_move: Side, square: Square) -> Bitboard {
         let occupancies = self.occupancies();
 
-        let pawn_attacks = LOOKUPS.pawn_attacks(side_to_move, square);
-        let knight_attacks = LOOKUPS.knight_attacks(square);
-        let diagonal_attacks = LOOKUPS.bishop_attacks(square, occupancies);
-        let orthogonal_attacks = LOOKUPS.rook_attacks(square, occupancies);
-        let king_attacks = LOOKUPS.king_attacks(square);
+        let pawn_attacks = ATTACK_LOOKUPS.pawn_attacks(side_to_move, square);
+        let knight_attacks = ATTACK_LOOKUPS.knight_attacks(square);
+        let diagonal_attacks = ATTACK_LOOKUPS.bishop_attacks(square, occupancies);
+        let orthogonal_attacks = ATTACK_LOOKUPS.rook_attacks(square, occupancies);
+        let king_attacks = ATTACK_LOOKUPS.king_attacks(square);
 
         let pawns = self.piece::<{ PieceType::PAWN.to_index() }>();
         let knights = self.piece::<{ PieceType::KNIGHT.to_index() }>();
@@ -878,7 +878,8 @@ impl Board {
             // if the attacker moves diagonally (pawn, bishop or queen), it can
             // reveal diagonal sliders behind it
             if attacker_type.0 & 1 == 0 {
-                attackers |= LOOKUPS.bishop_attacks(target, occupancies) & diagonal_attackers;
+                attackers |=
+                    ATTACK_LOOKUPS.bishop_attacks(target, occupancies) & diagonal_attackers;
             }
             // if the attacker moves orthogonally (rook or queen), it can
             // reveal orthogonal sliders behind it. The condition does include
@@ -886,7 +887,8 @@ impl Board {
             // comparision a net speedup over checking the rook and queen
             // separately.
             if attacker_type.0 >= PieceType::ROOK.0 {
-                attackers |= LOOKUPS.rook_attacks(target, occupancies) & orthogonal_attackers;
+                attackers |=
+                    ATTACK_LOOKUPS.rook_attacks(target, occupancies) & orthogonal_attackers;
             }
             attackers &= occupancies;
 

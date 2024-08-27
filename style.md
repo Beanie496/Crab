@@ -13,7 +13,8 @@ The order for each file should be as shown:
 - Macros
 - Types
 - Enums/unions/structs in that order, unless needed otherwise
-- Consts/statics
+- Statics
+- Consts
 - Impls
 - Functions definitions
 

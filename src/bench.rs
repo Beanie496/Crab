@@ -29,6 +29,7 @@ use crate::{
 
 /// Test positions for benchmarks.
 static BENCH_POSITIONS: &str = include_str!("../bench_positions.epd");
+
 /// The default limit of each benched position.
 pub const LIMIT: u64 = 10;
 /// The default limit type.
@@ -102,10 +103,11 @@ mod test {
 
     use crate::perft::perft;
 
-    /// The depth to which each position will run `perft`.
-    const PERFT_DEPTH: u8 = 4;
     /// Test positions with an expected depth 4 perft result at the end.
     static TEST_POSITIONS: &str = include_str!("../test_positions.epd");
+
+    /// The depth to which each position will run `perft`.
+    const PERFT_DEPTH: u8 = 4;
 
     /// A FEN string and its expected result at depth [`PERFT_DEPTH`].
     struct TestPosition {

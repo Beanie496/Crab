@@ -29,18 +29,10 @@ use oorandom::Rand64;
 use crate::{
     bitboard::Bitboard,
     board::Board,
-    cfor,
     defs::{Direction, PieceType, Rank, Side, Square},
     evaluation::Evaluation,
-    util::get_unchecked,
+    lookups::ATTACK_LOOKUPS,
 };
-use magic::{Magic, BISHOP_MAGICS, ROOK_MAGICS};
-use util::{bitboard_from_square, east, north, sliding_attacks, south, west};
-
-/// Items related to magic bitboards.
-pub mod magic;
-/// Useful functions for move generation.
-mod util;
 
 /// Moves of a certain type.
 pub trait MovesType {
@@ -93,32 +85,6 @@ impl MovesType for QuietsOnly {
     const CAPTURES: bool = false;
 }
 
-/// Contains lookup tables for each piece.
-pub struct Lookup {
-    /// The pawn attack table. `pawn_attacks[side][square] == attack bitboard
-    /// for that square`.
-    pawn_attacks: [[Bitboard; Square::TOTAL]; Side::TOTAL],
-    /// The knight attack table. `knight_attacks[square] == attack bitboard for
-    /// that square`.
-    knight_attacks: [Bitboard; Square::TOTAL],
-    /// The king attack table. `king_attacks[square] == attack bitboard for
-    /// that square`.
-    king_attacks: [Bitboard; Square::TOTAL],
-    /// The magic lookup table for rooks and bishops.
-    ///
-    /// The rook attacks are before all the bishop attacks. It uses the 'fancy'
-    /// approach. See <https://www.chessprogramming.org/Magic_Bitboards>.
-    magic_table: [Bitboard; ROOK_SIZE + BISHOP_SIZE],
-    /// The (wrapped) magic numbers for the bishop. One per square.
-    ///
-    /// See <https://www.chessprogramming.org/Magic_Bitboards>.
-    bishop_magics: [Magic; Square::TOTAL],
-    /// The (wrapped) magic numbers for the rook. One per square.
-    ///
-    /// See <https://www.chessprogramming.org/Magic_Bitboards>.
-    rook_magics: [Magic; Square::TOTAL],
-}
-
 /// A wrapper for a move and associated methods.
 ///
 /// Order is important here, which is why I've added the `repr` attribute -
@@ -164,28 +130,10 @@ impl DerefMut for Moves {
     }
 }
 
-/// The number of bitboards required to store all bishop attacks, where each
-/// element corresponds to one permutation of blockers.
-///
-/// Some elements will be duplicates, as different blockers can have the same
-/// attacks. Repeated once per quadrant: `2.pow(6)` blocker permutations for
-/// the corner, `2.pow(5)` for each non-corner edge and each square adjacent to
-/// an edge, `2.pow(7)` for the squares adjacent or diagonal to a corner and
-/// `2.pow(9)` for the centre.
-const BISHOP_SIZE: usize = 5_248;
-/// The number of bitboards required to store all rook attacks, where each
-/// element corresponds to one permutation of blockers.
-///
-/// Some elements will be duplicates, as different blockers can have the same
-/// attacks. There are `2.pow(12)` blocker permutations for each corner,
-/// `2.pow(11)` for each non-corner edge and `2.pow(10)` for all others.
-const ROOK_SIZE: usize = 102_400;
 /// Maximum number of legal moves that can be reached in a standard chess game.
 ///
 /// Example: `R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1`
 pub const MAX_LEGAL_MOVES: usize = 218;
-/// The lookup tables.
-pub static LOOKUPS: Lookup = Lookup::new();
 
 impl Eq for ScoredMove {}
 
@@ -247,175 +195,6 @@ impl Display for Move {
         } else {
             write!(f, "{start}{end}")
         }
-    }
-}
-
-impl Lookup {
-    /// Creates new lookup tables.
-    ///
-    /// This is meant to be called once at compile time.
-    #[allow(clippy::large_stack_frames)]
-    const fn new() -> Self {
-        let pawn_attacks = Self::init_pawn_attacks();
-        let king_attacks = Self::init_king_attacks();
-        let knight_attacks = Self::init_knight_attacks();
-        let (magic_table, bishop_magics, rook_magics) = Self::init_magics();
-
-        Self {
-            pawn_attacks,
-            knight_attacks,
-            king_attacks,
-            magic_table,
-            bishop_magics,
-            rook_magics,
-        }
-    }
-
-    /// Calculates and returns lookup tables for both pawns.
-    ///
-    /// `init_pawn_attacks()[Side::WHITE.to_index() == White pawn attack table`
-    const fn init_pawn_attacks() -> [[Bitboard; Square::TOTAL]; Side::TOTAL] {
-        let mut pawn_attacks = [[Bitboard::empty(); Square::TOTAL]; Side::TOTAL];
-        cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
-            let pawn = bitboard_from_square(square as u8);
-            let pushed_white = north(pawn);
-            let pushed_black = south(pawn);
-            pawn_attacks[Side::WHITE.to_index()][square] =
-                Bitboard(east(pushed_white) | west(pushed_white));
-            pawn_attacks[Side::BLACK.to_index()][square] =
-                Bitboard(east(pushed_black) | west(pushed_black));
-        });
-        pawn_attacks
-    }
-
-    /// Calculates and returns a lookup table for the knight.
-    const fn init_knight_attacks() -> [Bitboard; Square::TOTAL] {
-        let mut knight_attacks = [Bitboard::empty(); Square::TOTAL];
-        cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
-            let knight = bitboard_from_square(square as u8);
-            let mut e = east(knight);
-            let mut w = west(knight);
-            let mut attacks = north(north(e | w));
-            attacks |= south(south(e | w));
-
-            e = east(e);
-            w = west(w);
-            attacks |= north(e | w);
-            attacks |= south(e | w);
-
-            knight_attacks[square] = Bitboard(attacks);
-        });
-        knight_attacks
-    }
-
-    /// Calculates and returns a lookup table for the king.
-    const fn init_king_attacks() -> [Bitboard; Square::TOTAL] {
-        let mut king_attacks = [Bitboard::empty(); Square::TOTAL];
-        cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
-            let king = bitboard_from_square(square as u8);
-
-            let mut attacks = east(king) | west(king) | king;
-            attacks |= north(attacks) | south(attacks);
-            attacks ^= king;
-
-            king_attacks[square] = Bitboard(attacks);
-        });
-        king_attacks
-    }
-
-    /// Calculates and returns the magic lookup table and magic structs.
-    ///
-    /// `init_magics() == (magic_table, bishop_magics, rook_magics)`.
-    #[allow(clippy::large_stack_arrays, clippy::large_stack_frames)]
-    const fn init_magics() -> (
-        [Bitboard; ROOK_SIZE + BISHOP_SIZE],
-        [Magic; Square::TOTAL],
-        [Magic; Square::TOTAL],
-    ) {
-        let mut b_offset = ROOK_SIZE;
-        let mut r_offset = 0;
-        let mut magic_table = [Bitboard::empty(); ROOK_SIZE + BISHOP_SIZE];
-        let mut bishop_magics = [Magic::null(); Square::TOTAL];
-        let mut rook_magics = [Magic::null(); Square::TOTAL];
-
-        cfor!(let mut square = 0; square < Square::TOTAL; square += 1; {
-            let square = Square(square as u8);
-            let edges = Bitboard::edges_without(square).0;
-            let b_mask =
-                sliding_attacks::<{ PieceType::BISHOP.0 }>(square, Bitboard::empty()).0 & !edges;
-            let r_mask =
-                sliding_attacks::<{ PieceType::ROOK.0 }>(square, Bitboard::empty()).0 & !edges;
-            let b_mask_bits = b_mask.count_ones();
-            let r_mask_bits = r_mask.count_ones();
-            let b_perms = 2_usize.pow(b_mask_bits);
-            let r_perms = 2_usize.pow(r_mask_bits);
-
-            let b_magic = Magic::new(
-                BISHOP_MAGICS[square.to_index()],
-                Bitboard(b_mask),
-                b_offset,
-                64 - b_mask_bits,
-            );
-            bishop_magics[square.to_index()] = b_magic;
-            let r_magic = Magic::new(
-                ROOK_MAGICS[square.to_index()],
-                Bitboard(r_mask),
-                r_offset,
-                64 - r_mask_bits,
-            );
-            rook_magics[square.to_index()] = r_magic;
-
-            let mut blockers = b_mask;
-            cfor!(let mut attack = 0; attack < b_perms; attack += 1; {
-                let index = b_magic.get_table_index(Bitboard(blockers));
-                magic_table[index] = sliding_attacks::<{ PieceType::BISHOP.0 }>(square, Bitboard(blockers));
-                blockers = blockers.wrapping_sub(1) & b_mask;
-            });
-
-            let mut blockers = r_mask;
-            cfor!(let mut attack = 0; attack < r_perms; attack += 1; {
-                let index = r_magic.get_table_index(Bitboard(blockers));
-                magic_table[index] = sliding_attacks::<{ PieceType::ROOK.0 }>(square, Bitboard(blockers));
-                blockers = blockers.wrapping_sub(1) & r_mask;
-            });
-
-            b_offset += b_perms;
-            r_offset += r_perms;
-        });
-        (magic_table, bishop_magics, rook_magics)
-    }
-
-    /// Finds the pawn attacks from `square`.
-    pub fn pawn_attacks(&self, side: Side, square: Square) -> Bitboard {
-        let side_table = get_unchecked(&self.pawn_attacks, side.to_index());
-        *get_unchecked(side_table, square.to_index())
-    }
-
-    /// Finds the knight attacks from `square`.
-    pub fn knight_attacks(&self, square: Square) -> Bitboard {
-        *get_unchecked(&self.knight_attacks, square.to_index())
-    }
-
-    /// Finds the king attacks from `square`.
-    pub fn king_attacks(&self, square: Square) -> Bitboard {
-        *get_unchecked(&self.king_attacks, square.to_index())
-    }
-
-    /// Finds the bishop attacks from `square` with the given blockers.
-    pub fn bishop_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        let index = get_unchecked(&self.bishop_magics, square.to_index()).get_table_index(blockers);
-        *get_unchecked(&self.magic_table, index)
-    }
-
-    /// Finds the rook attacks from `square` with the given blockers.
-    pub fn rook_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        let index = get_unchecked(&self.rook_magics, square.to_index()).get_table_index(blockers);
-        *get_unchecked(&self.magic_table, index)
-    }
-
-    /// Finds the queen attacks from `square` with the given blockers.
-    pub fn queen_attacks(&self, square: Square, blockers: Bitboard) -> Bitboard {
-        self.bishop_attacks(square, blockers) | self.rook_attacks(square, blockers)
     }
 }
 
@@ -743,9 +522,9 @@ fn generate_pawn_moves<Type: MovesType, const IS_WHITE: bool>(
         // en passant
         if ep_square != Square::NONE {
             let attackers = if IS_WHITE {
-                LOOKUPS.pawn_attacks(Side::BLACK, ep_square) & normal_pawns
+                ATTACK_LOOKUPS.pawn_attacks(Side::BLACK, ep_square) & normal_pawns
             } else {
-                LOOKUPS.pawn_attacks(Side::WHITE, ep_square) & normal_pawns
+                ATTACK_LOOKUPS.pawn_attacks(Side::WHITE, ep_square) & normal_pawns
             };
 
             for pawn in attackers {
@@ -825,7 +604,7 @@ fn generate_non_sliding_moves<Type: MovesType, const IS_WHITE: bool>(
 
         let knights = board.piece::<{ PieceType::KNIGHT.to_index() }>() & us_bb;
         for knight in knights {
-            let targets = LOOKUPS.knight_attacks(knight) & knight_target_squares;
+            let targets = ATTACK_LOOKUPS.knight_attacks(knight) & knight_target_squares;
             for target in targets {
                 moves.push(Move::new(knight, target));
             }
@@ -855,7 +634,7 @@ fn generate_non_sliding_moves<Type: MovesType, const IS_WHITE: bool>(
             "Number of kings is not equal to one"
         );
         let king = kings.pop_next_square();
-        let targets = LOOKUPS.king_attacks(king) & king_target_squares;
+        let targets = ATTACK_LOOKUPS.king_attacks(king) & king_target_squares;
         for target in targets {
             moves.push(Move::new(king, target));
         }
@@ -885,7 +664,7 @@ fn generate_sliding_moves<Type: MovesType, const IS_WHITE: bool>(board: &Board, 
 
     let bishops = board.piece::<{ PieceType::BISHOP.to_index() }>() & us_bb;
     for bishop in bishops {
-        let targets = LOOKUPS.bishop_attacks(bishop, occupancies) & target_squares;
+        let targets = ATTACK_LOOKUPS.bishop_attacks(bishop, occupancies) & target_squares;
         for target in targets {
             moves.push(Move::new(bishop, target));
         }
@@ -893,7 +672,7 @@ fn generate_sliding_moves<Type: MovesType, const IS_WHITE: bool>(board: &Board, 
 
     let rooks = board.piece::<{ PieceType::ROOK.to_index() }>() & us_bb;
     for rook in rooks {
-        let targets = LOOKUPS.rook_attacks(rook, occupancies) & target_squares;
+        let targets = ATTACK_LOOKUPS.rook_attacks(rook, occupancies) & target_squares;
         for target in targets {
             moves.push(Move::new(rook, target));
         }
@@ -901,7 +680,7 @@ fn generate_sliding_moves<Type: MovesType, const IS_WHITE: bool>(board: &Board, 
 
     let queens = board.piece::<{ PieceType::QUEEN.to_index() }>() & us_bb;
     for queen in queens {
-        let targets = LOOKUPS.queen_attacks(queen, occupancies) & target_squares;
+        let targets = ATTACK_LOOKUPS.queen_attacks(queen, occupancies) & target_squares;
         for target in targets {
             moves.push(Move::new(queen, target));
         }

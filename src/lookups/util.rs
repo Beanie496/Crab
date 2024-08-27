@@ -16,10 +16,10 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use super::magic::MAX_BLOCKERS;
 use crate::{
     bitboard::Bitboard,
     defs::{File, PieceType, Square},
-    movegen::magic::MAX_BLOCKERS,
 };
 
 /// Generates all combinations of attacks from `square` and puts them in
