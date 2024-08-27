@@ -167,6 +167,7 @@ impl Worker<'_> {
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
+            let is_quiet = board.is_quiet(mv);
             let mut copy = *board;
             if !self.make_move(&mut copy, mv) {
                 continue;
@@ -177,9 +178,26 @@ impl Worker<'_> {
                 println!("info currmovenumber {total_moves} currmove {mv}");
             }
 
-            let extension = extension(is_in_check);
+            let reduction = late_move_reduction(depth, total_moves);
+            let mut new_depth = depth - 1;
 
-            let new_depth = depth + extension - 1;
+            if !NodeType::IS_PV && !is_in_check {
+                let lmr_depth = new_depth - reduction;
+
+                // Futility pruning: if the static evaluation is too bad, it's
+                // not worth it to search quiet moves, whether or not the score
+                // exceeds/can exceed alpha
+                if is_quiet
+                    && !best_score.is_mate()
+                    && lmr_depth <= 5
+                    && static_eval + futility_margin(lmr_depth) <= alpha
+                {
+                    movepicker.skip_quiets();
+                }
+            }
+
+            let extension = extension(is_in_check);
+            new_depth += extension;
 
             // Principle variation search (PVS) + late move reduction (LMR)
             // The first searched move is probably going to be the best because of
@@ -193,8 +211,6 @@ impl Worker<'_> {
             // then exceeds alpha, then great: we've found a better move.)
             let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
-                let reduction = late_move_reduction(depth, total_moves);
-
                 score = -self.search::<NonPvNode>(
                     &mut new_pv,
                     &copy,
@@ -375,6 +391,11 @@ impl Worker<'_> {
 /// Calculates the reduction for a move.
 fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) -> Depth {
     Depth::from(((static_eval - beta) / 200).min(Evaluation(6))) + depth / 3 + 3
+}
+
+/// Calculates the margin for futility pruning.
+fn futility_margin(depth: Depth) -> Evaluation {
+    Evaluation::from(depth) * 80 + 70
 }
 
 /// Calculates how much to extend the search by.

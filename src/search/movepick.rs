@@ -71,6 +71,11 @@ pub struct MovePicker<Type: MovesType> {
 }
 
 impl<Type: MovesType> MovePicker<Type> {
+    /// Skip any future quiets.
+    pub fn skip_quiets(&mut self) {
+        self.do_quiets = false;
+    }
+
     /// Return the next best [`Move`] in the list of legal moves.
     pub fn next(&mut self, board: &Board) -> Option<Move> {
         if self.stage == Stage::TtMove {
@@ -108,7 +113,7 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::FirstKiller {
             self.stage = Stage::SecondKiller;
-            if self.killers[0] != self.tt_move {
+            if self.do_quiets && self.killers[0] != self.tt_move {
                 if let Some(mv) = self.killers[0] {
                     if board.is_pseudolegal_killer(mv) {
                         return Some(mv);
@@ -119,7 +124,7 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::SecondKiller {
             self.stage = Stage::GenerateRemaining;
-            if self.killers[1] != self.tt_move {
+            if self.do_quiets && self.killers[1] != self.tt_move {
                 if let Some(mv) = self.killers[1] {
                     if board.is_pseudolegal_killer(mv) {
                         return Some(mv);

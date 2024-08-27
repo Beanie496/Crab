@@ -165,6 +165,14 @@ impl Mul for Evaluation {
     }
 }
 
+impl Mul<i16> for Evaluation {
+    type Output = Self;
+
+    fn mul(self, other: i16) -> Self::Output {
+        self * Self(other.into())
+    }
+}
+
 impl Mul<Phase> for Evaluation {
     type Output = Self;
 
