@@ -19,7 +19,7 @@
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
-    ops::{Add, AddAssign, Div, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
 };
 
 use crate::evaluation::{CompressedEvaluation, Evaluation};
@@ -105,6 +105,14 @@ impl From<CompressedDepth> for Depth {
 impl From<Evaluation> for Depth {
     fn from(eval: Evaluation) -> Self {
         Self(CompressedEvaluation::from(eval).0)
+    }
+}
+
+impl Mul for Depth {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self::Output {
+        Self(self.0 * other.0)
     }
 }
 
