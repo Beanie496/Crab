@@ -167,6 +167,7 @@ impl Worker<'_> {
         let mut movepicker = AllMovesPicker::new(tt_move, killers);
 
         let mut total_moves: u8 = 0;
+        let mut total_quiets: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
             let is_quiet = board.is_quiet(mv);
             let mut copy = *board;
@@ -174,6 +175,9 @@ impl Worker<'_> {
                 continue;
             }
             total_moves += 1;
+            if is_quiet {
+                total_quiets += 1;
+            }
 
             if NodeType::IS_ROOT && self.should_print() {
                 println!("info currmovenumber {total_moves} currmove {mv}");
@@ -187,7 +191,7 @@ impl Worker<'_> {
 
                 // Late move pruning (LMP): moves later in the movepicker are
                 // unlikely to be best, so we can skip them.
-                if lmr_depth <= 3 && total_moves >= late_move_threshold {
+                if lmr_depth <= 3 && total_quiets >= late_move_threshold {
                     movepicker.skip_quiets();
                 }
 
