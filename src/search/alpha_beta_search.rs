@@ -182,19 +182,19 @@ impl Worker<'_> {
             let reduction = late_move_reduction(depth, total_moves);
             let mut new_depth = depth - 1;
 
-            if !NodeType::IS_PV && !is_in_check && !best_score.is_mate() {
+            if !NodeType::IS_PV && !is_in_check && !best_score.is_mate() && is_quiet {
                 let lmr_depth = new_depth - reduction;
 
                 // Late move pruning (LMP): moves later in the movepicker are
                 // unlikely to be best, so we can skip them.
-                if lmr_depth <= 8 && total_moves >= late_move_threshold {
+                if lmr_depth <= 6 && total_moves >= late_move_threshold {
                     movepicker.skip_quiets();
                 }
 
                 // Futility pruning: if the static evaluation is too bad, it's
                 // not worth it to search quiet moves, whether or not the score
                 // exceeds/can exceed alpha
-                if is_quiet && lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
+                if lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
                     movepicker.skip_quiets();
                 }
             }
@@ -399,8 +399,7 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 /// Calculates how many moves need to have been made before late move pruning
 /// applies.
 fn late_move_threshold(depth: Depth) -> u8 {
-    let depth = f64::from(depth.0);
-    3 + (depth * depth / 2.0) as u8
+    3 + (depth * depth / 2).0 as u8
 }
 
 /// Calculates the margin for futility pruning.
