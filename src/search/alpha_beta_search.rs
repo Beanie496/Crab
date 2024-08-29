@@ -93,7 +93,7 @@ impl Worker<'_> {
             evaluate(board)
         };
 
-        self.histories.killers.clear_next(height);
+        self.histories.clear_next_killers(height);
 
         if !NodeType::IS_PV && !is_in_check {
             // Null move pruning: if we can give the opponent a free move (by
@@ -162,7 +162,7 @@ impl Worker<'_> {
         let mut best_score = -Evaluation::INFINITY;
         let mut best_move = None;
         let mut new_pv = Pv::new();
-        let killers = self.histories.killers.current(height);
+        let killers = self.histories.current_killers(height);
         let mut movepicker = AllMovesPicker::new(tt_move, killers);
 
         let mut total_moves: u8 = 0;
@@ -303,7 +303,7 @@ impl Worker<'_> {
         }
 
         if let Some(best_move) = best_move {
-            self.histories.killers.insert(height, best_move);
+            self.histories.insert_into_killers(height, best_move);
         }
 
         // store into tt

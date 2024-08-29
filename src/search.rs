@@ -19,7 +19,7 @@
 use std::{
     fmt::{self, Display, Formatter, Write},
     mem::MaybeUninit,
-    ops::{Deref, DerefMut, Index, IndexMut},
+    ops::{Deref, DerefMut},
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
@@ -126,21 +126,17 @@ pub struct BoardHistory {
 
 /// A struct containing various histories relating to the board.
 struct Histories {
-    /// Killer moves.
-    killers: Killers,
+    /// killer moves.
+    ///
+    /// For each depth, the best move from the previous search at the same
+    /// depth that originated from the same node.
+    killers: [[Option<Move>; 2]; Depth::MAX.to_index() + 1],
     /// A stack of keys of previous board states, beginning from the initial
     /// `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     board_history: BoardHistory,
-}
-
-/// The killer moves for a given depth: the best move from the previous search
-/// at the same depth.
-#[allow(clippy::missing_docs_in_private_items)]
-struct Killers {
-    killers: [[Option<Move>; 2]; Depth::MAX.to_index() + 1],
 }
 
 /// Whether White, Black or both sides can do a null move within a search.
@@ -244,27 +240,6 @@ impl DerefMut for BoardHistory {
     }
 }
 
-impl Index<usize> for Killers {
-    type Output = [Option<Move>; 2];
-
-    fn index(&self, index: usize) -> &Self::Output {
-        get_unchecked(&self.killers, index)
-    }
-}
-
-impl IndexMut<usize> for Killers {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        debug_assert!(
-            index < self.killers.len(),
-            "Attempted to index out of bounds: {} >= {}",
-            index,
-            self.killers.len()
-        );
-        // SAFETY: we just checked `index` is valid
-        unsafe { self.killers.get_unchecked_mut(index) }
-    }
-}
-
 impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
@@ -362,7 +337,7 @@ impl Histories {
     /// Creates new, empty [`Histories`].
     fn new() -> Self {
         Self {
-            killers: Killers::new(),
+            killers: [[None; 2]; Depth::MAX.to_index() + 1],
             board_history: BoardHistory::new(),
         }
     }
@@ -371,34 +346,25 @@ impl Histories {
     fn clear(&mut self) {
         self.killers[0] = [None; 2];
     }
-}
-
-impl Killers {
-    /// Creates new, empty [`Killers`].
-    const fn new() -> Self {
-        Self {
-            killers: [[None; 2]; Depth::MAX.to_index() + 1],
-        }
-    }
 
     /// Replace the second killer of the current height with the given move.
-    fn insert(&mut self, height: Height, mv: Move) {
+    fn insert_into_killers(&mut self, height: Height, mv: Move) {
         let height = height.to_index();
-        if self[height][0] == Some(mv) {
+        if self.killers[height][0] == Some(mv) {
             return;
         }
-        self[height][1] = self[height][0];
-        self[height][0] = Some(mv);
+        self.killers[height][1] = self.killers[height][0];
+        self.killers[height][0] = Some(mv);
     }
 
     /// Return the killers of the current height.
-    fn current(&self, height: Height) -> [Option<Move>; 2] {
-        self[height.to_index()]
+    const fn current_killers(&self, height: Height) -> [Option<Move>; 2] {
+        self.killers[height.to_index()]
     }
 
     /// Clear the killers of the next height.
-    fn clear_next(&mut self, height: Height) {
-        self[height.to_index() + 1] = [None; 2];
+    fn clear_next_killers(&mut self, height: Height) {
+        self.killers[height.to_index() + 1] = [None; 2];
     }
 }
 
