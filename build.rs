@@ -57,7 +57,7 @@ fn create_base_reductions() -> io::Result<()> {
         for (move_idx, depth_entry) in move_table.iter_mut().enumerate() {
             let ln_depth = f32::ln(depth as f32);
             let ln_move_idx = f32::ln(move_idx as f32);
-            *depth_entry = (ln_depth * ln_move_idx / 2.0) as Depth;
+            *depth_entry = (ln_depth * ln_move_idx / 2.0 - 0.2).max(0.0) as Depth;
         }
     }
 
