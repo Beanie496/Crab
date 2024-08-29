@@ -18,8 +18,8 @@
 
 use std::{
     fmt::{self, Display, Formatter, Write},
-    mem::MaybeUninit,
     ops::{Deref, DerefMut},
+    slice::Iter,
     sync::{mpsc::Receiver, Mutex},
     time::{Duration, Instant},
 };
@@ -32,7 +32,6 @@ use crate::{
     evaluation::Evaluation,
     movegen::Move,
     transposition_table::TranspositionTable,
-    util::{get_unchecked, insert_unchecked},
 };
 pub use depth::{CompressedDepth, Depth, Height};
 use time::calculate_time_window;
@@ -126,7 +125,7 @@ pub struct BoardHistory {
 
 /// A struct containing various histories relating to the board.
 struct Histories {
-    /// killer moves.
+    /// Killer moves.
     ///
     /// For each depth, the best move from the previous search at the same
     /// depth that originated from the same node.
@@ -149,21 +148,7 @@ struct NmpRights {
 #[derive(Clone)]
 pub struct Pv {
     /// A non-circular queue of moves.
-    moves: [MaybeUninit<Move>; Depth::MAX.to_index()],
-    /// Index of the first [`Move`].
-    ///
-    /// This will be equal to `first_empty` if there are no [`Move`]s.
-    first_item: u8,
-    /// Index of the first empty space.
-    first_empty: u8,
-}
-
-/// An iterater over the elements of a [`Pv`].
-struct PvIter<'a> {
-    /// A slice of moves to iterate over.
-    moves: &'a [MaybeUninit<Move>],
-    /// The index of the next move to return.
-    index: usize,
+    moves: ArrayVec<Move, { Depth::MAX.to_index() }>,
 }
 
 /// The information that [`Worker`]s need to share between them.
@@ -248,27 +233,6 @@ impl Display for Pv {
         }
         ret_str.pop();
         write!(f, "{ret_str}")
-    }
-}
-
-impl Iterator for Pv {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.dequeue()
-    }
-}
-
-impl<'a> Iterator for PvIter<'a> {
-    type Item = Move;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        (self.index < self.moves.len()).then(|| {
-            let mv = *get_unchecked(self.moves, self.index);
-            self.index += 1;
-            // SAFETY: all moves within `self.moves` are initialised
-            unsafe { mv.assume_init_read() }
-        })
     }
 }
 
@@ -409,70 +373,42 @@ impl NmpRights {
 }
 
 impl Pv {
-    /// Returns a new 0-initialised [`Pv`].
-    pub const fn new() -> Self {
+    /// Returns a new [`Pv`].
+    pub fn new() -> Self {
         Self {
-            moves: [MaybeUninit::uninit(); Depth::MAX.to_index()],
-            first_item: 0,
-            first_empty: 0,
+            moves: ArrayVec::new(),
         }
     }
 
-    /// Appends and consumes another [`Pv`] without clearing it afterwards.
-    fn append_pv(&mut self, other_pv: &mut Self) {
+    /// Appends another [`Pv`].
+    fn append_pv(&mut self, other_pv: &Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
-        for mv in other_pv {
+        for &mv in other_pv.iter() {
             self.enqueue(mv);
         }
     }
 
     /// Adds a [`Move`] to the back of the queue.
     fn enqueue(&mut self, mv: Move) {
-        insert_unchecked(
-            &mut self.moves,
-            self.first_empty as usize,
-            MaybeUninit::new(mv),
-        );
-        self.first_empty += 1;
-    }
-
-    /// Removes a [`Move`] from the front of the queue.
-    fn dequeue(&mut self) -> Option<Move> {
-        (self.first_item < self.first_empty).then(|| {
-            let mv = *get_unchecked(&self.moves, self.first_item as usize);
-            self.first_item += 1;
-            // SAFETY: all moves within `self.first_item..self.first_empty` are
-            // initialised
-            unsafe { mv.assume_init_read() }
-        })
+        debug_assert!(self.moves.len() < self.moves.capacity(), "overflowing a PV");
+        // SAFETY: we just checked it's safe to push
+        unsafe { self.moves.push_unchecked(mv) };
     }
 
     /// Clears all moves from the queue.
     fn clear(&mut self) {
-        self.first_item = 0;
-        self.first_empty = 0;
+        self.moves.clear();
     }
 
-    /// Returns a slice to the moves of the queue.
-    fn iter(&self) -> PvIter<'_> {
-        PvIter::new(self)
+    /// Returns an iterator over the moves.
+    fn iter(&self) -> Iter<'_, Move> {
+        self.moves.iter()
     }
 
-    /// Calculates the length of the queue.
-    fn len(&self) -> usize {
-        usize::from(self.first_empty - self.first_item)
-    }
-}
-
-impl<'a> PvIter<'a> {
-    /// Creates a new [`PvIter`] which contains a slice of all the moves in
-    /// `pv`.
-    fn new(pv: &'a Pv) -> Self {
-        Self {
-            moves: &pv.moves[(pv.first_item as usize)..(pv.first_empty as usize)],
-            index: 0,
-        }
+    /// Returns the length of the queue.
+    const fn len(&self) -> usize {
+        self.moves.len()
     }
 }
 

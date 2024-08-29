@@ -280,7 +280,7 @@ impl Worker<'_> {
 
                 pv.clear();
                 pv.enqueue(mv);
-                pv.append_pv(&mut new_pv);
+                pv.append_pv(&new_pv);
 
                 // the move is too good: our opponent is never going to pick
                 // the move that leads to this node because it is guaranteed to

@@ -45,7 +45,7 @@ impl Worker<'_> {
         }
 
         self.root_pv.clear();
-        self.root_pv.append_pv(&mut pv);
+        self.root_pv.append_pv(&pv);
 
         if self.can_print {
             println!(
