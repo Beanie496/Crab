@@ -303,7 +303,9 @@ impl Worker<'_> {
         }
 
         if let Some(best_move) = best_move {
-            self.histories.insert_into_killers(height, best_move);
+            if board.is_quiet(best_move) {
+                self.histories.insert_into_killers(height, best_move);
+            }
         }
 
         // store into tt
