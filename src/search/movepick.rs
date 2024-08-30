@@ -49,6 +49,8 @@ enum Stage {
     FirstKiller,
     /// Return the second killer.
     SecondKiller,
+    /// Return the counter move.
+    CounterMove,
     /// Generate all remaining moves (i.e. quiets).
     GenerateRemaining,
     /// Return all remaining moves (bad captures and quiets).
@@ -60,6 +62,7 @@ enum Stage {
 pub struct MovePicker<Type: MovesType> {
     tt_move: Option<Move>,
     killers: [Option<Move>; 2],
+    counter_move: Option<Move>,
     stage: Stage,
     moves: Moves,
     /// `Type::KING_QUIETS` will always be false for quiescence moves. To see
@@ -123,10 +126,25 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::SecondKiller {
-            self.stage = Stage::GenerateRemaining;
+            self.stage = Stage::CounterMove;
             if self.do_quiets && self.killers[1] != self.tt_move {
                 if let Some(mv) = self.killers[1] {
                     if board.is_pseudolegal_killer(mv) {
+                        return Some(mv);
+                    }
+                }
+            }
+        }
+
+        if self.stage == Stage::CounterMove {
+            self.stage = Stage::GenerateRemaining;
+            if self.do_quiets
+                && self.counter_move != self.tt_move
+                && self.counter_move != self.killers[0]
+                && self.counter_move != self.killers[1]
+            {
+                if let Some(mv) = self.counter_move {
+                    if board.is_pseudolegal(mv) {
                         return Some(mv);
                     }
                 }
@@ -184,6 +202,7 @@ impl<Type: MovesType> MovePicker<Type> {
             if self.tt_move == Some(scored_move.mv)
                 || self.killers[0] == Some(scored_move.mv)
                 || self.killers[1] == Some(scored_move.mv)
+                || self.counter_move == Some(scored_move.mv)
             {
                 self.moves.remove(best_index);
                 continue;
@@ -223,10 +242,15 @@ impl<Type: MovesType> MovePicker<Type> {
 impl AllMovesPicker {
     /// Creates a new [`MovePicker`] for all moves based on the information in
     /// `board` and `tt_move`.
-    pub fn new(tt_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
+    pub fn new(
+        tt_move: Option<Move>,
+        killers: [Option<Move>; 2],
+        counter_move: Option<Move>,
+    ) -> Self {
         Self {
             tt_move,
             killers,
+            counter_move,
             stage: Stage::TtMove,
             moves: Moves::new(),
             do_quiets: true,
@@ -247,6 +271,7 @@ impl QuiescenceMovePicker {
         Self {
             tt_move: None,
             killers: [None; 2],
+            counter_move: None,
             stage: Stage::GenerateCaptures,
             moves: Moves::new(),
             do_quiets: Type::KING_QUIETS,

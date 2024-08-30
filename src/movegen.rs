@@ -696,12 +696,12 @@ fn generate_castling<Type: MovesType, const IS_WHITE: bool>(board: &Board, moves
     let occupancies = board.occupancies();
 
     if board.castling_rights().can_castle_kingside::<IS_WHITE>()
-        && Bitboard::is_clear_to_castle::<IS_WHITE, true>(occupancies)
+        && Bitboard::is_clear_to_castle_const::<IS_WHITE, true>(occupancies)
     {
         moves.push(Move::new_castle::<IS_WHITE, true>());
     }
     if board.castling_rights().can_castle_queenside::<IS_WHITE>()
-        && Bitboard::is_clear_to_castle::<IS_WHITE, false>(occupancies)
+        && Bitboard::is_clear_to_castle_const::<IS_WHITE, false>(occupancies)
     {
         moves.push(Move::new_castle::<IS_WHITE, false>());
     }

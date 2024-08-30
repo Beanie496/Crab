@@ -31,7 +31,7 @@ use crate::{bitboard::Bitboard, error::ParseError, evaluation::Evaluation, util:
 pub struct Direction(pub i8);
 
 /// A file: file A = 0 to file F = 7.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub struct File(pub u8);
 
 /// A piece, containing the type of piece and side.

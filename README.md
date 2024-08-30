@@ -16,6 +16,7 @@ Features:
   - TT-move
   - MVV + SEE captures
   - Killer moves
+  - Counter moves
 - Futility pruning
 - Extensions:
   - Check extensions

@@ -18,13 +18,14 @@
 
 use std::{
     fmt::{self, Display, Formatter},
+    hint::unreachable_unchecked,
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Shl},
     str::FromStr,
 };
 
 use crate::{
     bitboard::Bitboard,
-    defs::{File, Piece, PieceType, Rank, Side, Square},
+    defs::{Direction, File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
     evaluation::{Phase, Score},
     lookups::{ray_between, ATTACK_LOOKUPS},
@@ -915,6 +916,127 @@ impl Board {
         self.side_to_move() != us
     }
 
+    /// Checks if `mv` is a pseudolegal move on `self`.
+    // implementation, for the most part, yoinked from viridithas
+    pub fn is_pseudolegal(&self, mv: Move) -> bool {
+        let start = mv.start();
+        let end = mv.end();
+        let is_promotion = mv.is_promotion();
+        let is_castling = mv.is_castling();
+        let is_en_passant = mv.is_en_passant();
+
+        let piece = self.piece_on(start);
+        let piece_type = PieceType::from(piece);
+        // this might be wrong so it needs to be checked before it's used
+        let piece_side = Side::from(piece);
+        let captured = self.piece_on(end);
+        // this also might be wrong
+        let captured_side = Side::from(captured);
+        let occupancies = self.occupancies();
+        let us = self.side_to_move();
+
+        // the piece exists and hasn't been captured
+        if piece == Piece::NONE || piece_side != us {
+            return false;
+        }
+
+        // we aren't capturing a friendly piece
+        if captured != Piece::NONE && captured_side == us {
+            return false;
+        }
+
+        // we aren't moving a non-pawn as a pawn
+        if piece_type != PieceType::PAWN && (is_en_passant || is_promotion) {
+            return false;
+        }
+
+        if is_castling {
+            let is_kingside = File::from(end) >= File::FILE5;
+
+            // we're castling with the king
+            if piece_type != PieceType::KING {
+                return false;
+            }
+
+            // we're allowed to castle (this includes if the rook still exists
+            // and hasn't moved)
+            if !self
+                .castling_rights()
+                .can_castle_any(piece_side == Side::WHITE, is_kingside)
+            {
+                return false;
+            }
+
+            // there is space to castle
+            if !Bitboard::is_clear_to_castle(occupancies, piece_side == Side::WHITE, is_kingside) {
+                return false;
+            }
+
+            // checked in `make_move()`: castling out of check, castling
+            // through check and castling into check
+            return true;
+        }
+
+        if piece_type == PieceType::PAWN {
+            let end_bb = Bitboard::from(end);
+            let first_rank = Bitboard::rank_bb(Rank::RANK8) | Bitboard::rank_bb(Rank::RANK1);
+
+            // if the pawn is reaching the final rank, it's promoting
+            if !(end_bb & first_rank).is_empty() && !mv.is_promotion() {
+                return false;
+            }
+
+            // the en passant is legal on the board
+            if is_en_passant {
+                return self.ep_square() == end;
+            }
+
+            let (push, double_push) = if piece_side == Side::WHITE {
+                (start + Direction::N, start + Direction::N + Direction::N)
+            } else {
+                (start + Direction::S, start + Direction::S + Direction::S)
+            };
+
+            if double_push == end {
+                let between = Square((start.0 + end.0) >> 1);
+                let start_bb = Bitboard::from(start);
+                let first_rank = Bitboard::rank_bb(Rank::RANK2) | Bitboard::rank_bb(Rank::RANK7);
+
+                // we're starting on the correct rank
+                if (start_bb & first_rank).is_empty() {
+                    return false;
+                }
+
+                // the double push isn't blocked
+                if captured != Piece::NONE {
+                    return false;
+                }
+
+                // there's nothing between the start and end
+                return self.piece_on(between) == Piece::NONE;
+            }
+
+            if captured == Piece::NONE {
+                // either it's a pawn push and there's nothing blocking it, or
+                // it's a pawn capture and *not* a pawn push
+                return push == end;
+            }
+        }
+
+        let attacks = match piece_type {
+            PieceType::PAWN => ATTACK_LOOKUPS.pawn_attacks(piece_side, start),
+            PieceType::BISHOP => ATTACK_LOOKUPS.bishop_attacks(start, occupancies),
+            PieceType::KNIGHT => ATTACK_LOOKUPS.knight_attacks(start),
+            PieceType::ROOK => ATTACK_LOOKUPS.rook_attacks(start, occupancies),
+            PieceType::QUEEN => ATTACK_LOOKUPS.queen_attacks(start, occupancies),
+            PieceType::KING => ATTACK_LOOKUPS.king_attacks(start),
+            // SAFETY: if the piece type was `NONE`, this function would have
+            // already exited
+            _ => unsafe { unreachable_unchecked() },
+        };
+        !(Bitboard::from(end) & attacks).is_empty()
+    }
+
     /// Checks if `mv` is a pseudolegal killer on the board, assuming it was
     /// legal in the previous same-depth search.
     pub fn is_pseudolegal_killer(&self, mv: Move) -> bool {
@@ -930,23 +1052,23 @@ impl Board {
         // this also might be wrong
         let captured_side = Side::from(captured);
 
-        // check the piece still exists (en passant can delete it) and hasn't been
+        // the piece still exists (en passant can delete it) and hasn't been
         // captured
         if piece == Piece::NONE || piece_side != self.side_to_move() {
             return false;
         }
 
-        // check we aren't capturing a friendly piece
+        // we aren't capturing a friendly piece
         if captured != Piece::NONE && captured_side == self.side_to_move() {
             return false;
         }
 
-        // check we weren't blocked
+        // we weren't blocked
         if !(ray_between(start, end) & self.occupancies()).is_empty() {
             return false;
         }
 
-        // check we aren't capturing a king
+        // we aren't capturing a king
         if captured_type == PieceType::KING {
             return false;
         }
@@ -958,9 +1080,13 @@ impl Board {
 
         if mv.is_castling() {
             let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
+
+            // we have space to castle
             if !(ray_between(start, rook_start) & self.side_any(captured_side)).is_empty() {
                 return false;
             }
+
+            // the rook hasn't been captured
             if self.piece_on(rook_start) != Piece::from_piecetype(PieceType::ROOK, piece_side) {
                 return false;
             }
@@ -1015,6 +1141,24 @@ impl CastlingRights {
             self & Self::Q == Self::Q
         } else {
             self & Self::q == Self::q
+        }
+    }
+
+    /// Calculates if the given board and piece side can castle.
+    fn can_castle_any(self, is_white: bool, is_kingside: bool) -> bool {
+        #[allow(clippy::collapsible_else_if)]
+        if is_white {
+            if is_kingside {
+                self & Self::K == Self::K
+            } else {
+                self & Self::Q == Self::Q
+            }
+        } else {
+            if is_kingside {
+                self & Self::k == Self::k
+            } else {
+                self & Self::q == Self::q
+            }
         }
     }
 

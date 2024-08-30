@@ -163,7 +163,10 @@ impl Worker<'_> {
         let mut best_move = None;
         let mut new_pv = Pv::new();
         let killers = self.histories.current_killers(height);
-        let mut movepicker = AllMovesPicker::new(tt_move, killers);
+        let last_history_item = self.histories.board_history.last();
+        let counter_move =
+            last_history_item.and_then(|item| self.histories.get_counter_move(*item));
+        let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
         while let Some(mv) = movepicker.next(board) {
@@ -305,6 +308,10 @@ impl Worker<'_> {
         if let Some(best_move) = best_move {
             if board.is_quiet(best_move) {
                 self.histories.insert_into_killers(height, best_move);
+                if let Some(&last_item) = self.histories.board_history.last() {
+                    self.histories
+                        .insert_into_counter_moves(last_item, best_move);
+                }
             }
         }
 
