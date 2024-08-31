@@ -32,6 +32,7 @@ use crate::{
     defs::{Direction, PieceType, Rank, Side, Square},
     evaluation::CompressedEvaluation,
     lookups::ATTACK_LOOKUPS,
+    search::Histories,
 };
 
 /// Moves of a certain type.
@@ -405,12 +406,7 @@ impl ScoredMove {
 
     /// Scores `self.mv`.
     #[allow(clippy::assertions_on_constants)]
-    pub fn score<Type: MovesType>(&mut self, board: &Board) {
-        if !Type::CAPTURES {
-            self.score += Self::QUIET_SCORE;
-            return;
-        }
-
+    pub fn score<Type: MovesType>(&mut self, board: &Board, histories: &Histories) {
         let mv = self.mv;
 
         let captured_piece = if mv.is_en_passant() {
@@ -418,6 +414,10 @@ impl ScoredMove {
         } else {
             PieceType::from(board.piece_on(mv.end()))
         };
+        let capture_score = Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
+
+        let quiet_score = Self::QUIET_SCORE
+            + histories.get_butterfly_score(board.side_to_move(), mv.start(), mv.end());
 
         // Pre-emptively give the capture a winning score - it can be
         // checked later.
@@ -426,15 +426,15 @@ impl ScoredMove {
         // capture, it will treat it as a capture, but if it's told it's
         // scoring any type of move, it will treat it as a quiet. This is so
         // queen promotions (even quiet ones) can be treated as captures.
-        if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
-            self.score += Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
+        self.score += if !Type::CAPTURES {
+            quiet_score
+        } else if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
+            capture_score
+        } else if captured_piece == PieceType::NONE {
+            quiet_score
         } else {
-            self.score += if captured_piece == PieceType::NONE {
-                Self::QUIET_SCORE
-            } else {
-                Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus()
-            };
-        }
+            capture_score
+        };
     }
 }
 

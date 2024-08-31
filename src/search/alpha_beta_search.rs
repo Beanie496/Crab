@@ -24,7 +24,7 @@ use crate::{
     board::Board,
     evaluation::{evaluate, Evaluation},
     lookups::base_reductions,
-    movegen::{CapturesOnly, Evasions},
+    movegen::{CapturesOnly, Evasions, Moves},
     transposition_table::{Bound, TranspositionEntry, TranspositionHit},
 };
 
@@ -169,7 +169,8 @@ impl Worker<'_> {
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
-        while let Some(mv) = movepicker.next(board) {
+        let mut quiet_moves = Moves::new();
+        while let Some(mv) = movepicker.next(board, &self.histories) {
             let is_quiet = board.is_quiet(mv);
             let mut copy = *board;
             if !self.make_move(&mut copy, mv) {
@@ -197,6 +198,10 @@ impl Worker<'_> {
                 {
                     movepicker.skip_quiets();
                 }
+            }
+
+            if is_quiet {
+                quiet_moves.push(mv);
             }
 
             let extension = extension(is_in_check);
@@ -312,6 +317,13 @@ impl Worker<'_> {
                     self.histories
                         .insert_into_counter_moves(last_item, best_move);
                 }
+
+                self.histories.update_butterfly_history(
+                    &quiet_moves,
+                    best_move,
+                    board.side_to_move(),
+                    depth,
+                );
             }
         }
 
@@ -374,7 +386,7 @@ impl Worker<'_> {
             QuiescenceMovePicker::new::<CapturesOnly>()
         };
 
-        while let Some(mv) = movepicker.next(board) {
+        while let Some(mv) = movepicker.next(board, &self.histories) {
             let mut copy = *board;
             if !copy.make_move(mv) {
                 continue;

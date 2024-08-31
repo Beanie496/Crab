@@ -29,8 +29,8 @@ use arrayvec::ArrayVec;
 use crate::{
     board::{Board, Key},
     defs::{Piece, Side, Square},
-    evaluation::Evaluation,
-    movegen::Move,
+    evaluation::{CompressedEvaluation, Evaluation},
+    movegen::{Move, Moves},
     transposition_table::TranspositionTable,
 };
 pub use depth::{CompressedDepth, Depth, Height};
@@ -144,23 +144,28 @@ pub struct HistoryItem {
 }
 
 /// A struct containing various histories relating to the board.
-struct Histories {
+pub struct Histories {
+    /// A history of bonuses for previous moves scoring.
+    ///
+    /// So called because the wasted space looks a little like a butterfly's
+    /// wings.
+    butterfly_history: Box<[[[CompressedEvaluation; Square::TOTAL]; Square::TOTAL]; Side::TOTAL]>,
     /// Killer moves.
     ///
     /// For each depth, the best move from the previous search at the same
     /// depth that originated from the same node.
     killers: [[Option<Move>; 2]; Depth::MAX.to_index() + 1],
+    /// Counter moves.
+    ///
+    /// The previous best response to a certain piece landing on a certain
+    /// square.
+    counter_moves: [[Option<Move>; Square::TOTAL]; Piece::TOTAL],
     /// A stack of keys of previous board states, beginning from the initial
     /// `position fen ...` command.
     ///
     /// The first (bottom) element is the initial board and the top element is
     /// the current board.
     board_history: BoardHistory,
-    /// Counter moves.
-    ///
-    /// The previous best response to a certain piece landing on a certain
-    /// square.
-    counter_moves: [[Option<Move>; Square::TOTAL]; Piece::TOTAL],
 }
 
 /// Whether White, Black or both sides can do a null move within a search.
@@ -219,6 +224,12 @@ pub struct Worker<'a> {
     board: Board,
     /// State that all threads have access to.
     state: &'a SharedState,
+}
+
+impl Histories {
+    /// The maximum of any history value.
+    // `/ 2` to prevent overflow
+    const MAX_HISTORY_VAL: CompressedEvaluation = CompressedEvaluation(i16::MAX / 2);
 }
 
 impl NmpRights {
@@ -343,16 +354,72 @@ impl Histories {
     /// Creates new, empty [`Histories`].
     fn new() -> Self {
         Self {
+            butterfly_history: Box::new(
+                [[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL],
+            ),
             killers: [[None; 2]; Depth::MAX.to_index() + 1],
-            board_history: BoardHistory::new(),
             counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
+            board_history: BoardHistory::new(),
         }
+    }
+
+    /// The bonus of a good move.
+    ///
+    /// It will always be in the range `0..=`[`Self::MAX_HISTORY_VAL`].
+    fn bonus(depth: Depth) -> Evaluation {
+        Evaluation::from(CompressedEvaluation(depth.0.min(8) * 100))
     }
 
     /// Clears all the histories apart from the board history.
     fn clear(&mut self) {
-        self.killers[0] = [None; 2];
+        self.butterfly_history =
+            Box::new([[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL]);
         self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
+        self.killers[0] = [None; 2];
+    }
+
+    /// Updates the butterfly history with a bonus for `best_move` and a
+    /// penalty for all other moves in `quiet_moves`.
+    ///
+    /// `quiet_moves` may or may not contain `best_move`.
+    fn update_butterfly_history(
+        &mut self,
+        quiet_moves: &Moves,
+        best_move: Move,
+        side: Side,
+        depth: Depth,
+    ) {
+        let side = side.to_index();
+
+        for mv in quiet_moves.iter().map(|scored_move| scored_move.mv) {
+            let start = mv.start().to_index();
+            let end = mv.end().to_index();
+            let abs_bonus = Self::bonus(depth);
+            let signed_bonus = if best_move == mv {
+                abs_bonus
+            } else {
+                -abs_bonus
+            };
+
+            let val = &mut self.butterfly_history[side][start][end];
+            // val cannot exceed MAX_HISTORY_VAL, so the bonus is lerped
+            // between its original value (for val == 0) and 0 (for val ==
+            // MAX_HISTORY_VAL)
+            let delta = signed_bonus
+                - abs_bonus * Evaluation::from(*val) / Evaluation::from(Self::MAX_HISTORY_VAL);
+            *val += CompressedEvaluation::from(delta);
+        }
+    }
+
+    /// Returns the butterfly score of a move by the given side from `start` to
+    /// `end`.
+    pub fn get_butterfly_score(
+        &self,
+        side: Side,
+        start: Square,
+        end: Square,
+    ) -> CompressedEvaluation {
+        self.butterfly_history[side.to_index()][start.to_index()][end.to_index()]
     }
 
     /// Replace the second killer of the current height with the given move.

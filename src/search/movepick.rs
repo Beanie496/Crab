@@ -25,6 +25,7 @@ use crate::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
         ScoredMove,
     },
+    search::Histories,
 };
 
 /// A [`MovePicker`] for the main search that searches all moves.
@@ -80,7 +81,7 @@ impl<Type: MovesType> MovePicker<Type> {
     }
 
     /// Return the next best [`Move`] in the list of legal moves.
-    pub fn next(&mut self, board: &Board) -> Option<Move> {
+    pub fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
         if self.stage == Stage::TtMove {
             self.stage = Stage::GenerateCaptures;
             if self.tt_move.is_some() {
@@ -94,7 +95,7 @@ impl<Type: MovesType> MovePicker<Type> {
             // SAFETY: either `self.moves.len() - 1` is a valid index,
             // or it's 0, in which case `moves[0..0]` will return an
             // empty array
-            unsafe { self.score::<CapturesOnly>(board, 0, self.moves.len()) };
+            unsafe { self.score::<CapturesOnly>(board, histories, 0, self.moves.len()) };
         }
 
         if self.stage == Stage::GoodCaptures {
@@ -159,14 +160,19 @@ impl<Type: MovesType> MovePicker<Type> {
                 // SAFETY: `total_non_quiets..self.moves.len()` is
                 // always valid
                 unsafe {
-                    self.score::<QuietsOnly>(board, total_non_quiets, self.moves.len());
+                    self.score::<QuietsOnly>(board, histories, total_non_quiets, self.moves.len());
                 }
             } else if self.do_quiets {
                 generate_moves::<KingMovesOnly>(board, &mut self.moves);
                 // SAFETY: `total_non_quiets..self.moves.len()` is
                 // always valid
                 unsafe {
-                    self.score::<KingMovesOnly>(board, total_non_quiets, self.moves.len());
+                    self.score::<KingMovesOnly>(
+                        board,
+                        histories,
+                        total_non_quiets,
+                        self.moves.len(),
+                    );
                 }
             }
         }
@@ -230,11 +236,17 @@ impl<Type: MovesType> MovePicker<Type> {
     ///
     /// The slice does not bounds check: if `moves[start..end]` would have
     /// panicked, this function will have undefined behaviour.
-    unsafe fn score<T: MovesType>(&mut self, board: &Board, start: usize, end: usize) {
+    unsafe fn score<T: MovesType>(
+        &mut self,
+        board: &Board,
+        histories: &Histories,
+        start: usize,
+        end: usize,
+    ) {
         // SAFETY: it's up to the caller to make sure this index is safe
         let moves = unsafe { self.moves.get_unchecked_mut(start..end).iter_mut() };
         for mv in moves {
-            mv.score::<T>(board);
+            mv.score::<T>(board, histories);
         }
     }
 }
