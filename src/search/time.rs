@@ -16,9 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::time::{Duration, Instant};
-
-use super::Limits;
+use super::{Limits, Worker};
 use crate::search::CompressedDepth;
 
 impl Limits {
@@ -30,22 +28,31 @@ impl Limits {
     const MAX_MOVES_TO_GO: CompressedDepth = CompressedDepth(20);
 }
 
-/// Calculates the maximum window of time that should be used for the next
-/// iterative deepening loop.
-pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Duration) -> Duration {
-    if let Limits::Timed {
-        time,
-        inc,
-        moves_to_go,
-    } = limits
-    {
-        // prioritise a low number of moves to go, but if it's sudden death
-        // (let's say), we set a maximum on the apparent moves to go, in order
-        // to avoid allocating too little time
-        let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
+impl Worker<'_> {
+    /// Calculates the maximum window of time that should be used for the next
+    /// iterative deepening loop.
+    pub fn calculate_time_window(&mut self) {
+        if let Limits::Timed {
+            ref mut time,
+            inc,
+            moves_to_go,
+        } = self.limits
+        {
+            // prioritise a low number of moves to go, but if it's sudden death
+            // (let's say), we set a maximum on the apparent moves to go, in order
+            // to avoid allocating too little time
+            let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
+            let total_overhead = self.start.elapsed() + self.move_overhead;
+            let total_time = *time;
 
-        (time / moves_to_go.0.into() + inc).saturating_sub(start.elapsed() + move_overhead)
-    } else {
-        Duration::MAX
+            self.allocated = (total_time / moves_to_go.0.into() + inc)
+                // don't allocate more time than we actually have
+                .min(total_time)
+                .saturating_sub(total_overhead);
+
+            // if an iterative deepening loop takes way longer than expected,
+            // make sure we don't use too much of our remaining time
+            *time = (total_time / 2).min(total_time.saturating_sub(total_overhead));
+        }
     }
 }

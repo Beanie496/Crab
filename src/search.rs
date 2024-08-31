@@ -34,7 +34,6 @@ use crate::{
     transposition_table::TranspositionTable,
 };
 pub use depth::{CompressedDepth, Depth, Height};
-use time::calculate_time_window;
 
 /// For running the main alpha-beta search.
 pub mod alpha_beta_search;
@@ -624,7 +623,7 @@ impl<'a> Worker<'a> {
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
         self.histories.clear();
-        self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
+        self.calculate_time_window();
 
         self.iterative_deepening();
     }
@@ -734,9 +733,9 @@ impl<'a> Worker<'a> {
                 }
             }
             Limits::Timed { time, .. } => {
-                // if we're about to pass our total amount of time (which
-                // includes the move overhead), stop the search
-                if self.start.elapsed() + Duration::from_millis(1) > time {
+                // if we've used all of our time and are eating into move
+                // overhead, stop the search
+                if self.start.elapsed() >= time {
                     self.status = SearchStatus::Stop;
                 }
             }
