@@ -22,7 +22,9 @@ use std::{
     str::FromStr,
 };
 
-use crate::{bitboard::Bitboard, error::ParseError, evaluation::Evaluation, util::get_unchecked};
+use crate::{
+    bitboard::Bitboard, error::ParseError, evaluation::CompressedEvaluation, util::get_unchecked,
+};
 
 /// A cardinal direction.
 // it doesn't make sense to say a direction is 'less than' another
@@ -62,8 +64,7 @@ pub struct Square(pub u8);
 
 /// Most Valuable Victim (MVV): a bonus to capturing a piece, with a higher
 /// bonus to move valuable pieces.
-// this can be tuned
-static MVV_BONUS: [i32; PieceType::TOTAL + 1] = [0, 300, 300, 500, 900, 0, 0];
+static MVV_BONUS: [i16; PieceType::TOTAL + 1] = [0, 300, 300, 500, 900, 0, 0];
 /// An array of character constants associated with each piece on both sides,
 /// with the character '0' at the end to allow conversion from [`Piece::NONE`].
 ///
@@ -73,8 +74,7 @@ static PIECE_CHARS: [char; Piece::TOTAL + 1] = [
     'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', '-',
 ];
 /// A bonus to a piece during SEE.
-// this can be tuned
-static SEE_VALUES: [i32; PieceType::TOTAL + 1] = [100, 300, 300, 500, 900, 0, 0];
+static SEE_VALUES: [i16; PieceType::TOTAL + 1] = [100, 300, 300, 500, 900, 0, 0];
 
 /// Cardinal directions, according to little-endian rank-fink file mapping.
 #[allow(dead_code, clippy::missing_docs_in_private_items)]
@@ -444,13 +444,13 @@ impl PieceType {
     }
 
     /// Returns the MVV bonus of the piece type.
-    pub fn mvv_bonus(self) -> Evaluation {
-        Evaluation(*get_unchecked(&MVV_BONUS, self.to_index()))
+    pub fn mvv_bonus(self) -> CompressedEvaluation {
+        CompressedEvaluation(*get_unchecked(&MVV_BONUS, self.to_index()))
     }
 
     /// Returns the SEE bonus of the piece type.
-    pub fn see_bonus(self) -> Evaluation {
-        Evaluation(*get_unchecked(&SEE_VALUES, self.to_index()))
+    pub fn see_bonus(self) -> CompressedEvaluation {
+        CompressedEvaluation(*get_unchecked(&SEE_VALUES, self.to_index()))
     }
 }
 

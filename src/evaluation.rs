@@ -35,7 +35,7 @@ use values::create_piece_square_tables;
 pub mod values;
 
 /// An [`Evaluation`] with half the size.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct CompressedEvaluation(pub i16);
 
 /// An evaluation.
@@ -85,6 +85,20 @@ impl Evaluation {
     pub const DRAW: Self = Self(0);
 }
 
+impl Add for CompressedEvaluation {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self(self.0 + other.0)
+    }
+}
+
+impl AddAssign for CompressedEvaluation {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
 impl From<Evaluation> for CompressedEvaluation {
     fn from(eval: Evaluation) -> Self {
         debug_assert!(
@@ -92,6 +106,48 @@ impl From<Evaluation> for CompressedEvaluation {
             "converting an Evaluation ({eval}) outside the permissible range for a CompressedEvaluation",
         );
         Self(eval.0 as i16)
+    }
+}
+
+impl Neg for CompressedEvaluation {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(-self.0)
+    }
+}
+
+impl PartialEq<i16> for CompressedEvaluation {
+    fn eq(&self, other: &i16) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialOrd<i16> for CompressedEvaluation {
+    fn partial_cmp(&self, other: &i16) -> Option<Ordering> {
+        Some(self.0.cmp(other))
+    }
+}
+
+impl Sub for CompressedEvaluation {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self(self.0 - other.0)
+    }
+}
+
+impl Sub<i16> for CompressedEvaluation {
+    type Output = Self;
+
+    fn sub(self, other: i16) -> Self::Output {
+        self - Self(other)
+    }
+}
+
+impl SubAssign for CompressedEvaluation {
+    fn sub_assign(&mut self, other: Self) {
+        self.0 -= other.0;
     }
 }
 

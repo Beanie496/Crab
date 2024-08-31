@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 
 use crate::{
     board::Board,
-    evaluation::Evaluation,
+    evaluation::{CompressedEvaluation, Evaluation},
     movegen::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
         ScoredMove,
@@ -186,7 +186,7 @@ impl<Type: MovesType> MovePicker<Type> {
                 return None;
             }
 
-            let mut best_score = -Evaluation::INFINITY;
+            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
             let mut best_index = 0;
             for (index, scored_move) in self.moves.iter().enumerate() {
                 if scored_move.score > best_score {

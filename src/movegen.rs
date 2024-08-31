@@ -30,7 +30,7 @@ use crate::{
     bitboard::Bitboard,
     board::Board,
     defs::{Direction, PieceType, Rank, Side, Square},
-    evaluation::Evaluation,
+    evaluation::CompressedEvaluation,
     lookups::ATTACK_LOOKUPS,
 };
 
@@ -107,7 +107,7 @@ pub struct Move {
 #[derive(Clone, Copy)]
 pub struct ScoredMove {
     pub mv: Move,
-    pub score: Evaluation,
+    pub score: CompressedEvaluation,
 }
 
 /// An stack of [`Move`]s.
@@ -178,9 +178,9 @@ impl Move {
 
 impl ScoredMove {
     /// The score of a capture with a winning static exchange evaluation.
-    pub const WINNING_CAPTURE_SCORE: Evaluation = Evaluation(0x2000);
+    pub const WINNING_CAPTURE_SCORE: CompressedEvaluation = CompressedEvaluation(0x2000);
     /// The score of a quiet move.
-    pub const QUIET_SCORE: Evaluation = Evaluation(0x1000);
+    pub const QUIET_SCORE: CompressedEvaluation = CompressedEvaluation(0x1000);
 }
 
 impl Display for Move {
@@ -399,7 +399,7 @@ impl ScoredMove {
     fn new(mv: Move) -> Self {
         Self {
             mv,
-            score: Evaluation::default(),
+            score: CompressedEvaluation::default(),
         }
     }
 
