@@ -17,6 +17,8 @@ Features:
   - MVV + SEE captures
   - Killer moves
   - Counter moves
+- Histories:
+  - Butterfly history
 - Futility pruning
 - Extensions:
   - Check extensions
