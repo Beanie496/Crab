@@ -48,6 +48,10 @@ impl Worker<'_> {
             return self.quiescence_search(board, alpha, beta, height);
         }
 
+        if !NodeType::IS_ROOT && self.check_status() != SearchStatus::Continue {
+            return Evaluation::default();
+        }
+
         let is_in_check = board.is_in_check();
         self.seldepth = self.seldepth.max(height);
         self.nodes += 1;
@@ -349,6 +353,10 @@ impl Worker<'_> {
         beta: Evaluation,
         height: Height,
     ) -> Evaluation {
+        if self.check_status() != SearchStatus::Continue {
+            return Evaluation::default();
+        }
+
         self.seldepth = self.seldepth.max(height);
         self.nodes += 1;
 
