@@ -253,7 +253,7 @@ impl Worker<'_> {
             self.unmake_move();
 
             // if the search was stopped early, we can't trust its results
-            if self.check_status() != SearchStatus::Continue {
+            if self.status != SearchStatus::Continue {
                 // in the (admittedly never observed before) scenario where the
                 // search was terminated during depth 1 and the PV was never
                 // updated, just add whatever move the search is currently on
@@ -390,7 +390,7 @@ impl Worker<'_> {
 
             let score = -self.quiescence_search(&copy, -beta, -alpha, height + 1);
 
-            if self.check_status() != SearchStatus::Continue {
+            if self.status != SearchStatus::Continue {
                 return Evaluation::default();
             }
 
