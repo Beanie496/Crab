@@ -390,10 +390,10 @@ impl Histories {
         depth: Depth,
     ) {
         let side = side.to_index();
-        let start = best_move.start().to_index();
-        let end = best_move.end().to_index();
 
         for mv in quiet_moves.iter().map(|scored_move| scored_move.mv) {
+            let start = mv.start().to_index();
+            let end = mv.end().to_index();
             let abs_bonus = Self::bonus(depth);
             let signed_bonus = if best_move == mv {
                 abs_bonus
