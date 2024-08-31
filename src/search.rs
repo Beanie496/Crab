@@ -555,7 +555,7 @@ impl<'a> Worker<'a> {
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
         self.histories.clear();
-        self.allocated = calculate_time_window(self.start, self.limits, self.move_overhead);
+        self.allocated = calculate_time_window(self.limits, self.move_overhead);
 
         self.iterative_deepening();
     }
@@ -664,10 +664,10 @@ impl<'a> Worker<'a> {
                     self.status = SearchStatus::Stop;
                 }
             }
-            Limits::Timed { time, .. } => {
-                // if we're about to pass our total amount of time (which
-                // includes the move overhead), stop the search
-                if self.start.elapsed() + Duration::from_millis(1) > time {
+            Limits::Timed { .. } => {
+                // if we've used all of our time and are eating into move
+                // overhead, stop the search
+                if self.start.elapsed() >= self.allocated {
                     self.status = SearchStatus::Stop;
                 }
             }

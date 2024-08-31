@@ -16,7 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::Limits;
 use crate::search::CompressedDepth;
@@ -32,7 +32,7 @@ impl Limits {
 
 /// Calculates the maximum window of time that should be used for the next
 /// iterative deepening loop.
-pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Duration) -> Duration {
+pub fn calculate_time_window(limits: Limits, move_overhead: Duration) -> Duration {
     if let Limits::Timed {
         time,
         inc,
@@ -44,7 +44,7 @@ pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Dura
         // to avoid allocating too little time
         let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
 
-        (time / moves_to_go.0.into() + inc).saturating_sub(start.elapsed() + move_overhead)
+        (time / moves_to_go.0.into() + inc).min(time).saturating_sub(move_overhead)
     } else {
         Duration::MAX
     }
