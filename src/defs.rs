@@ -64,7 +64,7 @@ pub struct Square(pub u8);
 
 /// Most Valuable Victim (MVV): a bonus to capturing a piece, with a higher
 /// bonus to move valuable pieces.
-static MVV_BONUS: [i16; PieceType::TOTAL + 1] = [0, 300, 300, 500, 900, 0, 0];
+static MVV_BONUS: [i16; PieceType::TOTAL - 1] = [0, 300, 300, 500, 900];
 /// An array of character constants associated with each piece on both sides,
 /// with the character '0' at the end to allow conversion from [`Piece::NONE`].
 ///

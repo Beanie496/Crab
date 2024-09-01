@@ -169,7 +169,8 @@ impl Worker<'_> {
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
-        let mut quiet_moves = Moves::new();
+        let mut quiets = Moves::new();
+        let mut captures = Moves::new();
         while let Some(mv) = movepicker.next(board, &self.histories) {
             let is_quiet = board.is_quiet(mv);
             let mut copy = *board;
@@ -201,7 +202,9 @@ impl Worker<'_> {
             }
 
             if is_quiet {
-                quiet_moves.push(mv);
+                quiets.push(mv);
+            } else {
+                captures.push(mv);
             }
 
             let extension = extension(is_in_check);
@@ -319,12 +322,15 @@ impl Worker<'_> {
                 }
 
                 self.histories.update_butterfly_history(
-                    &quiet_moves,
+                    &quiets,
                     best_move,
                     board.side_to_move(),
                     depth,
                 );
             }
+
+            self.histories
+                .update_capture_history(board, &captures, best_move, depth);
         }
 
         // store into tt

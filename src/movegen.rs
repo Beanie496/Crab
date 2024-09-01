@@ -415,20 +415,24 @@ impl ScoredMove {
         let mv = self.mv;
         let start = mv.start();
         let end = mv.end();
-
-        let captured_type = if mv.is_en_passant() {
-            PieceType::PAWN
+        // OMG THIS IS DUMB. FULL CONST GENERICS WHEN.
+        let captured_type = if Type::CAPTURES {
+            Histories::captured_piece_type::<true>(board, mv, end)
         } else {
-            PieceType::from(board.piece_on(end))
+            Histories::captured_piece_type::<false>(board, mv, end)
         };
 
         // If a move doesn't capture anything but `Type::CAPTURES` is true, the
         // score will be as if it's a capture. This is so queen promotions
         // (even quiet ones) can be treated as captures.
         self.score += if Type::CAPTURES {
+            let piece = board.piece_on(start);
+
             // Pre-emptively give the capture a winning score - it can be
             // checked later.
-            Self::WINNING_CAPTURE_SCORE + captured_type.mvv_bonus()
+            Self::WINNING_CAPTURE_SCORE
+                + captured_type.mvv_bonus()
+                + histories.get_capture_score(piece, captured_type, end)
         } else {
             Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end)
         };
