@@ -431,7 +431,7 @@ impl ScoredMove {
             // Pre-emptively give the capture a winning score - it can be
             // checked later.
             Self::WINNING_CAPTURE_SCORE
-                + captured_type.mvv_bonus()
+                + captured_type.mvv_bonus() * 8
                 + histories.get_capture_score(piece, captured_type, end)
         } else {
             Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end)

@@ -109,6 +109,22 @@ impl From<Evaluation> for CompressedEvaluation {
     }
 }
 
+impl Mul for CompressedEvaluation {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self::Output {
+        Self(self.0 * other.0)
+    }
+}
+
+impl Mul<i16> for CompressedEvaluation {
+    type Output = Self;
+
+    fn mul(self, other: i16) -> Self::Output {
+        self * Self(other)
+    }
+}
+
 impl Neg for CompressedEvaluation {
     type Output = Self;
 
