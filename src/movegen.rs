@@ -407,33 +407,30 @@ impl ScoredMove {
     /// Scores `self.mv`.
     #[allow(clippy::assertions_on_constants)]
     pub fn score<Type: MovesType>(&mut self, board: &Board, histories: &Histories) {
-        let mv = self.mv;
+        assert!(
+            Type::CAPTURES ^ (Type::KING_QUIETS || Type::NON_KING_QUIETS),
+            "must be scoring exactly one of quiet moves or captures"
+        );
 
-        let captured_piece = if mv.is_en_passant() {
+        let mv = self.mv;
+        let start = mv.start();
+        let end = mv.end();
+
+        let captured_type = if mv.is_en_passant() {
             PieceType::PAWN
         } else {
-            PieceType::from(board.piece_on(mv.end()))
+            PieceType::from(board.piece_on(end))
         };
-        let capture_score = Self::WINNING_CAPTURE_SCORE + captured_piece.mvv_bonus();
 
-        let quiet_score = Self::QUIET_SCORE
-            + histories.get_butterfly_score(board.side_to_move(), mv.start(), mv.end());
-
-        // Pre-emptively give the capture a winning score - it can be
-        // checked later.
-        // This outer if statement has odd but intentional behaviour - if a
-        // move doesn't capture anything but this function is being told it's a
-        // capture, it will treat it as a capture, but if it's told it's
-        // scoring any type of move, it will treat it as a quiet. This is so
-        // queen promotions (even quiet ones) can be treated as captures.
-        self.score += if !Type::CAPTURES {
-            quiet_score
-        } else if !Type::KING_QUIETS && !Type::NON_KING_QUIETS {
-            capture_score
-        } else if captured_piece == PieceType::NONE {
-            quiet_score
+        // If a move doesn't capture anything but `Type::CAPTURES` is true, the
+        // score will be as if it's a capture. This is so queen promotions
+        // (even quiet ones) can be treated as captures.
+        self.score += if Type::CAPTURES {
+            // Pre-emptively give the capture a winning score - it can be
+            // checked later.
+            Self::WINNING_CAPTURE_SCORE + captured_type.mvv_bonus()
         } else {
-            capture_score
+            Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end)
         };
     }
 }
