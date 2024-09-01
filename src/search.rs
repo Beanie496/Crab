@@ -145,7 +145,9 @@ pub struct HistoryItem {
 
 /// A struct containing various histories relating to the board.
 pub struct Histories {
-    /// A history of bonuses for previous moves scoring.
+    /// A history of bonuses for previous quiets.
+    ///
+    /// Indexed by side to move, start square then end square.
     ///
     /// So called because the wasted space looks a little like a butterfly's
     /// wings.
