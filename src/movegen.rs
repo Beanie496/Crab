@@ -180,8 +180,6 @@ impl Move {
 impl ScoredMove {
     /// The score of a capture with a winning static exchange evaluation.
     pub const WINNING_CAPTURE_SCORE: CompressedEvaluation = CompressedEvaluation(0x2000);
-    /// The score of a quiet move.
-    pub const QUIET_SCORE: CompressedEvaluation = CompressedEvaluation(0x1000);
 }
 
 impl Display for Move {
@@ -430,7 +428,7 @@ impl ScoredMove {
             // checked later.
             Self::WINNING_CAPTURE_SCORE + captured_type.mvv_bonus()
         } else {
-            Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end)
+            histories.get_butterfly_score(board.side_to_move(), start, end)
         };
     }
 }
