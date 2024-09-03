@@ -100,7 +100,12 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::GoodCaptures {
             if let Some(scored_move) = self.find_next_best(board) {
-                return Some(scored_move.mv);
+                if scored_move.score >= ScoredMove::WINNING_CAPTURE_SCORE {
+                    return Some(scored_move.mv);
+                }
+                // if the move is a bad capture, add it to the list again to be
+                // retried and move on to the next stage
+                self.moves.push(scored_move.mv);
             }
 
             if Type::NON_KING_QUIETS {
@@ -219,12 +224,6 @@ impl<Type: MovesType> MovePicker<Type> {
             {
                 scored_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
                 continue;
-            }
-
-            if self.stage == Stage::GoodCaptures
-                && scored_move.score < ScoredMove::WINNING_CAPTURE_SCORE
-            {
-                return None;
             }
 
             return Some(self.moves.swap_remove(best_index));
