@@ -177,13 +177,6 @@ impl Move {
     const EXTRA_BITS_SHIFT: usize = 14;
 }
 
-impl ScoredMove {
-    /// The score of a capture with a winning static exchange evaluation.
-    pub const WINNING_CAPTURE_SCORE: CompressedEvaluation = CompressedEvaluation(0x2000);
-    /// The score of a quiet move.
-    pub const QUIET_SCORE: CompressedEvaluation = CompressedEvaluation(0x1000);
-}
-
 impl Display for Move {
     /// Displays a move in long algebraic notation.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -426,11 +419,9 @@ impl ScoredMove {
         // score will be as if it's a capture. This is so queen promotions
         // (even quiet ones) can be treated as captures.
         self.score += if Type::CAPTURES {
-            // Pre-emptively give the capture a winning score - it can be
-            // checked later.
-            Self::WINNING_CAPTURE_SCORE + captured_type.mvv_bonus()
+            captured_type.mvv_bonus()
         } else {
-            Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end)
+            histories.get_butterfly_score(board.side_to_move(), start, end)
         };
     }
 }

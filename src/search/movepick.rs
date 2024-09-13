@@ -20,7 +20,6 @@ use std::marker::PhantomData;
 
 use crate::{
     board::Board,
-    evaluation::{CompressedEvaluation, Evaluation},
     movegen::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
         ScoredMove,
@@ -54,7 +53,10 @@ enum Stage {
     CounterMove,
     /// Generate all remaining moves (i.e. quiets).
     GenerateRemaining,
-    /// Return all remaining moves (bad captures and quiets).
+    /// Return all quiet moves with a score that isn't too bad.
+    GoodQuiets,
+    /// Return all remaining moves (bad captures then quiets with a really bad
+    /// score).
     Remaining,
 }
 
@@ -65,12 +67,13 @@ pub struct MovePicker<Type: MovesType> {
     killers: [Option<Move>; 2],
     counter_move: Option<Move>,
     stage: Stage,
-    moves: Moves,
     /// `Type::KING_QUIETS` will always be false for quiescence moves. To see
     /// if a quiescence move picker generates king quiet moves, this parameter
     /// is used instead. `!Type::NON_KING_QUIETS && self.do_quiets` means
     /// generate king quiets but not regular quiets.
     do_quiets: bool,
+    searched: usize,
+    moves: Moves,
     _type: PhantomData<Type>,
 }
 
@@ -100,18 +103,8 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::GoodCaptures {
-            if let Some(scored_move) = self.find_next_best(board) {
-                let mv = scored_move.mv;
-                if self.killers[0] == Some(mv) {
-                    self.killers[0] = None;
-                }
-                if self.killers[1] == Some(mv) {
-                    self.killers[1] = None;
-                }
-                if self.counter_move == Some(mv) {
-                    self.counter_move = None;
-                }
-                return Some(mv);
+            if let Some(scored_move) = self.find_best_good_capture(board) {
+                return Some(scored_move.mv);
             }
 
             if Type::NON_KING_QUIETS {
@@ -164,7 +157,7 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::GenerateRemaining {
-            self.stage = Stage::Remaining;
+            self.stage = Stage::GoodQuiets;
             let total_non_quiets = self.moves.len();
             if Type::NON_KING_QUIETS {
                 generate_moves::<QuietsOnly>(board, &mut self.moves);
@@ -188,63 +181,97 @@ impl<Type: MovesType> MovePicker<Type> {
             }
         }
 
+        if self.stage == Stage::GoodQuiets {
+            if self.do_quiets {
+                if let Some(scored_move) = self.find_best_good_quiet() {
+                    return Some(scored_move.mv);
+                }
+            }
+
+            self.searched = 0;
+            self.stage = Stage::Remaining;
+        }
+
         debug_assert!(self.stage == Stage::Remaining, "unhandled stage");
         if self.do_quiets {
-            self.find_next_best(board).map(|scored_move| scored_move.mv)
+            // by this point the moves are already ordered (with the bad
+            // captures all before the quiets) so we can simply select the next
+            // move instead of having to find the highest
+            let mv = self
+                .moves
+                .get(self.searched)
+                .map(|scored_move| scored_move.mv);
+            self.searched += 1;
+            mv
         } else {
             None
         }
     }
 
-    /// Find the next best move in the current list of generated moves.
-    fn find_next_best(&mut self, board: &Board) -> Option<ScoredMove> {
+    /// Finds the best capture that doesn't lose material in the moves that
+    /// haven't been searched yet.
+    ///
+    /// If there are no captures left (or the captures left all lose material),
+    /// it returns [`None`].
+    fn find_best_good_capture(&mut self, board: &Board) -> Option<ScoredMove> {
         loop {
-            if self.moves.is_empty() {
-                return None;
+            let (best_index, &best_move) = self.find_highest_move()?;
+
+            if self.tt_move == Some(best_move.mv) {
+                self.moves.swap_remove(best_index);
+                continue;
             }
 
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
-            let mut best_index = 0;
-            for (index, scored_move) in self.moves.iter().enumerate() {
-                if scored_move.score > best_score {
-                    best_score = scored_move.score;
-                    best_index = index;
-                }
+            if !board.is_winning_exchange(best_move.mv) {
+                self.moves.swap(self.searched, best_index);
+                self.searched += 1;
+                continue;
             }
 
-            // SAFETY: `best_index` was created from within `self.moves` so it
-            // must be valid
-            let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
+            self.moves.swap_remove(best_index);
+            return Some(best_move);
+        }
+    }
 
-            // if we're at the good capture stage, it's fine to try a
-            // killer/counter move because we haven't tried it before. If we do
-            // end up trying a killer/counter, we'll need to clear it so we
-            // don't try it again.
-            if self.tt_move == Some(scored_move.mv)
-                || self.stage != Stage::GoodCaptures
-                    && (self.killers[0] == Some(scored_move.mv)
-                        || self.killers[1] == Some(scored_move.mv)
-                        || self.counter_move == Some(scored_move.mv))
+    /// Finds the best quiet move that doesn't have a score that is too
+    /// negative in the moves that haven't been searched yet.
+    ///
+    /// If there are no quiets left (or the quiets left are all bad), it
+    /// returns [`None`].
+    fn find_best_good_quiet(&mut self) -> Option<ScoredMove> {
+        loop {
+            let (best_index, &best_move) = self.find_highest_move()?;
+
+            if self.tt_move == Some(best_move.mv)
+                || self.killers[0] == Some(best_move.mv)
+                || self.killers[1] == Some(best_move.mv)
+                || self.counter_move == Some(best_move.mv)
             {
                 self.moves.swap_remove(best_index);
                 continue;
             }
 
-            if best_score >= ScoredMove::WINNING_CAPTURE_SCORE
-                && !board.is_winning_exchange(scored_move.mv)
-            {
-                scored_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
+            // treat all moves with a score of -0x1000 or below as a
+            // bad quiet and search it after the bad captures
+            if best_move.score <= -0x1000 {
+                self.moves.swap(self.searched, best_index);
+                self.searched += 1;
                 continue;
             }
 
-            if self.stage == Stage::GoodCaptures
-                && scored_move.score < ScoredMove::WINNING_CAPTURE_SCORE
-            {
-                return None;
-            }
-
-            return Some(self.moves.swap_remove(best_index));
+            self.moves.swap_remove(best_index);
+            return Some(best_move);
         }
+    }
+
+    /// Returns the move with the highest score in the part of the move list
+    /// that hasn't been searched yet.
+    fn find_highest_move(&self) -> Option<(usize, &ScoredMove)> {
+        self.moves
+            .iter()
+            .enumerate()
+            .skip(self.searched)
+            .max_by(|&(_, sm1), &(_, sm2)| sm1.score.cmp(&sm2.score))
     }
 
     /// Scores the moves in `moves[start..end]`, given the information in
@@ -280,8 +307,9 @@ impl AllMovesPicker {
             killers,
             counter_move,
             stage: Stage::TtMove,
-            moves: Moves::new(),
             do_quiets: true,
+            searched: 0,
+            moves: Moves::new(),
             _type: PhantomData,
         }
     }
@@ -301,8 +329,9 @@ impl QuiescenceMovePicker {
             killers: [None; 2],
             counter_move: None,
             stage: Stage::GenerateCaptures,
-            moves: Moves::new(),
             do_quiets: Type::KING_QUIETS,
+            searched: 0,
+            moves: Moves::new(),
             _type: PhantomData,
         }
     }
