@@ -103,8 +103,8 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::GoodCaptures {
-            if let Some(scored_move) = self.find_best_good_capture(board) {
-                return Some(scored_move.mv);
+            if let Some(mv) = self.find_best_good_capture(board) {
+                return Some(mv);
             }
 
             if Type::NON_KING_QUIETS {
@@ -183,8 +183,8 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::GoodQuiets {
             if self.do_quiets {
-                if let Some(scored_move) = self.find_best_good_quiet() {
-                    return Some(scored_move.mv);
+                if let Some(mv) = self.find_best_good_quiet() {
+                    return Some(mv);
                 }
             }
 
@@ -213,23 +213,37 @@ impl<Type: MovesType> MovePicker<Type> {
     ///
     /// If there are no captures left (or the captures left all lose material),
     /// it returns [`None`].
-    fn find_best_good_capture(&mut self, board: &Board) -> Option<ScoredMove> {
+    fn find_best_good_capture(&mut self, board: &Board) -> Option<Move> {
         loop {
-            let (best_index, &best_move) = self.find_highest_move()?;
+            let (best_index, best_move) = self.find_highest_move()?;
+            let mv = best_move.mv;
 
-            if self.tt_move == Some(best_move.mv) {
+            if self.tt_move == Some(mv) {
                 self.moves.swap_remove(best_index);
                 continue;
             }
 
-            if !board.is_winning_exchange(best_move.mv) {
+            if !board.is_winning_exchange(mv) {
                 self.moves.swap(self.searched, best_index);
                 self.searched += 1;
                 continue;
             }
 
+            // if we're try a counter before the killer/counter stages (which
+            // can happen if a piece moves onto the destination square, making
+            // it a capture), clear them so we don't try them twice
+            if self.killers[0] == Some(mv) {
+                self.killers[0] = None;
+            }
+            if self.killers[1] == Some(mv) {
+                self.killers[1] = None;
+            }
+            if self.counter_move == Some(mv) {
+                self.counter_move = None;
+            }
+
             self.moves.swap_remove(best_index);
-            return Some(best_move);
+            return Some(mv);
         }
     }
 
@@ -238,14 +252,16 @@ impl<Type: MovesType> MovePicker<Type> {
     ///
     /// If there are no quiets left (or the quiets left are all bad), it
     /// returns [`None`].
-    fn find_best_good_quiet(&mut self) -> Option<ScoredMove> {
+    fn find_best_good_quiet(&mut self) -> Option<Move> {
         loop {
-            let (best_index, &best_move) = self.find_highest_move()?;
+            let (best_index, best_move) = self.find_highest_move()?;
+            let score = best_move.score;
+            let mv = Some(best_move.mv);
 
-            if self.tt_move == Some(best_move.mv)
-                || self.killers[0] == Some(best_move.mv)
-                || self.killers[1] == Some(best_move.mv)
-                || self.counter_move == Some(best_move.mv)
+            if self.tt_move == mv
+                || self.killers[0] == mv
+                || self.killers[1] == mv
+                || self.counter_move == mv
             {
                 self.moves.swap_remove(best_index);
                 continue;
@@ -253,14 +269,14 @@ impl<Type: MovesType> MovePicker<Type> {
 
             // treat all moves with a score of -0x1000 or below as a
             // bad quiet and search it after the bad captures
-            if best_move.score <= -0x1000 {
+            if score <= -0x1000 {
                 self.moves.swap(self.searched, best_index);
                 self.searched += 1;
                 continue;
             }
 
             self.moves.swap_remove(best_index);
-            return Some(best_move);
+            return mv;
         }
     }
 
