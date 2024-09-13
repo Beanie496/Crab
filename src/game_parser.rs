@@ -40,7 +40,8 @@ use crate::{
     bitboard::Bitboard,
     board::{Board, STARTPOS},
     defs::{self, Piece, PieceType, Side},
-    movegen::{Move, LOOKUPS},
+    lookups::ATTACK_LOOKUPS,
+    movegen::Move,
     search::{CompressedDepth, Limits, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
@@ -193,7 +194,7 @@ impl GameSampler {
                 let them = us.flip();
 
                 if capture {
-                    LOOKUPS.pawn_attacks(them, end) & pawns
+                    ATTACK_LOOKUPS.pawn_attacks(them, end) & pawns
                 } else {
                     let end_bb = Bitboard::from(end);
                     if us == Side::WHITE {
@@ -214,22 +215,24 @@ impl GameSampler {
                 }
             }
             Role::Knight => {
-                LOOKUPS.knight_attacks(end) & self.board.piece::<{ PieceType::KNIGHT.to_index() }>()
+                ATTACK_LOOKUPS.knight_attacks(end)
+                    & self.board.piece::<{ PieceType::KNIGHT.to_index() }>()
             }
             Role::Bishop => {
-                LOOKUPS.bishop_attacks(end, self.board.occupancies())
+                ATTACK_LOOKUPS.bishop_attacks(end, self.board.occupancies())
                     & self.board.piece::<{ PieceType::BISHOP.to_index() }>()
             }
             Role::Rook => {
-                LOOKUPS.rook_attacks(end, self.board.occupancies())
+                ATTACK_LOOKUPS.rook_attacks(end, self.board.occupancies())
                     & self.board.piece::<{ PieceType::ROOK.to_index() }>()
             }
             Role::Queen => {
-                LOOKUPS.queen_attacks(end, self.board.occupancies())
+                ATTACK_LOOKUPS.queen_attacks(end, self.board.occupancies())
                     & self.board.piece::<{ PieceType::QUEEN.to_index() }>()
             }
             Role::King => {
-                LOOKUPS.king_attacks(end) & self.board.piece::<{ PieceType::KING.to_index() }>()
+                ATTACK_LOOKUPS.king_attacks(end)
+                    & self.board.piece::<{ PieceType::KING.to_index() }>()
             }
         } & self.board.side_any(self.board.side_to_move());
 
@@ -293,7 +296,7 @@ impl GameSampler {
             worker.reset_board(&random_board);
             worker.start_search();
 
-            for mv in worker.root_pv() {
+            for &mv in worker.root_pv().iter() {
                 random_board.make_move(mv);
             }
             println!("{random_board} {}", self.result);

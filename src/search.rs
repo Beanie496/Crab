@@ -513,7 +513,7 @@ impl Pv {
     }
 
     /// Appends another [`Pv`].
-    fn append_pv(&mut self, other_pv: &Self) {
+    pub fn append_pv(&mut self, other_pv: &Self) {
         // NOTE: `collect_into()` would be a more ergonomic way to do this,
         // but that's currently nightly
         for &mv in other_pv.iter() {
@@ -522,24 +522,24 @@ impl Pv {
     }
 
     /// Adds a [`Move`] to the back of the queue.
-    fn enqueue(&mut self, mv: Move) {
+    pub fn enqueue(&mut self, mv: Move) {
         debug_assert!(self.moves.len() < self.moves.capacity(), "overflowing a PV");
         // SAFETY: we just checked it's safe to push
         unsafe { self.moves.push_unchecked(mv) };
     }
 
     /// Clears all moves from the queue.
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.moves.clear();
     }
 
     /// Returns an iterator over the moves.
-    fn iter(&self) -> Iter<'_, Move> {
+    pub fn iter(&self) -> Iter<'_, Move> {
         self.moves.iter()
     }
 
     /// Returns the length of the queue.
-    const fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.moves.len()
     }
 }
