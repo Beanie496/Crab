@@ -224,8 +224,15 @@ impl<Type: MovesType> MovePicker<Type> {
             }
 
             if !board.is_winning_exchange(mv) {
-                self.moves.swap(self.searched, best_index);
-                self.searched += 1;
+                if self.killers[0] == Some(mv)
+                    || self.killers[1] == Some(mv)
+                    || self.counter_move == Some(mv)
+                {
+                    self.moves.swap_remove(best_index);
+                } else {
+                    self.moves.swap(self.searched, best_index);
+                    self.searched += 1;
+                }
                 continue;
             }
 
