@@ -81,6 +81,7 @@ impl<Type: MovesType> MovePicker<Type> {
     }
 
     /// Return the next best [`Move`] in the list of legal moves.
+    #[allow(clippy::cognitive_complexity)]
     pub fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
         if self.stage == Stage::TtMove {
             self.stage = Stage::GenerateCaptures;
@@ -100,7 +101,17 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::GoodCaptures {
             if let Some(scored_move) = self.find_next_best(board) {
-                return Some(scored_move.mv);
+                let mv = scored_move.mv;
+                if self.killers[0] == Some(mv) {
+                    self.killers[0] = None;
+                }
+                if self.killers[1] == Some(mv) {
+                    self.killers[1] = None;
+                }
+                if self.counter_move == Some(mv) {
+                    self.counter_move = None;
+                }
+                return Some(mv);
             }
 
             if Type::NON_KING_QUIETS {
@@ -205,10 +216,15 @@ impl<Type: MovesType> MovePicker<Type> {
             // must be valid
             let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
 
+            // if we're at the good capture stage, it's fine to try a
+            // killer/counter move because we haven't tried it before. If we do
+            // end up trying a killer/counter, we'll need to clear it so we
+            // don't try it again.
             if self.tt_move == Some(scored_move.mv)
-                || self.killers[0] == Some(scored_move.mv)
-                || self.killers[1] == Some(scored_move.mv)
-                || self.counter_move == Some(scored_move.mv)
+                || self.stage != Stage::GoodCaptures
+                    && (self.killers[0] == Some(scored_move.mv)
+                        || self.killers[1] == Some(scored_move.mv)
+                        || self.counter_move == Some(scored_move.mv))
             {
                 self.moves.swap_remove(best_index);
                 continue;
