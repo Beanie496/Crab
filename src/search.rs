@@ -809,15 +809,8 @@ impl<'a> Worker<'a> {
         let time = self.start.elapsed();
         let nps = 1_000_000 * self.nodes / time.as_micros().max(1) as u64;
 
-        #[allow(clippy::unwrap_used)]
-        let score_str = if score.is_mate() {
-            format!("score mate {}", score.moves_to_mate())
-        } else {
-            format!("score cp {score}")
-        };
-
         println!(
-            "info depth {depth} seldepth {} {score_str} hashfull {} nodes {} time {} nps {nps} pv {pv}",
+            "info depth {depth} seldepth {} {score} hashfull {} nodes {} time {} nps {nps} pv {pv}",
             self.seldepth.0,
             self.state.tt.estimate_hashfull(),
             self.nodes,

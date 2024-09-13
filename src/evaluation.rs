@@ -43,7 +43,7 @@ pub struct CompressedEvaluation(pub i16);
 /// When converting to a [`CompressedEvaluation`] or compared against mate scores,
 /// this should always be in the range
 /// `-`[`Self::INFINITY`]`..=`[`Self::INFINITY`].
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Evaluation(pub i32);
 
 /// The phase of the game, represented by the sum of the weights of the pieces
@@ -56,7 +56,7 @@ pub struct Evaluation(pub i32);
 pub struct Phase(u8);
 
 /// A blend between a middlegame and endgame value.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Score(pub Evaluation, pub Evaluation);
 
 /// The piece-square tables for White and black, with an extra table of 0's to
@@ -73,6 +73,17 @@ static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 /// [`Side::WHITE`] and [`Side::BLACK`]. An extra `0` is added at the end to
 /// allow [`Piece::NONE`] to index into it.
 static PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
+
+impl Display for Evaluation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[allow(clippy::unwrap_used)]
+        if self.is_mate() {
+            write!(f, "score mate {}", self.moves_to_mate())
+        } else {
+            write!(f, "score cp {}", self.0)
+        }
+    }
+}
 
 impl Evaluation {
     /// The highest possible (positive) evaluation.
@@ -170,12 +181,6 @@ impl Add<i16> for Evaluation {
 impl AddAssign for Evaluation {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
-    }
-}
-
-impl Display for Evaluation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
