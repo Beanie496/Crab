@@ -270,10 +270,6 @@ impl Worker<'_> {
 
             best_score = best_score.max(score);
 
-            if NodeType::IS_ROOT && self.should_print() {
-                println!("info currmovenumber {total_moves} currmove {mv} currscore {score} bestscore {best_score}");
-            }
-
             // the move is even better than what we originally had
             if score > alpha {
                 best_move = Some(mv);
