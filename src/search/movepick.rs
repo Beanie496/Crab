@@ -99,7 +99,7 @@ impl<Type: MovesType> MovePicker<Type> {
             self.stage = Stage::GoodCaptures;
             generate_moves::<CapturesOnly>(board, &mut self.moves);
             for mv in self.moves.iter_mut() {
-                mv.score_as_capture(board);
+                mv.score_as_capture(board, histories);
             }
         }
 

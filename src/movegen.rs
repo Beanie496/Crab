@@ -401,17 +401,15 @@ impl ScoredMove {
     ///
     /// Note that it doesn't actually have to capture a piece. This is so queen
     /// promotions (even quiet ones) can be treated as captures.
-    pub fn score_as_capture(&mut self, board: &Board) {
+    pub fn score_as_capture(&mut self, board: &Board, histories: &Histories) {
         let mv = self.mv;
+        let start = mv.start();
         let end = mv.end();
+        let piece = board.piece_on(start);
+        let captured_type = Histories::captured_piece_type(board, mv, end);
 
-        let captured_type = if mv.is_en_passant() {
-            PieceType::PAWN
-        } else {
-            PieceType::from(board.piece_on(end))
-        };
-
-        self.score += captured_type.mvv_bonus();
+        self.score +=
+            captured_type.mvv_bonus() * 16 + histories.get_capture_score(piece, captured_type, end);
     }
 
     /// Scores `self.mv`, assuming it's a quiet move.

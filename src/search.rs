@@ -28,7 +28,7 @@ use arrayvec::ArrayVec;
 
 use crate::{
     board::{Board, Key},
-    defs::{Piece, Side, Square},
+    defs::{Piece, PieceType, Side, Square},
     evaluation::{CompressedEvaluation, Evaluation},
     movegen::{Move, Moves},
     transposition_table::TranspositionTable,
@@ -152,6 +152,11 @@ pub struct Histories {
     /// So called because the wasted space looks a little like a butterfly's
     /// wings.
     butterfly_history: Box<[[[CompressedEvaluation; Square::TOTAL]; Square::TOTAL]; Side::TOTAL]>,
+    /// A history of bonuses for previous captures.
+    ///
+    /// Indexed by the piece being moved, the piece being captured and the
+    /// destination square.
+    capture_history: Box<[[[CompressedEvaluation; Square::TOTAL]; PieceType::TOTAL]; Piece::TOTAL]>,
     /// Killer moves.
     ///
     /// For each depth, the best move from the previous search at the same
@@ -229,9 +234,10 @@ pub struct Worker<'a> {
 }
 
 impl Histories {
-    /// The maximum of any history value.
-    // `/ 2` to prevent overflow
-    const MAX_HISTORY_VAL: CompressedEvaluation = CompressedEvaluation(i16::MAX / 2);
+    /// The maximum value a butterfly history entry can have.
+    const MAX_BUTTERFLY_HISTORY: Evaluation = Evaluation(i16::MAX as i32 / 2);
+    /// The maximum value a capture history entry can have.
+    const MAX_CAPTURE_HISTORY: Evaluation = Evaluation(8192);
 }
 
 impl NmpRights {
@@ -359,6 +365,9 @@ impl Histories {
             butterfly_history: Box::new(
                 [[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL],
             ),
+            capture_history: Box::new(
+                [[[CompressedEvaluation(0); Square::TOTAL]; PieceType::TOTAL]; Piece::TOTAL],
+            ),
             killers: [[None; 2]; Depth::MAX.to_index() + 1],
             counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
             board_history: BoardHistory::new(),
@@ -366,50 +375,78 @@ impl Histories {
     }
 
     /// The bonus of a good move.
-    ///
-    /// It will always be in the range `0..=`[`Self::MAX_HISTORY_VAL`].
     fn bonus(depth: Depth) -> Evaluation {
         Evaluation::from(CompressedEvaluation(depth.0.min(8) * 100))
+    }
+
+    /// Updates a particular item of a history table.
+    ///
+    /// `is_bonus` is if the update should be a bonus (as opposed to a malus).
+    fn update_history_value(
+        value: &mut CompressedEvaluation,
+        depth: Depth,
+        is_bonus: bool,
+        max_history: Evaluation,
+    ) {
+        let abs_bonus = Self::bonus(depth);
+        let signed_bonus = if is_bonus { abs_bonus } else { -abs_bonus };
+        // the value cannot exceed max_history, so the bonus is lerped between
+        // its original value (for val == 0) and 0 (for val == max_history)
+        let delta = signed_bonus - abs_bonus * Evaluation::from(*value) / max_history;
+        *value += CompressedEvaluation::from(delta);
+    }
+
+    /// Returns the type of the captured piece on `board` from `mv`.
+    pub fn captured_piece_type(board: &Board, mv: Move, end: Square) -> PieceType {
+        let captured_type = PieceType::from(board.piece_on(end));
+
+        if captured_type == PieceType::NONE {
+            debug_assert!(
+                mv.is_en_passant() || mv.is_promotion(),
+                "{mv} on {board} is being scored as a capture"
+            );
+            // if a promotion isn't capturing anything, we can just use the
+            // pawn index instead, as it's impossible to capture a pawn on the
+            // final rank anyway
+            PieceType::PAWN
+        } else {
+            captured_type
+        }
     }
 
     /// Clears all the histories apart from the board history.
     fn clear(&mut self) {
         self.butterfly_history =
             Box::new([[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL]);
+        self.capture_history =
+            Box::new([[[CompressedEvaluation(0); Square::TOTAL]; PieceType::TOTAL]; Piece::TOTAL]);
         self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
         self.killers[0] = [None; 2];
     }
 
     /// Updates the butterfly history with a bonus for `best_move` and a
-    /// penalty for all other moves in `quiet_moves`.
+    /// penalty for all other moves in `quiets`.
     ///
-    /// `quiet_moves` may or may not contain `best_move`.
+    /// `quiets` may or may not contain `best_move`.
     fn update_butterfly_history(
         &mut self,
-        quiet_moves: &Moves,
+        quiets: &Moves,
         best_move: Move,
         side: Side,
         depth: Depth,
     ) {
         let side = side.to_index();
 
-        for mv in quiet_moves.iter().map(|scored_move| scored_move.mv) {
+        for mv in quiets.iter().map(|scored_move| scored_move.mv) {
             let start = mv.start().to_index();
             let end = mv.end().to_index();
-            let abs_bonus = Self::bonus(depth);
-            let signed_bonus = if best_move == mv {
-                abs_bonus
-            } else {
-                -abs_bonus
-            };
 
-            let val = &mut self.butterfly_history[side][start][end];
-            // val cannot exceed MAX_HISTORY_VAL, so the bonus is lerped
-            // between its original value (for val == 0) and 0 (for val ==
-            // MAX_HISTORY_VAL)
-            let delta = signed_bonus
-                - abs_bonus * Evaluation::from(*val) / Evaluation::from(Self::MAX_HISTORY_VAL);
-            *val += CompressedEvaluation::from(delta);
+            Self::update_history_value(
+                &mut self.butterfly_history[side][start][end],
+                depth,
+                best_move == mv,
+                Self::MAX_BUTTERFLY_HISTORY,
+            );
         }
     }
 
@@ -422,6 +459,43 @@ impl Histories {
         end: Square,
     ) -> CompressedEvaluation {
         self.butterfly_history[side.to_index()][start.to_index()][end.to_index()]
+    }
+
+    /// Updates the capture history with a bonus for `best_move` and a penalty
+    /// for all other moves in `captures`.
+    ///
+    /// `captures` may or may not contain `best_move`.
+    fn update_capture_history(
+        &mut self,
+        board: &Board,
+        captures: &Moves,
+        best_move: Move,
+        depth: Depth,
+    ) {
+        for mv in captures.iter().map(|scored_move| scored_move.mv) {
+            let end = mv.end();
+            let piece = board.piece_on(mv.start());
+            let captured_type = Self::captured_piece_type(board, mv, end);
+
+            Self::update_history_value(
+                &mut self.capture_history[piece.to_index()][captured_type.to_index()]
+                    [end.to_index()],
+                depth,
+                best_move == mv,
+                Self::MAX_CAPTURE_HISTORY,
+            );
+        }
+    }
+
+    /// Returns the capture score of `piece` moving to `end` and capturing
+    /// `captured_type`.
+    pub fn get_capture_score(
+        &self,
+        piece: Piece,
+        captured_type: PieceType,
+        end: Square,
+    ) -> CompressedEvaluation {
+        self.capture_history[piece.to_index()][captured_type.to_index()][end.to_index()]
     }
 
     /// Replace the second killer of the current height with the given move.
