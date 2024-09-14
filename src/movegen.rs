@@ -177,13 +177,6 @@ impl Move {
     const EXTRA_BITS_SHIFT: usize = 14;
 }
 
-impl ScoredMove {
-    /// The score of a capture with a winning static exchange evaluation.
-    pub const WINNING_CAPTURE_SCORE: CompressedEvaluation = CompressedEvaluation(0x2000);
-    /// The score of a quiet move.
-    pub const QUIET_SCORE: CompressedEvaluation = CompressedEvaluation(0x1000);
-}
-
 impl Display for Move {
     /// Displays a move in long algebraic notation.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -418,9 +411,7 @@ impl ScoredMove {
             PieceType::from(board.piece_on(end))
         };
 
-        // Pre-emptively give the capture a winning score - it can be
-        // checked later.
-        self.score += Self::WINNING_CAPTURE_SCORE + captured_type.mvv_bonus();
+        self.score += captured_type.mvv_bonus();
     }
 
     /// Scores `self.mv`, assuming it's a quiet move.
@@ -429,8 +420,7 @@ impl ScoredMove {
         let start = mv.start();
         let end = mv.end();
 
-        self.score +=
-            Self::QUIET_SCORE + histories.get_butterfly_score(board.side_to_move(), start, end);
+        self.score += histories.get_butterfly_score(board.side_to_move(), start, end);
     }
 }
 
