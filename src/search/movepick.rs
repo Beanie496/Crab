@@ -61,11 +61,13 @@ enum Stage {
 /// A selector of the next best move in a position.
 #[allow(clippy::missing_docs_in_private_items)]
 pub struct MovePicker<Type: MovesType> {
+    // having this big array at the beginning of the struct is fastest, funnily
+    // enough
+    moves: Moves,
     tt_move: Option<Move>,
     killers: [Option<Move>; 2],
     counter_move: Option<Move>,
     stage: Stage,
-    moves: Moves,
     /// `Type::KING_QUIETS` will always be false for quiescence moves. To see
     /// if a quiescence move picker generates king quiet moves, this parameter
     /// is used instead. `!Type::NON_KING_QUIETS && self.do_quiets` means
@@ -260,11 +262,11 @@ impl AllMovesPicker {
         counter_move: Option<Move>,
     ) -> Self {
         Self {
+            moves: Moves::new(),
             tt_move,
             killers,
             counter_move,
             stage: Stage::TtMove,
-            moves: Moves::new(),
             do_quiets: true,
             _type: PhantomData,
         }
@@ -281,11 +283,11 @@ impl QuiescenceMovePicker {
         );
 
         Self {
+            moves: Moves::new(),
             tt_move: None,
             killers: [None; 2],
             counter_move: None,
             stage: Stage::GenerateCaptures,
-            moves: Moves::new(),
             do_quiets: Type::KING_QUIETS,
             _type: PhantomData,
         }
