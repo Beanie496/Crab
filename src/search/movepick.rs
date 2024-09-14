@@ -53,7 +53,10 @@ enum Stage {
     CounterMove,
     /// Generate all remaining moves (i.e. quiets).
     GenerateRemaining,
-    /// Return all remaining moves (bad captures and quiets).
+    /// Return all quiet moves with a score that isn't too bad.
+    GoodQuiets,
+    /// Return all remaining moves (bad captures then quiets with a really bad
+    /// score).
     Remaining,
 }
 
@@ -155,7 +158,7 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::GenerateRemaining {
-            self.stage = Stage::Remaining;
+            self.stage = Stage::GoodQuiets;
             let total_non_quiets = usize::from(self.searched);
 
             if Type::NON_KING_QUIETS {
@@ -171,9 +174,28 @@ impl<Type: MovesType> MovePicker<Type> {
             }
         }
 
+        if self.stage == Stage::GoodQuiets {
+            if self.do_quiets {
+                if let Some(mv) = self.find_best_good_quiet() {
+                    return Some(mv);
+                }
+            }
+
+            self.searched = 0;
+            self.stage = Stage::Remaining;
+        }
+
         debug_assert!(self.stage == Stage::Remaining, "unhandled stage");
         if self.do_quiets {
-            self.find_best_remaining()
+            // by this point the moves are already ordered (with the bad
+            // captures all before the quiets) so we can simply select the next
+            // move instead of having to find the highest
+            let mv = self
+                .moves
+                .get(usize::from(self.searched))
+                .map(|scored_move| scored_move.mv);
+            self.searched += 1;
+            mv
         } else {
             None
         }
@@ -184,26 +206,7 @@ impl<Type: MovesType> MovePicker<Type> {
     /// Returns [`None`] if there are no good captures.
     fn find_best_good_capture(&mut self, board: &Board) -> Option<Move> {
         loop {
-            if usize::from(self.searched) == self.moves.len() {
-                return None;
-            }
-
-            // There are several shorter/more intuitive ways of doing this. All
-            // are slower.
-            let mut best_index = 0;
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
-            for (index, scored_move) in self
-                .moves
-                .iter()
-                .enumerate()
-                .skip(usize::from(self.searched))
-            {
-                if scored_move.score > best_score {
-                    best_index = index;
-                    best_score = scored_move.score;
-                }
-            }
-
+            let best_index = self.find_highest_move()?;
             // SAFETY: `best_index` was created from within `self.moves` so it
             // must be valid
             let best_move = unsafe { self.moves.get_unchecked_mut(best_index) };
@@ -219,9 +222,6 @@ impl<Type: MovesType> MovePicker<Type> {
             }
 
             if !board.is_winning_exchange(mv) {
-                // make sure bad captures are tried after quiets with scores
-                // that are, at worst, only a little negative
-                best_move.score -= CompressedEvaluation(0x1000);
                 self.moves.swap(usize::from(self.searched), best_index);
                 self.searched += 1;
                 continue;
@@ -232,41 +232,63 @@ impl<Type: MovesType> MovePicker<Type> {
         }
     }
 
-    /// Finds and removes the best remaining move.
+    /// Finds and removes the best quiet.
     ///
-    /// Returns [`None`] if there are no moves left to try.
-    fn find_best_remaining(&mut self) -> Option<Move> {
+    /// Returns [`None`] if there are no moves left to try or the best quiet
+    /// has a score that is too negative.
+    fn find_best_good_quiet(&mut self) -> Option<Move> {
         loop {
-            if self.moves.is_empty() {
-                return None;
-            }
-
-            let mut best_index = 0;
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
-            for (index, scored_move) in self.moves.iter().enumerate() {
-                if scored_move.score > best_score {
-                    best_index = index;
-                    best_score = scored_move.score;
-                }
-            }
-
+            let best_index = self.find_highest_move()?;
             // SAFETY: `best_index` was created from within `self.moves` so it
             // must be valid
             let best_move = unsafe { self.moves.get_unchecked(best_index) };
             let mv = Some(best_move.mv);
-
-            self.moves.swap_remove(best_index);
 
             if self.tt_move == mv
                 || self.killers[0] == mv
                 || self.killers[1] == mv
                 || self.counter_move == mv
             {
+                self.moves.swap_remove(best_index);
                 continue;
             }
 
+            // treat all moves with an especially bad score as a bad quiet and
+            // search it after the bad captures
+            if best_move.score <= -0x1000 {
+                self.moves.swap(usize::from(self.searched), best_index);
+                self.searched += 1;
+                continue;
+            }
+
+            self.moves.swap_remove(best_index);
             return mv;
         }
+    }
+
+    /// Returns the index of the move with the highest score.
+    fn find_highest_move(&self) -> Option<usize> {
+        if usize::from(self.searched) == self.moves.len() {
+            return None;
+        }
+
+        // There are several shorter/more intuitive ways of doing this. All
+        // are slower.
+        let mut best_index = 0;
+        let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
+        for (index, scored_move) in self
+            .moves
+            .iter()
+            .enumerate()
+            .skip(usize::from(self.searched))
+        {
+            if scored_move.score > best_score {
+                best_index = index;
+                best_score = scored_move.score;
+            }
+        }
+
+        Some(best_index)
     }
 }
 
