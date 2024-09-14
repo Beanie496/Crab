@@ -83,6 +83,7 @@ impl<Type: MovesType> MovePicker<Type> {
     }
 
     /// Return the next best [`Move`] in the list of legal moves.
+    #[allow(clippy::cognitive_complexity)]
     pub fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
         if self.stage == Stage::TtMove {
             self.stage = Stage::GenerateCaptures;
@@ -94,10 +95,9 @@ impl<Type: MovesType> MovePicker<Type> {
         if self.stage == Stage::GenerateCaptures {
             self.stage = Stage::GoodCaptures;
             generate_moves::<CapturesOnly>(board, &mut self.moves);
-            // SAFETY: either `self.moves.len() - 1` is a valid index,
-            // or it's 0, in which case `moves[0..0]` will return an
-            // empty array
-            unsafe { self.score::<CapturesOnly>(board, histories, 0, self.moves.len()) };
+            for mv in self.moves.iter_mut() {
+                mv.score_as_capture(board);
+            }
         }
 
         if self.stage == Stage::GoodCaptures {
@@ -157,22 +157,16 @@ impl<Type: MovesType> MovePicker<Type> {
         if self.stage == Stage::GenerateRemaining {
             self.stage = Stage::Remaining;
             let total_non_quiets = self.moves.len();
+
             if Type::NON_KING_QUIETS {
                 generate_moves::<QuietsOnly>(board, &mut self.moves);
-                // SAFETY: `total_non_quiets..self.moves.len()` is always valid
-                unsafe {
-                    self.score::<QuietsOnly>(board, histories, total_non_quiets, self.moves.len());
+                for mv in self.moves.iter_mut().skip(total_non_quiets) {
+                    mv.score_as_quiet(board, histories);
                 }
             } else if self.do_quiets {
                 generate_moves::<KingMovesOnly>(board, &mut self.moves);
-                // SAFETY: `total_non_quiets..self.moves.len()` is always valid
-                unsafe {
-                    self.score::<KingMovesOnly>(
-                        board,
-                        histories,
-                        total_non_quiets,
-                        self.moves.len(),
-                    );
+                for mv in self.moves.iter_mut().skip(total_non_quiets) {
+                    mv.score_as_quiet(board, histories);
                 }
             }
         }
@@ -267,25 +261,6 @@ impl<Type: MovesType> MovePicker<Type> {
             }
 
             return mv;
-        }
-    }
-
-    /// Scores the moves in `moves[start..end]`, given the information in
-    /// `search_info` and the current height.
-    ///
-    /// The slice does not bounds check: if `moves[start..end]` would have
-    /// panicked, this function will have undefined behaviour.
-    unsafe fn score<T: MovesType>(
-        &mut self,
-        board: &Board,
-        histories: &Histories,
-        start: usize,
-        end: usize,
-    ) {
-        // SAFETY: it's up to the caller to make sure this index is safe
-        let moves = unsafe { self.moves.get_unchecked_mut(start..end).iter_mut() };
-        for mv in moves {
-            mv.score::<T>(board, histories);
         }
     }
 }
