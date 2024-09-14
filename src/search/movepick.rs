@@ -96,7 +96,7 @@ impl<Type: MovesType> MovePicker<Type> {
             self.stage = Stage::GoodCaptures;
             generate_moves::<CapturesOnly>(board, &mut self.moves);
             for mv in self.moves.iter_mut() {
-                mv.score_as_capture(board);
+                mv.score_as_capture(board, histories);
             }
         }
 
@@ -221,7 +221,7 @@ impl<Type: MovesType> MovePicker<Type> {
             if !board.is_winning_exchange(mv) {
                 // make sure bad captures are tried after quiets with scores
                 // that are, at worst, only a little negative
-                best_move.score -= CompressedEvaluation(0x1000);
+                best_move.score -= CompressedEvaluation(8192);
                 self.moves.swap(usize::from(self.searched), best_index);
                 self.searched += 1;
                 continue;
