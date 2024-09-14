@@ -101,8 +101,8 @@ impl<Type: MovesType> MovePicker<Type> {
         }
 
         if self.stage == Stage::GoodCaptures {
-            if let Some(scored_move) = self.find_next_best(board) {
-                return Some(scored_move.mv);
+            if let Some(mv) = self.find_best_good_capture(board) {
+                return Some(mv);
             }
 
             if Type::NON_KING_QUIETS {
@@ -159,15 +159,13 @@ impl<Type: MovesType> MovePicker<Type> {
             let total_non_quiets = self.moves.len();
             if Type::NON_KING_QUIETS {
                 generate_moves::<QuietsOnly>(board, &mut self.moves);
-                // SAFETY: `total_non_quiets..self.moves.len()` is
-                // always valid
+                // SAFETY: `total_non_quiets..self.moves.len()` is always valid
                 unsafe {
                     self.score::<QuietsOnly>(board, histories, total_non_quiets, self.moves.len());
                 }
             } else if self.do_quiets {
                 generate_moves::<KingMovesOnly>(board, &mut self.moves);
-                // SAFETY: `total_non_quiets..self.moves.len()` is
-                // always valid
+                // SAFETY: `total_non_quiets..self.moves.len()` is always valid
                 unsafe {
                     self.score::<KingMovesOnly>(
                         board,
@@ -181,55 +179,94 @@ impl<Type: MovesType> MovePicker<Type> {
 
         debug_assert!(self.stage == Stage::Remaining, "unhandled stage");
         if self.do_quiets {
-            self.find_next_best(board).map(|scored_move| scored_move.mv)
+            self.find_best_remaining()
         } else {
             None
         }
     }
 
-    /// Find the next best move in the current list of generated moves.
-    fn find_next_best(&mut self, board: &Board) -> Option<ScoredMove> {
+    /// Finds and removes the best capture that wins or trades material.
+    ///
+    /// Returns [`None`] if there are no good captures.
+    fn find_best_good_capture(&mut self, board: &Board) -> Option<Move> {
         loop {
             if self.moves.is_empty() {
                 return None;
             }
 
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
+            // There are several shorter/more intuitive ways of doing this. All
+            // are slower.
             let mut best_index = 0;
+            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
             for (index, scored_move) in self.moves.iter().enumerate() {
                 if scored_move.score > best_score {
-                    best_score = scored_move.score;
                     best_index = index;
+                    best_score = scored_move.score;
                 }
             }
 
             // SAFETY: `best_index` was created from within `self.moves` so it
             // must be valid
-            let scored_move = unsafe { self.moves.get_unchecked_mut(best_index) };
+            let best_move = unsafe { self.moves.get_unchecked_mut(best_index) };
+            let mv = best_move.mv;
 
-            if self.tt_move == Some(scored_move.mv)
-                || self.killers[0] == Some(scored_move.mv)
-                || self.killers[1] == Some(scored_move.mv)
-                || self.counter_move == Some(scored_move.mv)
+            if self.tt_move == Some(mv)
+                || self.killers[0] == Some(mv)
+                || self.killers[1] == Some(mv)
+                || self.counter_move == Some(mv)
             {
                 self.moves.swap_remove(best_index);
                 continue;
             }
 
-            if best_score >= ScoredMove::WINNING_CAPTURE_SCORE
-                && !board.is_winning_exchange(scored_move.mv)
-            {
-                scored_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
-                continue;
-            }
-
-            if self.stage == Stage::GoodCaptures
-                && scored_move.score < ScoredMove::WINNING_CAPTURE_SCORE
-            {
+            if best_score >= ScoredMove::WINNING_CAPTURE_SCORE {
+                if !board.is_winning_exchange(mv) {
+                    best_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
+                    continue;
+                }
+            } else {
                 return None;
             }
 
-            return Some(self.moves.swap_remove(best_index));
+            self.moves.swap_remove(best_index);
+            return Some(mv);
+        }
+    }
+
+    /// Finds and removes the best remaining move.
+    ///
+    /// Returns [`None`] if there are no moves left to try.
+    fn find_best_remaining(&mut self) -> Option<Move> {
+        loop {
+            if self.moves.is_empty() {
+                return None;
+            }
+
+            let mut best_index = 0;
+            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
+            for (index, scored_move) in self.moves.iter().enumerate() {
+                if scored_move.score > best_score {
+                    best_index = index;
+                    best_score = scored_move.score;
+                }
+            }
+
+            // SAFETY: `best_index` was created from within `self.moves` so it
+            // must be valid
+            let best_move = unsafe { self.moves.get_unchecked(best_index) };
+            let mv = Some(best_move.mv);
+
+            self.moves.swap_remove(best_index);
+
+            if self.tt_move == mv
+                || self.killers[0] == mv
+                || self.killers[1] == mv
+                || self.counter_move == mv
+            {
+                continue;
+            }
+
+            return mv;
         }
     }
 
