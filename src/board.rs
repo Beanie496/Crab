@@ -1051,6 +1051,7 @@ impl Board {
         let captured_type = PieceType::from(captured);
         // this also might be wrong
         let captured_side = Side::from(captured);
+        let occupancies = self.occupancies();
 
         // the piece still exists (en passant can delete it) and hasn't been
         // captured
@@ -1064,7 +1065,7 @@ impl Board {
         }
 
         // we weren't blocked
-        if !(ray_between(start, end) & self.occupancies()).is_empty() {
+        if !(ray_between(start, end) & occupancies).is_empty() {
             return false;
         }
 
@@ -1080,9 +1081,10 @@ impl Board {
 
         if mv.is_castling() {
             let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
+            let is_kingside = File::from(end) >= File::FILE5;
 
             // we have space to castle
-            if !(ray_between(start, rook_start) & self.side_any(captured_side)).is_empty() {
+            if !Bitboard::is_clear_to_castle(occupancies, piece_side == Side::WHITE, is_kingside) {
                 return false;
             }
 
