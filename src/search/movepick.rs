@@ -23,7 +23,6 @@ use crate::{
     evaluation::{CompressedEvaluation, Evaluation},
     movegen::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
-        ScoredMove,
     },
     search::Histories,
 };
@@ -73,6 +72,7 @@ pub struct MovePicker<Type: MovesType> {
     /// is used instead. `!Type::NON_KING_QUIETS && self.do_quiets` means
     /// generate king quiets but not regular quiets.
     do_quiets: bool,
+    searched: u8,
     _type: PhantomData<Type>,
 }
 
@@ -156,7 +156,7 @@ impl<Type: MovesType> MovePicker<Type> {
 
         if self.stage == Stage::GenerateRemaining {
             self.stage = Stage::Remaining;
-            let total_non_quiets = self.moves.len();
+            let total_non_quiets = usize::from(self.searched);
 
             if Type::NON_KING_QUIETS {
                 generate_moves::<QuietsOnly>(board, &mut self.moves);
@@ -184,7 +184,7 @@ impl<Type: MovesType> MovePicker<Type> {
     /// Returns [`None`] if there are no good captures.
     fn find_best_good_capture(&mut self, board: &Board) -> Option<Move> {
         loop {
-            if self.moves.is_empty() {
+            if usize::from(self.searched) == self.moves.len() {
                 return None;
             }
 
@@ -192,7 +192,12 @@ impl<Type: MovesType> MovePicker<Type> {
             // are slower.
             let mut best_index = 0;
             let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
-            for (index, scored_move) in self.moves.iter().enumerate() {
+            for (index, scored_move) in self
+                .moves
+                .iter()
+                .enumerate()
+                .skip(usize::from(self.searched))
+            {
                 if scored_move.score > best_score {
                     best_index = index;
                     best_score = scored_move.score;
@@ -213,13 +218,13 @@ impl<Type: MovesType> MovePicker<Type> {
                 continue;
             }
 
-            if best_score >= ScoredMove::WINNING_CAPTURE_SCORE {
-                if !board.is_winning_exchange(mv) {
-                    best_move.score -= ScoredMove::WINNING_CAPTURE_SCORE;
-                    continue;
-                }
-            } else {
-                return None;
+            if !board.is_winning_exchange(mv) {
+                // make sure bad captures are tried after quiets with scores
+                // that are, at worst, only a little negative
+                best_move.score -= CompressedEvaluation(0x1000);
+                self.moves.swap(usize::from(self.searched), best_index);
+                self.searched += 1;
+                continue;
             }
 
             self.moves.swap_remove(best_index);
@@ -280,6 +285,7 @@ impl AllMovesPicker {
             counter_move,
             stage: Stage::TtMove,
             do_quiets: true,
+            searched: 0,
             _type: PhantomData,
         }
     }
@@ -301,6 +307,7 @@ impl QuiescenceMovePicker {
             counter_move: None,
             stage: Stage::GenerateCaptures,
             do_quiets: Type::KING_QUIETS,
+            searched: 0,
             _type: PhantomData,
         }
     }
