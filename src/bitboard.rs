@@ -19,8 +19,8 @@
 use std::{
     fmt::{self, Display, Formatter},
     ops::{
-        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
-        ShrAssign,
+        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref, Not, Shl, ShlAssign,
+        Shr, ShrAssign,
     },
 };
 
@@ -90,6 +90,14 @@ impl BitXorAssign for Bitboard {
     }
 }
 
+impl Deref for Bitboard {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl Display for Bitboard {
     /// Displays the bits of a bitboard in little-endian rank-file mapping.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -103,9 +111,9 @@ impl Display for Bitboard {
                 } else {
                     ret.push_str("1 ");
                 }
-                bb.0 = bb.0.rotate_left(1);
+                bb.0 = bb.rotate_left(1);
             }
-            bb.0 = bb.0.rotate_right(16);
+            bb.0 = bb.rotate_right(16);
             ret.pop();
             ret.push('\n');
         }
@@ -328,7 +336,7 @@ impl Bitboard {
 
     /// Clears the least significant bit of the bitboard and returns it.
     pub fn pop_lsb(&mut self) -> Self {
-        let popped_bit = self.0 & self.0.wrapping_neg();
+        let popped_bit = self.0 & self.wrapping_neg();
         self.0 ^= popped_bit;
         Self(popped_bit)
     }
@@ -336,7 +344,7 @@ impl Bitboard {
     /// Clears the least significant bit of the bitboard and converts the
     /// position of that bit to a [`Square`].
     pub fn pop_next_square(&mut self) -> Square {
-        let square = Square(self.0.trailing_zeros() as u8);
+        let square = Square(self.trailing_zeros() as u8);
         *self ^= Self::from(square);
         square
     }

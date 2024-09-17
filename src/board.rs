@@ -751,11 +751,11 @@ impl Board {
 
     /// Checks if there are pieces on the board that aren't pawns (or kings).
     #[rustfmt::skip]
-    pub const fn has_non_pawn_pieces(&self) -> bool {
-        self.piece::<{ PieceType::KNIGHT.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::BISHOP.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::ROOK.to_index() }>().0.count_ones()
-            + self.piece::<{ PieceType::QUEEN.to_index() }>().0.count_ones()
+    pub fn has_non_pawn_pieces(&self) -> bool {
+        self.piece::<{ PieceType::KNIGHT.to_index() }>().count_ones()
+            + self.piece::<{ PieceType::BISHOP.to_index() }>().count_ones()
+            + self.piece::<{ PieceType::ROOK.to_index() }>().count_ones()
+            + self.piece::<{ PieceType::QUEEN.to_index() }>().count_ones()
             > 0
     }
 

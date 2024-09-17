@@ -40,7 +40,7 @@ pub fn gen_all_sliding_attacks<const PIECE: u8>(
     while !blockers.is_empty() {
         attacks[first_empty] = sliding_attacks::<PIECE>(square, blockers);
         first_empty += 1;
-        blockers = Bitboard(blockers.0.wrapping_sub(1)) & mask;
+        blockers = Bitboard(blockers.wrapping_sub(1)) & mask;
     }
     attacks[first_empty] = sliding_attacks::<PIECE>(square, Bitboard::empty());
 }

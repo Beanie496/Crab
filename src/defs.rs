@@ -381,7 +381,7 @@ impl Display for Square {
 impl From<Bitboard> for Square {
     /// Converts the position of the LSB of `bb` to a [`Square`].
     fn from(bb: Bitboard) -> Self {
-        Self(bb.0.trailing_zeros() as u8)
+        Self(bb.trailing_zeros() as u8)
     }
 }
 

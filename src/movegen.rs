@@ -616,7 +616,7 @@ fn generate_non_sliding_moves<Type: MovesType, const IS_WHITE: bool>(
 
         let mut kings = board.piece::<{ PieceType::KING.to_index() }>() & us_bb;
         debug_assert!(
-            kings.0.count_ones() == 1,
+            kings.count_ones() == 1,
             "Number of kings is not equal to one"
         );
         let king = kings.pop_next_square();

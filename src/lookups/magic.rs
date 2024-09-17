@@ -247,7 +247,7 @@ pub fn find_magics<const PIECE: u8>() {
         let square = Square(square as u8);
         let edges = Bitboard::edges_without(square);
         let mask = sliding_attacks::<PIECE>(square, Bitboard::empty()) & !edges;
-        let mask_bits = mask.0.count_ones();
+        let mask_bits = mask.count_ones();
         let perms = 2_usize.pow(mask_bits);
         let shift = 64 - mask_bits;
         gen_all_sliding_attacks::<PIECE>(square, &mut attacks);
@@ -263,7 +263,7 @@ pub fn find_magics<const PIECE: u8>() {
             let mut found = true;
 
             for attack in attacks.iter().take(perms) {
-                let index = blockers.0.wrapping_mul(sparse_rand) >> shift;
+                let index = blockers.wrapping_mul(sparse_rand) >> shift;
                 /* Each time an index is made, it's checked to see if it's
                  * collided with one of its previous indexes. If it hasn't
                  * (i.e. epoch[index] < count), the index is marked as being
@@ -281,7 +281,7 @@ pub fn find_magics<const PIECE: u8>() {
                     break;
                 }
                 // Carry-Rippler trick
-                blockers = Bitboard(blockers.0.wrapping_sub(1)) & mask;
+                blockers = Bitboard(blockers.wrapping_sub(1)) & mask;
             }
             if found {
                 println!("Found magic for {piece_str}: {sparse_rand}");
