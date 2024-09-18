@@ -287,7 +287,7 @@ impl GameSampler {
     /// moves in the PV, then prints the resulting board and its result to
     /// stdout in the format `format!("{board} {result}")`.
     fn sample_positions(&mut self) {
-        let mut worker = Worker::new(&self.state).with_limits(Limits::Depth(Self::SEARCH_DEPTH));
+        let mut worker = Worker::new(&self.state, 0).with_limits(Limits::Depth(Self::SEARCH_DEPTH));
 
         for _ in 0..Self::SAMPLE_LIMIT {
             let random_index = self.rng.rand_range(0..self.candidates.len() as u64) as usize;

@@ -124,6 +124,7 @@ impl Worker<'_> {
             );
 
             if self.can_print {
+                self.nodes.flush();
                 self.print_report(score, pv, depth);
             }
 

@@ -50,7 +50,7 @@ impl Worker<'_> {
 
         let is_in_check = board.is_in_check();
         self.seldepth = self.seldepth.max(height);
-        self.nodes += 1;
+        self.nodes.increment();
 
         if !NodeType::IS_ROOT {
             // Mate distance pruning: if the score of mating in the next move
@@ -372,7 +372,7 @@ impl Worker<'_> {
         height: Height,
     ) -> Evaluation {
         self.seldepth = self.seldepth.max(height);
-        self.nodes += 1;
+        self.nodes.increment();
 
         let is_in_check = board.is_in_check();
         let mut best_score = if is_in_check {

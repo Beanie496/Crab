@@ -82,7 +82,7 @@ where
     let rx = Mutex::new(channel().1);
     let tt = TranspositionTable::with_capacity(32);
     let state = SharedState::new(rx, tt);
-    let mut worker = Worker::new(&state)
+    let mut worker = Worker::new(&state, 0)
         .with_printing(false)
         .with_limits(Limits::Infinite);
 

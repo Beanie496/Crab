@@ -17,13 +17,13 @@
  */
 
 use std::{
-    sync::{mpsc::channel, Mutex},
+    sync::{atomic::Ordering, mpsc::channel, Mutex},
     time::Duration,
 };
 
 use crate::{
     board::Board,
-    search::{BoardHistory, CompressedDepth, Limits, SharedState, Worker},
+    search::{BoardHistory, CompressedDepth, Limits, SearchStatus, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
@@ -76,15 +76,18 @@ where
 
         let board = position.parse::<Board>().expect("Malformed test position");
 
-        let mut worker = Worker::new(&state)
+        state.nodes.store(0, Ordering::Relaxed);
+        state
+            .status
+            .store(SearchStatus::Continue.into(), Ordering::Relaxed);
+
+        let mut worker = Worker::new(&state, 0)
             .with_board(&BoardHistory::new(), &board)
             .with_limits(limits);
         worker.start_search();
-        let elapsed = worker.elapsed_time();
-        let nodes = worker.nodes();
 
-        total_time += elapsed;
-        total_nodes += nodes;
+        total_time += worker.elapsed_time();
+        total_nodes += worker.nodes();
         state.tt.clear();
     }
 

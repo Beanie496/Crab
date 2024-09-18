@@ -16,15 +16,14 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::process::exit;
-
-use super::{AspirationWindow, Depth, Height, Pv, SearchStatus, Worker};
+use super::{AspirationWindow, Depth, Height, Pv, Worker};
+use crate::movegen::Move;
 
 impl Worker<'_> {
     /// Performs iterative deepening on the given board.
     ///
-    /// Returns the number of positions searched.
-    pub(super) fn iterative_deepening(&mut self) {
+    /// Returns the best move.
+    pub(super) fn iterative_deepening(&mut self) -> Move {
         let mut asp_window = AspirationWindow::new();
         let mut pv = Pv::new();
 
@@ -33,7 +32,6 @@ impl Worker<'_> {
             let depth = Depth(depth);
 
             self.seldepth = Height::default();
-            self.status = SearchStatus::Continue;
 
             let score = self.aspiration_loop(&mut pv, &mut asp_window, depth);
 
@@ -46,16 +44,8 @@ impl Worker<'_> {
 
         self.root_pv.clear();
         self.root_pv.append_pv(&pv);
+        self.nodes.flush();
 
-        if self.can_print {
-            println!(
-                "bestmove {}",
-                self.root_pv.iter().next().expect("null best move")
-            );
-        }
-
-        if self.check_status() == SearchStatus::Quit {
-            exit(0);
-        }
+        *self.root_pv.iter().next().expect("null best move")
     }
 }
