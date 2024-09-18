@@ -31,9 +31,9 @@ use crate::{
 impl Worker<'_> {
     /// Performs a search on `board`.
     ///
-    /// Returns the evaluation of after searching to the given depth. If `NodeType`
-    /// is `Root`, `pv` will always have at least one legal move in it after the
-    /// search.
+    /// Returns the evaluation of after searching to the given depth. If
+    /// `NodeType` is `Root`, `pv` will always have at least one legal move in
+    /// it after the search.
     #[allow(clippy::cognitive_complexity)]
     pub fn search<NodeType: Node>(
         &mut self,
@@ -53,8 +53,7 @@ impl Worker<'_> {
         self.nodes += 1;
 
         if !NodeType::IS_ROOT {
-            // mate distance pruning
-            // if the score of mating in the next move
+            // Mate distance pruning: if the score of mating in the next move
             // (`mate_after(height + 1)`) is still unable to exceed alpha, we
             // can prune. Likewise, if we're getting mated right now
             // (`mated_after(height)`) and we're still exceeding beta, we can
@@ -151,10 +150,11 @@ impl Worker<'_> {
             }
         }
 
-        // Internal iterative reductions (IIR): if we don't have a TT move (either
-        // because we failed low last time or we because didn't even get a TT hit),
-        // it is better to reduce now and hope we have a TT move next time, rather
-        // than waste a lot of time doing a search with bad move ordering
+        // Internal iterative reductions (IIR): if we don't have a TT move
+        // (either because we failed low last time or we because didn't even
+        // get a TT hit), it is better to reduce now and hope we have a TT move
+        // next time, rather than waste a lot of time doing a search with bad
+        // move ordering
         if !NodeType::IS_PV && tt_move.is_none() && depth >= 4 {
             depth -= 1;
         }
@@ -207,16 +207,17 @@ impl Worker<'_> {
             let extension = extension(is_in_check);
             new_depth += extension;
 
-            // Principle variation search (PVS) + late move reduction (LMR)
-            // The first searched move is probably going to be the best because of
-            // move ordering. To prove this, on the searches of subsequent moves,
-            // we lower beta to alpha + 1 (a zero window) and reduce the new depth
-            // depending on some heuristics. If the search then raises alpha, we do
-            // a research without reducing in case the lower depth was missing
-            // something. If _that_ search still raises alpha, it must have failed
-            // to exceed -alpha - 1, but could have exceeded the old beta, so we
-            // must do a research without reducing and with a full window. (If that
-            // then exceeds alpha, then great: we've found a better move.)
+            // Principle variation search (PVS) + late move reduction (LMR):
+            // The first searched move is probably going to be the best because
+            // of move ordering. To prove this, on the searches of subsequent
+            // moves, we lower beta to alpha + 1 (a zero window) and reduce the
+            // new depth depending on some heuristics. If the search then
+            // raises alpha, we do a research without reducing in case the
+            // lower depth was missing something. If _that_ search still raises
+            // alpha, it must have failed to exceed -alpha - 1, but could have
+            // exceeded the old beta, so we must do a research without reducing
+            // and with a full window. (If that then exceeds alpha, then great:
+            // we've found a better move.)
             let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
                 score = -self.search::<NonPvNode>(
@@ -274,8 +275,8 @@ impl Worker<'_> {
             if score > alpha {
                 best_move = Some(mv);
 
-                // if we're in a zero-window search, raising alpha will raise beta
-                // and we don't care about the PV
+                // if we're in a zero-window search, raising alpha will raise
+                // beta and we don't care about the PV
                 if !NodeType::IS_PV {
                     break;
                 }
@@ -346,8 +347,8 @@ impl Worker<'_> {
         best_score
     }
 
-    /// Performs a search that only considers captures and uses a static evaluation
-    /// at the leaf nodes.
+    /// Performs a search that only considers captures and uses a static
+    /// evaluation at the leaf nodes.
     ///
     /// This should be called at the leaf nodes of the main search.
     fn quiescence_search(
