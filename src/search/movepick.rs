@@ -255,7 +255,7 @@ impl<Type: MovesType> MovePicker<Type> {
 
             // treat all moves with an especially bad score as a bad quiet and
             // search it after the bad captures
-            if best_move.score <= -0x1000 {
+            if best_move.score <= -8192 {
                 self.moves.swap(usize::from(self.searched), best_index);
                 self.searched += 1;
                 continue;
