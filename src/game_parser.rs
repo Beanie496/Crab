@@ -296,7 +296,7 @@ impl GameSampler {
             worker.reset_board(&random_board);
             worker.start_search();
 
-            for &mv in worker.root_pv().iter() {
+            for &mv in worker.root_pv() {
                 random_board.make_move(mv);
             }
             println!("{random_board} {}", self.result);

@@ -634,10 +634,10 @@ impl<'a> Worker<'a> {
         self.nodes
     }
 
-    /// Returns a copy of the PV of the current positon.
+    /// Returns an iterator over the PV of the current positon.
     #[allow(dead_code)]
-    pub fn root_pv(&self) -> Pv {
-        self.root_pv.clone()
+    pub fn root_pv(&self) -> Iter<'_, Move> {
+        self.root_pv.iter()
     }
 
     /// Returns the time taken since the search started.
