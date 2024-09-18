@@ -96,6 +96,12 @@ impl Div<u8> for Depth {
     }
 }
 
+impl From<bool> for Depth {
+    fn from(b: bool) -> Self {
+        Self(b.into())
+    }
+}
+
 impl From<CompressedDepth> for Depth {
     fn from(depth: CompressedDepth) -> Self {
         Self(depth.0.into())

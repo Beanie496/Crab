@@ -10,7 +10,6 @@ Features:
 - Principle variation search
 - A transposition table
 - Null move pruning
-- Internal iterative reductions
 - Staged movegen
 - Move ordering:
   - TT-move

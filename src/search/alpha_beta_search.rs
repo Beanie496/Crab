@@ -41,7 +41,7 @@ impl Worker<'_> {
         board: &Board,
         mut alpha: Evaluation,
         mut beta: Evaluation,
-        mut depth: Depth,
+        depth: Depth,
         height: Height,
     ) -> Evaluation {
         if depth <= 0 {
@@ -150,15 +150,6 @@ impl Worker<'_> {
             }
         }
 
-        // Internal iterative reductions (IIR): if we don't have a TT move
-        // (either because we failed low last time or we because didn't even
-        // get a TT hit), it is better to reduce now and hope we have a TT move
-        // next time, rather than waste a lot of time doing a search with bad
-        // move ordering
-        if !NodeType::IS_PV && tt_move.is_none() && depth >= 4 {
-            depth -= 1;
-        }
-
         let mut best_score = -Evaluation::INFINITY;
         let mut best_move = None;
         let mut new_pv = Pv::new();
@@ -183,7 +174,7 @@ impl Worker<'_> {
                 println!("info currmovenumber {total_moves} currmove {mv}");
             }
 
-            let reduction = late_move_reduction(depth, total_moves);
+            let reduction = late_move_reduction::<NodeType>(depth, total_moves);
             let mut new_depth = depth - 1;
 
             if !NodeType::IS_PV && !is_in_check {
@@ -428,9 +419,9 @@ fn extension(is_in_check: bool) -> Depth {
 }
 
 /// Calculates how much to reduce the search by during late move reductions.
-fn late_move_reduction(depth: Depth, total_moves: u8) -> Depth {
+fn late_move_reduction<NodeType: Node>(depth: Depth, total_moves: u8) -> Depth {
     if depth >= 3 && total_moves >= 3 {
-        base_reductions(depth, total_moves)
+        base_reductions(depth, total_moves) + Depth::from(!NodeType::IS_PV)
     } else {
         Depth::default()
     }
