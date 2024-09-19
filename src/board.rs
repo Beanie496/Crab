@@ -488,8 +488,6 @@ impl Board {
                 PieceType::ROOK,
                 us,
             );
-
-            self.clear_castling_rights_for(us);
         } else if is_double_pawn_push(start, end, piece_type) {
             let ep_square = Square((start.0 + end.0) >> 1);
             self.set_ep_square(ep_square);
@@ -539,7 +537,12 @@ impl Board {
             }
         }
         if piece_type == PieceType::KING {
-            self.clear_castling_rights_for(us);
+            let removed_rights = if us == Side::WHITE {
+                CastlingRights::K | CastlingRights::Q
+            } else {
+                CastlingRights::k | CastlingRights::q
+            };
+            self.remove_castling_rights(removed_rights);
         }
 
         self.toggle_castling_rights_key(self.castling_rights());
@@ -694,22 +697,6 @@ impl Board {
     /// Does not update the zobrist key.
     fn remove_castling_rights(&mut self, rights: CastlingRights) {
         self.castling_rights.remove_rights(rights);
-    }
-
-    /// Clears the castlign rights for the given side, whether or not they
-    /// already exist. Does not update the zobrist key.
-    fn clear_castling_rights_for(&mut self, side: Side) {
-        let rights = if side == Side::WHITE {
-            CastlingRights::K | CastlingRights::Q
-        } else {
-            debug_assert!(
-                side == Side::BLACK,
-                "Side is not White or Black: \"{}\"",
-                char::from(side),
-            );
-            CastlingRights::k | CastlingRights::q
-        };
-        self.remove_castling_rights(rights);
     }
 
     /// Increments the halfmove counter.
@@ -1167,14 +1154,14 @@ impl CastlingRights {
     /// Adds the given rights to the castling rights.
     ///
     /// If the rights already exist, nothing will happen.
-    fn add_rights(&mut self, right: Self) {
-        *self |= right;
+    fn add_rights(&mut self, rights: Self) {
+        *self |= rights;
     }
 
     /// Removes the given rights from the castling rights.
     ///
     /// If the rights do not already exist, nothing will happen.
-    fn remove_rights(&mut self, right: Self) {
-        *self &= !right;
+    fn remove_rights(&mut self, rights: Self) {
+        *self &= !rights;
     }
 }
