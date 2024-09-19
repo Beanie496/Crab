@@ -176,6 +176,7 @@ impl Worker<'_> {
             if !self.make_move(&mut copy, mv) {
                 continue;
             }
+            self.state.tt.prefetch(copy.key());
             total_moves += 1;
 
             if NodeType::IS_ROOT && self.should_print() {

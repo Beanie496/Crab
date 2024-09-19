@@ -16,6 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use core::arch::x86_64::{_mm_prefetch, _MM_HINT_ET0};
 use std::{
     mem::{size_of, transmute},
     sync::atomic::{AtomicU64, Ordering},
@@ -198,6 +199,18 @@ impl TranspositionTable {
         for entry in self.tt_mut() {
             *entry[0].get_mut() = 0;
             *entry[1].get_mut() = 0;
+        }
+    }
+
+    /// Prefetches the entry with the given key into all levels of cache.
+    pub fn prefetch(&self, key: Key) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let index = self.index(key);
+            let pointer = get_unchecked(self.tt(), index).as_ptr();
+            // SAFETY: there isn't anything particularly dangerous about this,
+            // and `pointer` is always valid
+            unsafe { _mm_prefetch(pointer.cast(), _MM_HINT_ET0) }
         }
     }
 
