@@ -233,7 +233,7 @@ impl Histories {
 
     /// Returns the butterfly score of a move by the given side from `start` to
     /// `end`.
-    pub fn get_butterfly_score(&self, side: Side, start: Square, end: Square) -> Evaluation {
+    pub fn butterfly_score(&self, side: Side, start: Square, end: Square) -> Evaluation {
         self.butterfly_history[side.to_index()][start.to_index()][end.to_index()].into()
     }
 
@@ -277,7 +277,7 @@ impl Histories {
     /// square.
     ///
     /// This score may be across more than one ply.
-    pub fn get_continuation_history_score(&self, piece: Piece, end: Square) -> Evaluation {
+    pub fn continuation_history_score(&self, piece: Piece, end: Square) -> Evaluation {
         self.board_history
             .iter()
             .rev()
@@ -323,7 +323,7 @@ impl Histories {
     }
 
     /// Gets the counter move as indexed by `history_item`.
-    pub fn get_counter_move(&self, history_item: HistoryItem) -> Option<Move> {
+    pub fn counter_move(&self, history_item: HistoryItem) -> Option<Move> {
         history_item.piece_dest.and_then(|info| {
             let piece = info.piece.to_index();
             let square = info.dest.to_index();

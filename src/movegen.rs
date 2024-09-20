@@ -420,8 +420,8 @@ impl ScoredMove {
         let start = mv.start();
         let end = mv.end();
 
-        self.score += histories.get_butterfly_score(board.side_to_move(), start, end)
-            + histories.get_continuation_history_score(board.piece_on(start), end);
+        self.score += histories.butterfly_score(board.side_to_move(), start, end)
+            + histories.continuation_history_score(board.piece_on(start), end);
     }
 }
 
