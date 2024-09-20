@@ -18,23 +18,23 @@
 
 use std::marker::PhantomData;
 
+use super::Histories;
 use crate::{
     board::Board,
     evaluation::{CompressedEvaluation, Evaluation},
     movegen::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
     },
-    search::Histories,
 };
 
 /// A [`MovePicker`] for the main search that searches all moves.
-pub type AllMovesPicker = MovePicker<AllMoves>;
+pub(super) type AllMovesPicker = MovePicker<AllMoves>;
 /// A [`MovePicker`] for the quiescence search that searches only captures
 /// and/or evasions.
 ///
 /// Whether or not it generates king quiet moves is given by the type parameter
 /// to `new`.
-pub type QuiescenceMovePicker = MovePicker<CapturesOnly>;
+pub(super) type QuiescenceMovePicker = MovePicker<CapturesOnly>;
 
 /// The stage of move picking.
 #[derive(PartialEq)]
@@ -59,7 +59,7 @@ enum Stage {
 
 /// A selector of the next best move in a position.
 #[allow(clippy::missing_docs_in_private_items)]
-pub struct MovePicker<Type: MovesType> {
+pub(super) struct MovePicker<Type: MovesType> {
     // having this big array at the beginning of the struct is fastest, funnily
     // enough
     moves: Moves,
@@ -78,13 +78,13 @@ pub struct MovePicker<Type: MovesType> {
 
 impl<Type: MovesType> MovePicker<Type> {
     /// Skip any future quiets.
-    pub fn skip_quiets(&mut self) {
+    pub(super) fn skip_quiets(&mut self) {
         self.do_quiets = false;
     }
 
     /// Return the next best [`Move`] in the list of legal moves.
     #[allow(clippy::cognitive_complexity)]
-    pub fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
+    pub(super) fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
         if self.stage == Stage::TtMove {
             self.stage = Stage::GenerateCaptures;
             if self.tt_move.is_some() {
@@ -273,7 +273,7 @@ impl<Type: MovesType> MovePicker<Type> {
 impl AllMovesPicker {
     /// Creates a new [`MovePicker`] for all moves based on the information in
     /// `board` and `tt_move`.
-    pub fn new(
+    pub(super) fn new(
         tt_move: Option<Move>,
         killers: [Option<Move>; 2],
         counter_move: Option<Move>,
@@ -294,7 +294,7 @@ impl AllMovesPicker {
 impl QuiescenceMovePicker {
     /// Creates a new [`MovePicker`] for captures only (and optionally king
     /// quiet moves).
-    pub fn new<Type: MovesType>() -> Self {
+    pub(super) fn new<Type: MovesType>() -> Self {
         assert!(
             !Type::NON_KING_QUIETS,
             "generating quiet moves for a quiescence move picker"

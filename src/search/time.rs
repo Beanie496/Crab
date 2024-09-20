@@ -18,8 +18,7 @@
 
 use std::time::{Duration, Instant};
 
-use super::Limits;
-use crate::search::CompressedDepth;
+use super::{CompressedDepth, Limits};
 
 impl Limits {
     /// The maximum number of effective moves to go until the next time
@@ -32,7 +31,11 @@ impl Limits {
 
 /// Calculates the maximum window of time that should be used for the next
 /// iterative deepening loop.
-pub fn calculate_time_window(start: Instant, limits: Limits, move_overhead: Duration) -> Duration {
+pub(super) fn calculate_time_window(
+    start: Instant,
+    limits: Limits,
+    move_overhead: Duration,
+) -> Duration {
     if let Limits::Timed {
         time,
         inc,

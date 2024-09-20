@@ -18,13 +18,13 @@
 
 use std::process::exit;
 
-use super::{aspiration::AspirationWindow, Depth, Height, Pv, SearchStatus, Worker};
+use super::{AspirationWindow, Depth, Height, Pv, SearchStatus, Worker};
 
 impl Worker<'_> {
     /// Performs iterative deepening on the given board.
     ///
     /// Returns the number of positions searched.
-    pub fn iterative_deepening(&mut self) {
+    pub(super) fn iterative_deepening(&mut self) {
         let mut asp_window = AspirationWindow::new();
         let mut pv = Pv::new();
 

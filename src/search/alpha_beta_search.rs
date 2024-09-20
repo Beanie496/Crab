@@ -17,8 +17,8 @@
  */
 
 use super::{
-    movepick::{AllMovesPicker, QuiescenceMovePicker},
-    Depth, Height, Node, NonPvNode, Pv, PvNode, SearchStatus, Worker,
+    AllMovesPicker, Depth, Height, Node, NonPvNode, Pv, PvNode, QuiescenceMovePicker, SearchStatus,
+    Worker,
 };
 use crate::{
     board::Board,

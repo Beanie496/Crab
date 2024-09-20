@@ -47,7 +47,7 @@ impl AspirationWindow {
     }
 
     /// Adjusts the aspiration window around the score.
-    pub fn adjust_around(&mut self, score: Evaluation, depth: Depth) {
+    pub(super) fn adjust_around(&mut self, score: Evaluation, depth: Depth) {
         let unbounded_margin =
             Evaluation(60) / Evaluation::from(depth.min(Depth(3))) + score * score / 3_000;
 

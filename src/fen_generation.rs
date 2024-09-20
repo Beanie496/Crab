@@ -30,9 +30,7 @@ use crate::{
     defs::Side,
     evaluation::Evaluation,
     movegen::{generate_moves, AllMoves, Moves},
-    search::{
-        aspiration::AspirationWindow, Depth, Height, Limits, Pv, RootNode, SharedState, Worker,
-    },
+    search::{AspirationWindow, Depth, Height, Limits, Pv, RootNode, SharedState, Worker},
     transposition_table::TranspositionTable,
 };
 
