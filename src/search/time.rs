@@ -44,15 +44,14 @@ impl Worker<'_> {
             let moves_to_go = moves_to_go.min(Limits::MAX_MOVES_TO_GO);
             let total_overhead = self.start.elapsed() + self.move_overhead;
             let total_time = *time;
+            // if an iterative deepening loop takes way longer than expected,
+            // make sure we don't run out of time
+            *time = total_time.saturating_sub(total_overhead);
 
             self.allocated = (total_time / moves_to_go.0.into() + inc)
                 // don't allocate more time than we actually have
                 .min(total_time)
                 .saturating_sub(total_overhead);
-
-            // if an iterative deepening loop takes way longer than expected,
-            // make sure we don't use too much of our remaining time
-            *time = (total_time / 2).min(total_time.saturating_sub(total_overhead));
         }
     }
 }
