@@ -22,7 +22,7 @@ use arrayvec::ArrayVec;
 
 use super::{Depth, Height};
 use crate::{
-    board::Key,
+    board::{Board, Key},
     defs::{Piece, Side, Square},
     evaluation::{CompressedEvaluation, Evaluation},
     movegen::{Move, Moves},
@@ -38,12 +38,11 @@ pub struct BoardHistory {
     history: ArrayVec<HistoryItem, { Depth::MAX.to_index() }>,
 }
 
-/// Information needed for indexing into counter moves.
+/// A piece and its destination square.
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Clone, Copy)]
-pub struct CounterMoveInfo {
-    /// The piece being moved.
+pub struct PieceDest {
     piece: Piece,
-    /// The destination square of that piece.
     dest: Square,
 }
 
@@ -52,10 +51,10 @@ pub struct CounterMoveInfo {
 pub struct HistoryItem {
     /// The key of the item.
     pub key: Key,
-    /// Information for counter moves.
+    /// The last piece that moves and its destination.
     ///
     /// It's an [`Option`] because of null moves.
-    pub counter_move_info: Option<CounterMoveInfo>,
+    pub piece_dest: Option<PieceDest>,
 }
 
 /// A struct containing various histories relating to the board.
@@ -68,6 +67,15 @@ pub struct Histories {
     /// wings.
     pub butterfly_history:
         Box<[[[CompressedEvaluation; Square::TOTAL]; Square::TOTAL]; Side::TOTAL]>,
+    /// Continuation history.
+    ///
+    /// A score for a piece/destination square depending on the previous piece
+    /// that moved and its destination square.
+    ///
+    /// Indexed by previous piece, previous end square, current piece then
+    /// current end square.
+    pub continuation_history:
+        Box<[[[[CompressedEvaluation; Square::TOTAL]; Piece::TOTAL]; Square::TOTAL]; Piece::TOTAL]>,
     /// Killer moves.
     ///
     /// For each depth, the best move from the previous search at the same
@@ -88,8 +96,7 @@ pub struct Histories {
 
 impl Histories {
     /// The maximum of any history value.
-    // `/ 2` to prevent overflow
-    const MAX_HISTORY_VAL: Evaluation = Evaluation(i16::MAX as i32 / 2);
+    const MAX_HISTORY_VAL: Evaluation = Evaluation(16383);
 }
 
 impl Deref for BoardHistory {
@@ -127,8 +134,8 @@ impl BoardHistory {
     }
 }
 
-impl CounterMoveInfo {
-    /// Creates new [`CounterMoveInfo`].
+impl PieceDest {
+    /// Creates a new [`PieceDest`].
     pub const fn new(piece: Piece, dest: Square) -> Self {
         Self { piece, dest }
     }
@@ -136,20 +143,23 @@ impl CounterMoveInfo {
 
 impl HistoryItem {
     /// Creates a new [`HistoryItem`] with the given fields.
-    pub const fn new(key: Key, counter_move_info: Option<CounterMoveInfo>) -> Self {
-        Self {
-            key,
-            counter_move_info,
-        }
+    pub const fn new(key: Key, piece_dest: Option<PieceDest>) -> Self {
+        Self { key, piece_dest }
     }
 }
 
 impl Histories {
     /// Creates new, empty [`Histories`].
+    // not large enough to overflow the stack in debug
+    #[allow(clippy::large_stack_frames, clippy::large_stack_arrays)]
     pub fn new() -> Self {
         Self {
             butterfly_history: Box::new(
                 [[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL],
+            ),
+            continuation_history: Box::new(
+                [[[[CompressedEvaluation(0); Square::TOTAL]; Piece::TOTAL]; Square::TOTAL];
+                    Piece::TOTAL],
             ),
             killers: [[None; 2]; Depth::MAX.to_index() + 1],
             counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
@@ -182,9 +192,15 @@ impl Histories {
     }
 
     /// Clears all the histories apart from the board history.
+    // not large enough to overflow the stack in debug
+    #[allow(clippy::large_stack_frames, clippy::large_stack_arrays)]
     pub fn clear(&mut self) {
         self.butterfly_history =
             Box::new([[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL]);
+        self.continuation_history = Box::new(
+            [[[[CompressedEvaluation(0); Square::TOTAL]; Piece::TOTAL]; Square::TOTAL];
+                Piece::TOTAL],
+        );
         self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
         self.killers[0] = [None; 2];
     }
@@ -217,13 +233,63 @@ impl Histories {
 
     /// Returns the butterfly score of a move by the given side from `start` to
     /// `end`.
-    pub fn get_butterfly_score(
-        &self,
-        side: Side,
-        start: Square,
-        end: Square,
-    ) -> CompressedEvaluation {
-        self.butterfly_history[side.to_index()][start.to_index()][end.to_index()]
+    pub fn get_butterfly_score(&self, side: Side, start: Square, end: Square) -> Evaluation {
+        self.butterfly_history[side.to_index()][start.to_index()][end.to_index()].into()
+    }
+
+    /// Updates the continuation history with a bonus for `best_move` and a
+    /// penalty for all other moves in `quiet_moves`.
+    ///
+    /// This score may be across more than one ply.
+    ///
+    /// `quiet_moves` may or may not contain `best_move`.
+    pub fn update_continuation_history(
+        &mut self,
+        board: &Board,
+        quiet_moves: &Moves,
+        best_move: Move,
+        depth: Depth,
+    ) {
+        self.board_history
+            .iter()
+            .rev()
+            .take(2)
+            .filter_map(|item| item.piece_dest)
+            .for_each(|piece_dest| {
+                let prev_piece = piece_dest.piece.to_index();
+                let prev_end = piece_dest.dest.to_index();
+
+                for mv in quiet_moves.iter().map(|scored_move| scored_move.mv) {
+                    let piece = board.piece_on(mv.start()).to_index();
+                    let end = mv.end().to_index();
+
+                    Self::update_history_value(
+                        &mut self.continuation_history[prev_piece][prev_end][piece][end],
+                        depth,
+                        best_move == mv,
+                        Self::MAX_HISTORY_VAL,
+                    );
+                }
+            });
+    }
+
+    /// Returns the continuation score of the given piece moving to the given
+    /// square.
+    ///
+    /// This score may be across more than one ply.
+    pub fn get_continuation_history_score(&self, piece: Piece, end: Square) -> Evaluation {
+        self.board_history
+            .iter()
+            .rev()
+            .take(2)
+            .filter_map(|item| item.piece_dest)
+            .map(|piece_dest| {
+                let prev_piece = piece_dest.piece.to_index();
+                let prev_end = piece_dest.dest.to_index();
+                self.continuation_history[prev_piece][prev_end][piece.to_index()][end.to_index()]
+            })
+            .sum::<CompressedEvaluation>()
+            .into()
     }
 
     /// Replace the second killer of the current height with the given move.
@@ -248,9 +314,9 @@ impl Histories {
 
     /// Inserts `mv` into the table as given by `history_item`.
     pub fn insert_into_counter_moves(&mut self, history_item: HistoryItem, mv: Move) {
-        if let Some(counter_move_info) = history_item.counter_move_info {
-            let piece = counter_move_info.piece.to_index();
-            let square = counter_move_info.dest.to_index();
+        if let Some(piece_dest) = history_item.piece_dest {
+            let piece = piece_dest.piece.to_index();
+            let square = piece_dest.dest.to_index();
 
             self.counter_moves[piece][square] = Some(mv);
         }
@@ -258,7 +324,7 @@ impl Histories {
 
     /// Gets the counter move as indexed by `history_item`.
     pub fn get_counter_move(&self, history_item: HistoryItem) -> Option<Move> {
-        history_item.counter_move_info.and_then(|info| {
+        history_item.piece_dest.and_then(|info| {
             let piece = info.piece.to_index();
             let square = info.dest.to_index();
             self.counter_moves[piece][square]

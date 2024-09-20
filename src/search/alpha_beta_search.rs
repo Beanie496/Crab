@@ -313,6 +313,9 @@ impl Worker<'_> {
                     board.side_to_move(),
                     depth,
                 );
+
+                self.histories
+                    .update_continuation_history(board, &quiet_moves, best_move, depth);
             }
         }
 

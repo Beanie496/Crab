@@ -18,6 +18,7 @@ Features:
   - Counter moves
 - Histories:
   - Butterfly history
+  - Continuation history
 - Futility pruning
 - Extensions:
   - Check extensions

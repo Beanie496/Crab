@@ -30,7 +30,7 @@ use crate::{
     bitboard::Bitboard,
     board::Board,
     defs::{Direction, PieceType, Rank, Side, Square},
-    evaluation::CompressedEvaluation,
+    evaluation::Evaluation,
     lookups::ATTACK_LOOKUPS,
     search::Histories,
 };
@@ -108,7 +108,7 @@ pub struct Move {
 #[derive(Clone, Copy)]
 pub struct ScoredMove {
     pub mv: Move,
-    pub score: CompressedEvaluation,
+    pub score: Evaluation,
 }
 
 /// An stack of [`Move`]s.
@@ -393,7 +393,7 @@ impl ScoredMove {
     fn new(mv: Move) -> Self {
         Self {
             mv,
-            score: CompressedEvaluation::default(),
+            score: Evaluation::default(),
         }
     }
 
@@ -420,7 +420,8 @@ impl ScoredMove {
         let start = mv.start();
         let end = mv.end();
 
-        self.score += histories.get_butterfly_score(board.side_to_move(), start, end);
+        self.score += histories.get_butterfly_score(board.side_to_move(), start, end)
+            + histories.get_continuation_history_score(board.piece_on(start), end);
     }
 }
 

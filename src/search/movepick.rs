@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 use super::Histories;
 use crate::{
     board::Board,
-    evaluation::{CompressedEvaluation, Evaluation},
+    evaluation::Evaluation,
     movegen::{
         generate_moves, AllMoves, CapturesOnly, KingMovesOnly, Move, Moves, MovesType, QuietsOnly,
     },
@@ -191,7 +191,7 @@ impl<Type: MovesType> MovePicker<Type> {
             // There are several shorter/more intuitive ways of doing this. All
             // are slower.
             let mut best_index = 0;
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
+            let mut best_score = -Evaluation::INFINITY;
             for (index, scored_move) in self
                 .moves
                 .iter()
@@ -221,7 +221,7 @@ impl<Type: MovesType> MovePicker<Type> {
             if !board.is_winning_exchange(mv) {
                 // make sure bad captures are tried after quiets with scores
                 // that are, at worst, only a little negative
-                best_move.score -= CompressedEvaluation(0x1000);
+                best_move.score -= Evaluation(0x1000);
                 self.moves.swap(usize::from(self.searched), best_index);
                 self.searched += 1;
                 continue;
@@ -242,7 +242,7 @@ impl<Type: MovesType> MovePicker<Type> {
             }
 
             let mut best_index = 0;
-            let mut best_score = -CompressedEvaluation::from(Evaluation::INFINITY);
+            let mut best_score = -Evaluation::INFINITY;
             for (index, scored_move) in self.moves.iter().enumerate() {
                 if scored_move.score > best_score {
                     best_index = index;
