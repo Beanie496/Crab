@@ -23,7 +23,10 @@ use std::{
 };
 
 use crate::{
-    bitboard::Bitboard, error::ParseError, evaluation::CompressedEvaluation, util::get_unchecked,
+    bitboard::Bitboard,
+    error::ParseError,
+    evaluation::{CompressedEvaluation, Evaluation},
+    util::get_unchecked,
 };
 
 /// A cardinal direction.
@@ -64,7 +67,7 @@ pub struct Square(pub u8);
 
 /// Most Valuable Victim (MVV): a bonus to capturing a piece, with a higher
 /// bonus to move valuable pieces.
-static MVV_BONUS: [i16; PieceType::TOTAL + 1] = [0, 300, 300, 500, 900, 0, 0];
+static MVV_BONUS: [i32; PieceType::TOTAL + 1] = [0, 300, 300, 500, 900, 0, 0];
 /// An array of character constants associated with each piece on both sides,
 /// with the character '0' at the end to allow conversion from [`Piece::NONE`].
 ///
@@ -444,8 +447,8 @@ impl PieceType {
     }
 
     /// Returns the MVV bonus of the piece type.
-    pub fn mvv_bonus(self) -> CompressedEvaluation {
-        CompressedEvaluation(*get_unchecked(&MVV_BONUS, self.to_index()))
+    pub fn mvv_bonus(self) -> Evaluation {
+        Evaluation(*get_unchecked(&MVV_BONUS, self.to_index()))
     }
 
     /// Returns the SEE bonus of the piece type.

@@ -19,6 +19,7 @@
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
+    iter::Sum,
     ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
@@ -159,6 +160,12 @@ impl Sub<i16> for CompressedEvaluation {
 impl SubAssign for CompressedEvaluation {
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
+    }
+}
+
+impl Sum for CompressedEvaluation {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self(iter.map(|eval| eval.0).sum())
     }
 }
 

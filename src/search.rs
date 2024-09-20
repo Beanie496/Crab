@@ -34,7 +34,7 @@ use crate::{
 };
 pub use aspiration::AspirationWindow;
 pub use depth::{CompressedDepth, Depth, Height};
-pub use history::{BoardHistory, CounterMoveInfo, Histories, HistoryItem};
+pub use history::{BoardHistory, Histories, HistoryItem, PieceDest};
 use movepick::{AllMovesPicker, QuiescenceMovePicker};
 
 /// For running the main alpha-beta search.
@@ -431,7 +431,7 @@ impl<'a> Worker<'a> {
 
         let dest = mv.end();
         let piece = board.piece_on(dest);
-        let counter_move_info = CounterMoveInfo::new(piece, dest);
+        let counter_move_info = PieceDest::new(piece, dest);
         self.push_board_history(HistoryItem::new(old_key, Some(counter_move_info)));
         true
     }
