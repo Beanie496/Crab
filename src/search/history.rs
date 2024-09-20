@@ -89,7 +89,7 @@ pub struct Histories {
 impl Histories {
     /// The maximum of any history value.
     // `/ 2` to prevent overflow
-    const MAX_HISTORY_VAL: CompressedEvaluation = CompressedEvaluation(i16::MAX / 2);
+    const MAX_HISTORY_VAL: Evaluation = Evaluation(i16::MAX as i32 / 2);
 }
 
 impl Deref for BoardHistory {
@@ -164,6 +164,23 @@ impl Histories {
         Evaluation::from(CompressedEvaluation(depth.0.min(8) * 100))
     }
 
+    /// Updates a particular item of a history table.
+    ///
+    /// `is_bonus` is if the update should be a bonus (as opposed to a malus).
+    fn update_history_value(
+        value: &mut CompressedEvaluation,
+        depth: Depth,
+        is_bonus: bool,
+        max_history: Evaluation,
+    ) {
+        let abs_bonus = Self::bonus(depth);
+        let signed_bonus = if is_bonus { abs_bonus } else { -abs_bonus };
+        // the value cannot exceed max_history, so the bonus is lerped between
+        // its original value (for val == 0) and 0 (for val == max_history)
+        let delta = signed_bonus - abs_bonus * Evaluation::from(*value) / max_history;
+        *value += CompressedEvaluation::from(delta);
+    }
+
     /// Clears all the histories apart from the board history.
     pub fn clear(&mut self) {
         self.butterfly_history =
@@ -188,20 +205,13 @@ impl Histories {
         for mv in quiet_moves.iter().map(|scored_move| scored_move.mv) {
             let start = mv.start().to_index();
             let end = mv.end().to_index();
-            let abs_bonus = Self::bonus(depth);
-            let signed_bonus = if best_move == mv {
-                abs_bonus
-            } else {
-                -abs_bonus
-            };
 
-            let val = &mut self.butterfly_history[side][start][end];
-            // val cannot exceed MAX_HISTORY_VAL, so the bonus is lerped
-            // between its original value (for val == 0) and 0 (for val ==
-            // MAX_HISTORY_VAL)
-            let delta = signed_bonus
-                - abs_bonus * Evaluation::from(*val) / Evaluation::from(Self::MAX_HISTORY_VAL);
-            *val += CompressedEvaluation::from(delta);
+            Self::update_history_value(
+                &mut self.butterfly_history[side][start][end],
+                depth,
+                best_move == mv,
+                Self::MAX_HISTORY_VAL,
+            );
         }
     }
 
