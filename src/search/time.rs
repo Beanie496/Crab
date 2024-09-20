@@ -16,7 +16,7 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{Limits, Worker, CompressedDepth};
+use super::{CompressedDepth, Limits, Worker};
 
 impl Limits {
     /// The maximum number of effective moves to go until the next time
