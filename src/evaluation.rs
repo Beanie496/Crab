@@ -44,7 +44,7 @@ pub struct CompressedEvaluation(pub i16);
 /// When converting to a [`CompressedEvaluation`] or compared against mate scores,
 /// this should always be in the range
 /// `-`[`Self::INFINITY`]`..=`[`Self::INFINITY`].
-#[derive(Clone, Copy, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Evaluation(pub i32);
 
 /// The phase of the game, represented by the sum of the weights of the pieces
@@ -75,17 +75,6 @@ static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 /// allow [`Piece::NONE`] to index into it.
 static PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
-impl Display for Evaluation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        #[allow(clippy::unwrap_used)]
-        if self.is_mate() {
-            write!(f, "score mate {}", self.moves_to_mate())
-        } else {
-            write!(f, "score cp {}", self.0)
-        }
-    }
-}
-
 impl Evaluation {
     /// The highest possible (positive) evaluation.
     pub const INFINITY: Self = Self(i16::MAX as i32);
@@ -95,6 +84,17 @@ impl Evaluation {
     pub const MATE_BOUND: Self = Self(Self::MATE.0 - Depth::MAX.0 as i32);
     /// The evaluation of a draw.
     pub const DRAW: Self = Self(0);
+}
+
+impl Display for Evaluation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[allow(clippy::unwrap_used)]
+        if self.is_mate() {
+            write!(f, "score mate {}", self.moves_to_mate())
+        } else {
+            write!(f, "score cp {}", self.0)
+        }
+    }
 }
 
 impl Add for CompressedEvaluation {
@@ -115,7 +115,8 @@ impl From<Evaluation> for CompressedEvaluation {
     fn from(eval: Evaluation) -> Self {
         debug_assert!(
             eval >= -Evaluation::INFINITY && eval <= Evaluation::INFINITY,
-            "converting an Evaluation ({eval}) outside the permissible range for a CompressedEvaluation",
+            "converting an Evaluation ({}) outside the permissible range for a CompressedEvaluation",
+            eval.0
         );
         Self(eval.0 as i16)
     }

@@ -155,8 +155,7 @@ impl Worker<'_> {
         let mut new_pv = Pv::new();
         let killers = self.histories.current_killers(height);
         let last_history_item = self.histories.board_history.last();
-        let counter_move =
-            last_history_item.and_then(|item| self.histories.counter_move(*item));
+        let counter_move = last_history_item.and_then(|item| self.histories.counter_move(*item));
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
