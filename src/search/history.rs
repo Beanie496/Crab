@@ -76,6 +76,13 @@ pub struct Histories {
     /// current end square.
     pub continuation_history:
         Box<[[[[CompressedEvaluation; Square::TOTAL]; Piece::TOTAL]; Square::TOTAL]; Piece::TOTAL]>,
+    /// Correction history.
+    ///
+    /// A history of differences between static evaluation and score.
+    ///
+    /// Indexed by side to move then pawn hash.
+    pub correction_history:
+        Box<[[CompressedEvaluation; Self::CORRECTION_HISTORY_SIZE]; Side::TOTAL]>,
     /// Killer moves.
     ///
     /// For each depth, the best move from the previous search at the same
@@ -97,6 +104,14 @@ pub struct Histories {
 impl Histories {
     /// The maximum of any history value.
     const MAX_HISTORY_VAL: Evaluation = Evaluation(16383);
+    /// The size of the correction history table per side.
+    ///
+    /// The pawn hash index is calculated by `key % CORRECTION_HISTORY_SIZE`,
+    /// so this must be a power of 2, otherwise the indices would have an
+    /// uneven distributions and take longer to compute.
+    const CORRECTION_HISTORY_SIZE: usize = 0x4000;
+    /// The maximum value that any correction history value can take.
+    const CORRECTION_HISTORY_LIMIT: Evaluation = Evaluation(256);
 }
 
 impl Deref for BoardHistory {
@@ -161,6 +176,9 @@ impl Histories {
                 [[[[CompressedEvaluation(0); Square::TOTAL]; Piece::TOTAL]; Square::TOTAL];
                     Piece::TOTAL],
             ),
+            correction_history: Box::new(
+                [[CompressedEvaluation(0); Self::CORRECTION_HISTORY_SIZE]; Side::TOTAL],
+            ),
             killers: [[None; 2]; Depth::MAX.to_index() + 1],
             counter_moves: [[None; Square::TOTAL]; Piece::TOTAL],
             board_history: BoardHistory::new(),
@@ -201,6 +219,8 @@ impl Histories {
             [[[[CompressedEvaluation(0); Square::TOTAL]; Piece::TOTAL]; Square::TOTAL];
                 Piece::TOTAL],
         );
+        self.correction_history =
+            Box::new([[CompressedEvaluation(0); Self::CORRECTION_HISTORY_SIZE]; Side::TOTAL]);
         self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
         self.killers[0] = [None; 2];
     }
@@ -289,6 +309,32 @@ impl Histories {
                 self.continuation_history[prev_piece][prev_end][piece.to_index()][end.to_index()]
             })
             .sum::<CompressedEvaluation>()
+            .into()
+    }
+
+    /// Updates the correction history with the difference between the score
+    /// and static evaluation.
+    pub fn update_correction_history(&mut self, board: &Board, delta: Evaluation, depth: Depth) {
+        let original_delta = &mut self.correction_history[board.side_to_move().to_index()]
+            [board.pawn_key() as usize % Self::CORRECTION_HISTORY_SIZE];
+
+        let wide_original_delta = Evaluation::from(*original_delta);
+        // yoinked from viridithas, which is in turn yoinked from alexandria
+        let delta_weight = (depth.0 - 1).min(16);
+
+        let lerped = (wide_original_delta * (256 - delta_weight) + delta * delta_weight) / 256;
+        *original_delta = lerped
+            .clamp(
+                -Self::CORRECTION_HISTORY_LIMIT,
+                Self::CORRECTION_HISTORY_LIMIT,
+            )
+            .into();
+    }
+
+    /// Get the correction of the static evaluation.
+    pub fn correction_history_delta(&self, board: &Board) -> Evaluation {
+        self.correction_history[board.side_to_move().to_index()]
+            [board.pawn_key() as usize % Self::CORRECTION_HISTORY_SIZE]
             .into()
     }
 

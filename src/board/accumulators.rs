@@ -19,7 +19,7 @@
 use super::{Board, CastlingRights, Key};
 use crate::{
     cfor,
-    defs::{Piece, Square},
+    defs::{Piece, PieceType, Square},
     evaluation::{piece_phase, piece_score, Phase, Score},
     util::get_unchecked,
 };
@@ -68,6 +68,11 @@ impl Board {
     /// Gets the zobrist key.
     pub const fn key(&self) -> Key {
         self.key
+    }
+
+    /// Gets the zobrist key for the pawns only.
+    pub const fn pawn_key(&self) -> Key {
+        self.pawn_key
     }
 
     /// Moves the accumulated `piece` from `start` to `end`.
@@ -127,6 +132,9 @@ impl Board {
     /// `piece` can be [`Piece::NONE`] but `square` has to be a valid square.
     fn toggle_piece_key(&mut self, square: Square, piece: Piece) {
         self.key ^= ZOBRIST_KEYS.piece_key(square, piece);
+        if PieceType::from(piece) == PieceType::PAWN {
+            self.pawn_key ^= ZOBRIST_KEYS.piece_key(square, piece);
+        }
     }
 
     /// Toggles the side to move zobrist key.

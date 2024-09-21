@@ -83,6 +83,10 @@ pub struct Board {
     ///
     /// It is incrementally updated.
     key: Key,
+    /// The zobrist key of the pawns only.
+    ///
+    /// It is incrementally updated.
+    pawn_key: Key,
 }
 
 /// Castling rights.
@@ -325,6 +329,7 @@ impl Board {
             phase: Phase::default(),
             score: Score::default(),
             key: 0,
+            pawn_key: 0,
         }
     }
 

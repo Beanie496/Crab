@@ -84,12 +84,12 @@ impl Worker<'_> {
         }
         let tt_move = tt_hit.and_then(TranspositionHit::mv);
 
-        let static_eval = if is_in_check {
-            -Evaluation::INFINITY
-        } else if let Some(h) = tt_hit {
-            h.static_eval()
+        let (original_static_eval, static_eval) = if is_in_check {
+            let eval = -Evaluation::INFINITY;
+            (eval, eval)
         } else {
-            evaluate(board)
+            let eval = tt_hit.map_or_else(|| evaluate(board), TranspositionHit::static_eval);
+            (eval, eval + self.histories.correction_history_delta(board))
         };
 
         self.histories.clear_next_killers(height);
@@ -298,6 +298,15 @@ impl Worker<'_> {
             };
         }
 
+        let bound = if best_score >= beta {
+            Bound::Lower
+        // this only happens if we fail to raise alpha
+        } else if best_move.is_none() {
+            Bound::Upper
+        } else {
+            Bound::Exact
+        };
+
         if let Some(best_move) = best_move {
             if board.is_quiet(best_move) {
                 self.histories.insert_into_killers(height, best_move);
@@ -315,21 +324,28 @@ impl Worker<'_> {
 
                 self.histories
                     .update_continuation_history(board, &quiet_moves, best_move, depth);
+
+                // if the position is quiet and the best score is definitely
+                // different to the static eval
+                if !(is_in_check
+                    || bound == Bound::Lower && best_score <= static_eval
+                    || bound == Bound::Upper && best_score >= static_eval)
+                {
+                    self.histories.update_correction_history(
+                        board,
+                        best_score - static_eval,
+                        depth,
+                    );
+                }
             }
         }
 
         // store into tt
-        let bound = if best_score >= beta {
-            Bound::Lower
-        // this only happens if we fail to raise alpha
-        } else if best_move.is_none() {
-            Bound::Upper
-        } else {
-            Bound::Exact
-        };
+        // note that the original static eval is saved, since the static eval
+        // used from the TT is then corrected
         let tt_entry = TranspositionEntry::new(
             board.key(),
-            static_eval,
+            original_static_eval,
             best_score,
             best_move,
             depth,
