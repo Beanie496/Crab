@@ -18,6 +18,7 @@
 
 use std::{
     io::stdin,
+    iter,
     ops::RangeInclusive,
     str::FromStr,
     sync::{
@@ -481,20 +482,21 @@ where
 /// Creates `threads` [`Worker`]s.
 fn create_workers<'a>(
     state: &'a SharedState,
-    past_keys: &BoardHistory,
+    board_history: &BoardHistory,
     board: &Board,
     threads: usize,
     move_overhead: Duration,
 ) -> Vec<Worker<'a>> {
-    let mut workers = Vec::with_capacity(threads);
-    for _ in 0..workers.capacity() {
-        let worker = Worker::new(state)
-            .with_board(past_keys, board)
-            .with_printing(true)
-            .with_move_overhead(move_overhead);
-        workers.push(worker);
-    }
-    workers
+    iter::from_fn(|| {
+        Some(
+            Worker::new(state)
+                .with_board(board_history, board)
+                .with_printing(true)
+                .with_move_overhead(move_overhead),
+        )
+    })
+    .take(threads)
+    .collect()
 }
 
 /// Parses an `Option<&str>` into an `Option<T>`.
