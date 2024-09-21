@@ -375,7 +375,7 @@ impl Worker<'_> {
         let mut best_score = if is_in_check {
             Evaluation::mated_after(height)
         } else {
-            evaluate(board)
+            evaluate(board) + self.histories.correction_history_delta(board)
         };
 
         if height.is_maximum() {
