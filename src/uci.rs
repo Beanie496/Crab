@@ -209,13 +209,9 @@ pub fn main_loop() -> Result<(), RecvError> {
             }
             Some("position") => {
                 set_position(tokens, &mut board_history, &mut board);
-                workers = create_workers(
-                    &state,
-                    &board_history,
-                    &board,
-                    options.threads(),
-                    options.move_overhead(),
-                );
+                for worker in &mut workers {
+                    worker.set_board(&board_history, &board);
+                }
             }
             Some("setoption") => {
                 set_option(tokens, &mut options, &mut state);
