@@ -298,6 +298,15 @@ impl Worker<'_> {
             };
         }
 
+        let bound = if best_score >= beta {
+            Bound::Lower
+        // this only happens if we fail to raise alpha
+        } else if best_move.is_none() {
+            Bound::Upper
+        } else {
+            Bound::Exact
+        };
+
         if let Some(best_move) = best_move {
             if board.is_quiet(best_move) {
                 self.histories.insert_into_killers(height, best_move);
@@ -315,21 +324,23 @@ impl Worker<'_> {
 
                 self.histories
                     .update_continuation_history(board, &quiet_moves, best_move, depth);
+
+                // if the position is quiet and the best score is definitely
+                // different to the static eval
+                if !(is_in_check
+                    || bound == Bound::Lower && best_score <= static_eval
+                    || bound == Bound::Upper && best_score >= static_eval)
+                {
+                    self.histories.update_correction_history(
+                        board,
+                        best_score - static_eval,
+                        depth,
+                    );
+                }
             }
         }
 
-        self.histories
-            .update_correction_history(board, best_score - static_eval, depth);
-
         // store into tt
-        let bound = if best_score >= beta {
-            Bound::Lower
-        // this only happens if we fail to raise alpha
-        } else if best_move.is_none() {
-            Bound::Upper
-        } else {
-            Bound::Exact
-        };
         // note that the original static eval is saved, since the static eval
         // used from the TT is then corrected
         let tt_entry = TranspositionEntry::new(
