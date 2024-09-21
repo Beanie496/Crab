@@ -19,6 +19,7 @@ Features:
 - Histories:
   - Butterfly history
   - Continuation history
+  - Correction history
 - Futility pruning
 - Extensions:
   - Check extensions

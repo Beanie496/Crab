@@ -84,12 +84,12 @@ impl Worker<'_> {
         }
         let tt_move = tt_hit.and_then(TranspositionHit::mv);
 
-        let static_eval = if is_in_check {
-            -Evaluation::INFINITY
-        } else if let Some(h) = tt_hit {
-            h.static_eval()
+        let (original_static_eval, static_eval) = if is_in_check {
+            let eval = -Evaluation::INFINITY;
+            (eval, eval)
         } else {
-            evaluate(board)
+            let eval = tt_hit.map_or_else(|| evaluate(board), TranspositionHit::static_eval);
+            (eval, eval + self.histories.correction_history_delta(board))
         };
 
         self.histories.clear_next_killers(height);
@@ -155,8 +155,7 @@ impl Worker<'_> {
         let mut new_pv = Pv::new();
         let killers = self.histories.current_killers(height);
         let last_history_item = self.histories.board_history.last();
-        let counter_move =
-            last_history_item.and_then(|item| self.histories.counter_move(*item));
+        let counter_move = last_history_item.and_then(|item| self.histories.counter_move(*item));
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
@@ -319,6 +318,9 @@ impl Worker<'_> {
             }
         }
 
+        self.histories
+            .update_correction_history(board, best_score - static_eval, depth);
+
         // store into tt
         let bound = if best_score >= beta {
             Bound::Lower
@@ -328,9 +330,11 @@ impl Worker<'_> {
         } else {
             Bound::Exact
         };
+        // note that the original static eval is saved, since the static eval
+        // used from the TT is then corrected
         let tt_entry = TranspositionEntry::new(
             board.key(),
-            static_eval,
+            original_static_eval,
             best_score,
             best_move,
             depth,
