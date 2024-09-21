@@ -209,18 +209,25 @@ impl Histories {
         *value += CompressedEvaluation::from(delta);
     }
 
-    /// Clears all the histories apart from the board history.
+    /// Age all histories that can be aged and clear the rest.
     // not large enough to overflow the stack in debug
     #[allow(clippy::large_stack_frames, clippy::large_stack_arrays)]
-    pub fn clear(&mut self) {
-        self.butterfly_history =
-            Box::new([[[CompressedEvaluation(0); Square::TOTAL]; Square::TOTAL]; Side::TOTAL]);
-        self.continuation_history = Box::new(
-            [[[[CompressedEvaluation(0); Square::TOTAL]; Piece::TOTAL]; Square::TOTAL];
-                Piece::TOTAL],
-        );
-        self.correction_history =
-            Box::new([[CompressedEvaluation(0); Self::CORRECTION_HISTORY_SIZE]; Side::TOTAL]);
+    pub fn age_all(&mut self) {
+        self.butterfly_history
+            .iter_mut()
+            .flatten()
+            .flatten()
+            .for_each(|v| *v /= 2);
+        self.continuation_history
+            .iter_mut()
+            .flatten()
+            .flatten()
+            .flatten()
+            .for_each(|v| *v /= 2);
+        self.correction_history
+            .iter_mut()
+            .flatten()
+            .for_each(|v| *v /= 2);
         self.counter_moves = [[None; Square::TOTAL]; Piece::TOTAL];
         self.killers[0] = [None; 2];
     }

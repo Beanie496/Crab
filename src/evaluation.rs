@@ -20,7 +20,7 @@ use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
     iter::Sum,
-    ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 use crate::{
@@ -108,6 +108,18 @@ impl Add for CompressedEvaluation {
 impl AddAssign for CompressedEvaluation {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
+    }
+}
+
+impl DivAssign for CompressedEvaluation {
+    fn div_assign(&mut self, other: Self) {
+        self.0 /= other.0;
+    }
+}
+
+impl DivAssign<i16> for CompressedEvaluation {
+    fn div_assign(&mut self, other: i16) {
+        *self /= Self(other);
     }
 }
 

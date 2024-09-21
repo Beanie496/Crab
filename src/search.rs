@@ -399,7 +399,7 @@ impl<'a> Worker<'a> {
         self.nodes = 0;
         self.status = SearchStatus::Continue;
         self.nmp_rights = NmpRights::new();
-        self.histories.clear();
+        self.histories.age_all();
         self.calculate_time_window();
 
         self.iterative_deepening();
