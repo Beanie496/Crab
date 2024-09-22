@@ -1,14 +1,26 @@
-- razoring
-- rfp
-- iir
-- followup move history
-- qs see
-- qs delta pruning
+to try, in rough chronological order
 - history pruning
-- capture history
-- singular extensions
-- multicut
+- storing static eval in tt if no tt hit
+- improving
+- cutnode
+- r += !improving + !cutnode
+- custom uci commands
+- `go mate`
+- `go searchmoves`
 - nnue
 - buckets
-- black magic bitboards
-- magic bitboards that share attacks
+- rfp
+- razoring
+- qs see
+- qs movecount pruning
+- qs delta pruning
+- singular extensions
+- multicut
+- remove check extensions
+- probcut
+
+failed, but might retry:
+- qs tt lookup and/or qs tt storing
+- qs corrhist
+- capture history
+- iir
