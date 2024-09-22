@@ -67,7 +67,7 @@ impl UciOptions {
     /// The range that the move overhead can take, in milliseconds.
     pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1_000);
     /// The range that the number of threads can take.
-    pub const THREAD_RANGE: RangeInclusive<usize> = (1..=255);
+    pub const THREAD_RANGE: RangeInclusive<usize> = (1..=256);
     /// The range that the hash size can take.
     // hardware limit: 48-bit pointers
     pub const HASH_RANGE: RangeInclusive<usize> = (1..=2_usize.pow(48) / (1024 * 1024));
