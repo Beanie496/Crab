@@ -41,7 +41,7 @@ impl Worker<'_> {
         board: &Board,
         mut alpha: Evaluation,
         mut beta: Evaluation,
-        depth: Depth,
+        mut depth: Depth,
         height: Height,
     ) -> Evaluation {
         if depth <= 0 {
@@ -148,6 +148,14 @@ impl Worker<'_> {
                     }
                 }
             }
+        }
+
+        // Internal iterative reductions: if we're in a PV node and we don't
+        // have a TT move, the move ordering will probably be bad, so it's
+        // better to do a reduced-depth search now and let the next iterative
+        // deepening iteration do the full-depth search.
+        if NodeType::IS_PV && tt_move.is_none() && depth >= 4 {
+            depth -= 1;
         }
 
         let mut best_score = -Evaluation::INFINITY;
