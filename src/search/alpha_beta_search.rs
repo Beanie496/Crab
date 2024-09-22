@@ -70,7 +70,7 @@ impl Worker<'_> {
             }
         }
 
-        // load from tt
+        // load from TT
         let tt_hit = self.state.tt.load(board.key(), height);
         if let Some(h) = tt_hit {
             if !NodeType::IS_PV
@@ -180,15 +180,16 @@ impl Worker<'_> {
             if !NodeType::IS_PV && !is_in_check && is_quiet && !best_score.is_mate() {
                 let lmr_depth = new_depth - reduction;
 
-                // Late move pruning (LMP): moves later in the movepicker are
-                // unlikely to be best, so we can skip them.
+                // Late move pruning: if we've already searched a lot of
+                // moves, we're unlikely to raise alpha with the remaining
+                // moves, so we can skip them.
                 if lmr_depth <= 8 && total_moves >= late_move_threshold {
                     movepicker.skip_quiets();
                 }
 
-                // Futility pruning: if the static evaluation is too bad, it's
-                // not worth it to search quiet moves, whether or not the score
-                // exceeds/can exceed alpha
+                // Futility pruning: if the static evaluation is very low,
+                // we're unlikely to raise alpha with a quiet move, so we can
+                // skip them.
                 if lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
                     movepicker.skip_quiets();
                 }
@@ -201,15 +202,15 @@ impl Worker<'_> {
             let extension = extension(is_in_check);
             new_depth += extension;
 
-            // Principle variation search (PVS) + late move reduction (LMR):
-            // The first searched move is probably going to be the best because
-            // of move ordering. To prove this, on the searches of subsequent
-            // moves, we lower beta to alpha + 1 (a zero window) and reduce the
-            // new depth depending on some heuristics. If the search then
-            // raises alpha, we do a research without reducing in case the
-            // lower depth was missing something. If _that_ search still raises
-            // alpha, it must have failed to exceed -alpha - 1, but could have
-            // exceeded the old beta, so we must do a research without reducing
+            // Principle variation search + late move reduction: the first
+            // searched move is likely the best thanks to move ordering. To
+            // prove this, on the searches of subsequent moves, we lower beta
+            // to alpha + 1 (a zero window) and reduce the new depth depending
+            // on some heuristics. If the search then raises alpha, we do a
+            // research without reducing in case the lower depth was missing
+            // something. If _that_ search still raises alpha, it must have
+            // failed low with the zero window, but might still raise alpha
+            // with the old window, so we must do a research without reducing
             // and with a full window. (If that then exceeds alpha, then great:
             // we've found a better move.)
             let mut score = Evaluation::default();
@@ -343,7 +344,7 @@ impl Worker<'_> {
             }
         }
 
-        // store into tt
+        // store into TT
         // note that the original static eval is saved, since the static eval
         // used from the TT is then corrected
         let tt_entry = TranspositionEntry::new(
