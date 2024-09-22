@@ -19,7 +19,11 @@
 use std::{
     fmt::{self, Display, Formatter, Write},
     slice::Iter,
-    sync::{mpsc::Receiver, Mutex},
+    sync::{
+        atomic::{AtomicU64, AtomicU8, Ordering},
+        mpsc::Receiver,
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 
@@ -31,6 +35,7 @@ use crate::{
     evaluation::Evaluation,
     movegen::Move,
     transposition_table::TranspositionTable,
+    util::BufferedAtomicU64Counter,
 };
 pub use aspiration::AspirationWindow;
 pub use depth::{CompressedDepth, Depth, Height};
@@ -107,7 +112,8 @@ pub enum Limits {
 
 /// The current status of the search.
 #[derive(Clone, Copy, Eq, PartialEq)]
-enum SearchStatus {
+#[repr(u8)]
+pub enum SearchStatus {
     /// Do nothing: continue the search as normal.
     Continue,
     /// Stop the search.
@@ -131,6 +137,12 @@ pub struct Pv {
 
 /// The information that [`Worker`]s need to share between them.
 pub struct SharedState {
+    /// How many positions have been searched across all threads.
+    pub nodes: AtomicU64,
+    /// The status of the search.
+    ///
+    /// This is a [`SearchStatus`] that has been converted into a `u8`.
+    pub status: AtomicU8,
     /// A receiver to receive UCI commands from.
     pub uci_rx: Mutex<Receiver<String>>,
     /// A hash table of previously-encountered positions.
@@ -146,12 +158,10 @@ pub struct Worker<'a> {
     start: Instant,
     /// The maximum depth reached.
     seldepth: Height,
-    /// How many positions have been searched.
-    nodes: u64,
+    /// A buffer around `state.nodes`.
+    nodes: BufferedAtomicU64Counter<'a>,
     /// The final PV from the initial position.
     root_pv: Pv,
-    /// The status of the search: continue, stop or quit?
-    status: SearchStatus,
     /// Which side (if at all) null move pruning is allowed for.
     nmp_rights: NmpRights,
     /// The histories used exlusively within the search.
@@ -172,6 +182,8 @@ pub struct Worker<'a> {
     board: Board,
     /// State that all threads have access to.
     state: &'a SharedState,
+    /// The ID of the current thread, starting from 0 for the main thread.
+    thread_id: usize,
 }
 
 impl NmpRights {
@@ -197,6 +209,22 @@ impl Display for Pv {
         }
         ret_str.pop();
         write!(f, "{ret_str}")
+    }
+}
+
+impl From<u8> for SearchStatus {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => Self::Continue,
+            1 => Self::Stop,
+            _ => Self::Quit,
+        }
+    }
+}
+
+impl From<SearchStatus> for u8 {
+    fn from(val: SearchStatus) -> Self {
+        val as Self
     }
 }
 
@@ -322,8 +350,13 @@ impl Pv {
 
 impl SharedState {
     /// Created new [`SharedState`].
-    pub const fn new(uci_rx: Mutex<Receiver<String>>, tt: TranspositionTable) -> Self {
-        Self { uci_rx, tt }
+    pub fn new(uci_rx: Mutex<Receiver<String>>, tt: TranspositionTable) -> Self {
+        Self {
+            nodes: AtomicU64::new(0),
+            status: AtomicU8::new(SearchStatus::Continue.into()),
+            uci_rx,
+            tt,
+        }
     }
 }
 
@@ -331,21 +364,23 @@ impl<'a> Worker<'a> {
     /// Creates a new [`Worker`].
     ///
     /// Each field starts off zeroed.
-    pub fn new(state: &'a SharedState) -> Self {
+    ///
+    /// Note that printing, by default, is only enabled for the main thread.
+    pub fn new(state: &'a SharedState, thread_id: usize) -> Self {
         Self {
             start: Instant::now(),
             seldepth: Height::default(),
-            nodes: 0,
+            nodes: BufferedAtomicU64Counter::new(&state.nodes),
             root_pv: Pv::new(),
-            status: SearchStatus::Continue,
             nmp_rights: NmpRights::new(),
             histories: Histories::new(),
-            can_print: true,
+            can_print: thread_id == 0,
             limits: Limits::default(),
             allocated: Duration::MAX,
             move_overhead: Duration::ZERO,
             board: Board::new(),
             state,
+            thread_id,
         }
     }
 
@@ -393,21 +428,22 @@ impl<'a> Worker<'a> {
     /// Starts the search.
     ///
     /// Each necessary field is reset.
-    pub fn start_search(&mut self) {
+    ///
+    /// Returns the best move.
+    pub fn start_search(&mut self) -> Move {
         self.start = Instant::now();
         self.seldepth = Height::default();
-        self.nodes = 0;
-        self.status = SearchStatus::Continue;
+        self.nodes.clear();
         self.nmp_rights = NmpRights::new();
         self.histories.age_all();
         self.calculate_time_window();
 
-        self.iterative_deepening();
+        self.iterative_deepening()
     }
 
     /// Returns the number of searched nodes.
-    pub const fn nodes(&self) -> u64 {
-        self.nodes
+    pub fn nodes(&self) -> u64 {
+        self.nodes.count()
     }
 
     /// Returns an iterator over the PV of the current positon.
@@ -473,23 +509,28 @@ impl<'a> Worker<'a> {
     ///
     /// This will check the UCI receiver to see if the GUI has told us to stop,
     /// then check to see if we're exceeding the limits of the search.
-    fn check_status(&mut self) -> SearchStatus {
-        // only check every 2048 nodes and don't bother wasting more time if
+    fn check_status(&self) -> SearchStatus {
+        let status = self.state.status.load(Ordering::Relaxed).into();
+        // only check every so often and don't bother wasting more time if
         // we've already stopped
-        if self.nodes % 2048 != 0 || self.status != SearchStatus::Continue {
-            return self.status;
+        if !self.nodes.has_empty_buffer() || status != SearchStatus::Continue {
+            return status;
         }
 
         #[allow(clippy::unwrap_used)]
         if let Ok(token) = self.state.uci_rx.lock().unwrap().try_recv() {
             let token = token.trim();
             if token == "stop" {
-                self.status = SearchStatus::Stop;
-                return self.status;
+                self.state
+                    .status
+                    .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                return SearchStatus::Stop;
             }
             if token == "quit" {
-                self.status = SearchStatus::Quit;
-                return self.status;
+                self.state
+                    .status
+                    .store(SearchStatus::Quit.into(), Ordering::Relaxed);
+                return SearchStatus::Quit;
             }
             if token == "isready" {
                 println!("readyok");
@@ -500,32 +541,41 @@ impl<'a> Worker<'a> {
         #[allow(clippy::wildcard_enum_match_arm)]
         match self.limits {
             Limits::Nodes(n) => {
-                if self.nodes >= n {
-                    self.status = SearchStatus::Stop;
+                if self.nodes() >= n {
+                    self.state
+                        .status
+                        .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                    return SearchStatus::Stop;
                 }
             }
             Limits::Movetime(m) => {
                 if self.start.elapsed() >= m {
-                    self.status = SearchStatus::Stop;
+                    self.state
+                        .status
+                        .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                    return SearchStatus::Stop;
                 }
             }
             Limits::Timed { time, .. } => {
                 // if we've used all of our time and are eating into move
                 // overhead, stop the search
                 if self.start.elapsed() >= time {
-                    self.status = SearchStatus::Stop;
+                    self.state
+                        .status
+                        .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                    return SearchStatus::Stop;
                 }
             }
             _ => (),
         };
 
-        self.status
+        SearchStatus::Continue
     }
 
     /// Calculates if the iterative deepening loop should be exited.
     ///
     /// Assumes that this is being called at the end of the loop.
-    fn should_stop(&mut self, depth: Depth) -> bool {
+    fn should_stop(&self, depth: Depth) -> bool {
         if self.check_status() != SearchStatus::Continue {
             return true;
         }
@@ -534,20 +584,28 @@ impl<'a> Worker<'a> {
         match self.limits {
             Limits::Depth(d) => {
                 if depth >= Depth::from(d) {
-                    self.status = SearchStatus::Stop;
+                    if self.is_main_thread() {
+                        self.state
+                            .status
+                            .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                    }
+                    return true;
                 }
             }
             Limits::Timed { .. } => {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
-                if self.start.elapsed() > self.allocated.mul_f32(0.4) {
-                    self.status = SearchStatus::Stop;
+                if self.is_main_thread() && self.start.elapsed() > self.allocated.mul_f32(0.4) {
+                    self.state
+                        .status
+                        .store(SearchStatus::Stop.into(), Ordering::Relaxed);
+                    return true;
                 }
             }
             _ => (),
         }
 
-        self.status != SearchStatus::Continue
+        false
     }
 
     /// Returns if the root node should print extra information.
@@ -583,14 +641,19 @@ impl<'a> Worker<'a> {
     /// Prints information about a completed search iteration.
     fn print_report(&self, score: Evaluation, pv: &Pv, depth: Depth) {
         let time = self.start.elapsed();
-        let nps = 1_000_000 * self.nodes / time.as_micros().max(1) as u64;
+        let nodes = self.nodes.count();
+        let nps = 1_000_000 * nodes / time.as_micros().max(1) as u64;
 
         println!(
-            "info depth {depth} seldepth {} {score} hashfull {} nodes {} time {} nps {nps} pv {pv}",
+            "info depth {depth} seldepth {} {score} hashfull {} nodes {nodes} time {} nps {nps} pv {pv}",
             self.seldepth.0,
             self.state.tt.estimate_hashfull(),
-            self.nodes,
             time.as_millis(),
         );
+    }
+
+    /// Checks if the current thread is the main one.
+    const fn is_main_thread(&self) -> bool {
+        self.thread_id == 0
     }
 }

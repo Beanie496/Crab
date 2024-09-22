@@ -18,6 +18,8 @@
 
 #![allow(dead_code)]
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::{
     bitboard::Bitboard,
     defs::{PieceType, Rank, Square},
@@ -34,6 +36,59 @@ macro_rules! cfor {
             $expr;
         }
     }}
+}
+
+/// A buffered atomic counter.
+///
+/// Will only update the internal atomic counter if the internal buffer reaches
+/// some value.
+pub struct BufferedAtomicU64Counter<'a> {
+    /// Where the increments are stored before being flushed to the counter.
+    buffer: u64,
+    /// The atomic counter.
+    counter: &'a AtomicU64,
+}
+
+impl BufferedAtomicU64Counter<'_> {
+    /// How large the buffer can be before it flushes to the atomic counter.
+    const BUFFER_SIZE: u64 = 2048;
+}
+
+impl<'a> BufferedAtomicU64Counter<'a> {
+    /// Creates a new [`BufferedAtomicU64Counter`].
+    pub const fn new(counter: &'a AtomicU64) -> Self {
+        Self { buffer: 0, counter }
+    }
+
+    /// Increments the buffer, flushing it to the atomic counter if it's too
+    /// large.
+    pub fn increment(&mut self) {
+        self.buffer += 1;
+        if self.buffer > Self::BUFFER_SIZE {
+            self.flush();
+        }
+    }
+
+    /// Clears the buffer.
+    pub fn clear(&mut self) {
+        self.buffer = 0;
+    }
+
+    /// Flushes the buffer to the atomic counter.
+    pub fn flush(&mut self) {
+        self.counter.fetch_add(self.buffer, Ordering::Relaxed);
+        self.buffer = 0;
+    }
+
+    /// Returns the total number of increments.
+    pub fn count(&self) -> u64 {
+        self.counter.load(Ordering::Relaxed) + self.buffer
+    }
+
+    /// Checks if the buffer is empty.
+    pub const fn has_empty_buffer(&self) -> bool {
+        self.buffer == 0
+    }
 }
 
 /// A wrapper over [`get_unchecked()`], but asserts in debug mode that `index`

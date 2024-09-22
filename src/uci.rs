@@ -18,10 +18,11 @@
 
 use std::{
     io::stdin,
-    iter,
     ops::RangeInclusive,
+    process::exit,
     str::FromStr,
     sync::{
+        atomic::Ordering,
         mpsc::{channel, RecvError},
         Mutex,
     },
@@ -36,7 +37,10 @@ use crate::{
     lookups::magic::find_magics,
     movegen::{generate_moves, AllMoves, Moves},
     perft::perft,
-    search::{BoardHistory, CompressedDepth, HistoryItem, Limits, PieceDest, SharedState, Worker},
+    search::{
+        BoardHistory, CompressedDepth, HistoryItem, Limits, PieceDest, SearchStatus, SharedState,
+        Worker,
+    },
     transposition_table::TranspositionTable,
 };
 
@@ -63,7 +67,7 @@ impl UciOptions {
     /// The range that the move overhead can take, in milliseconds.
     pub const MOVE_OVERHEAD_RANGE: RangeInclusive<u64> = (0..=1_000);
     /// The range that the number of threads can take.
-    pub const THREAD_RANGE: RangeInclusive<usize> = (1..=1);
+    pub const THREAD_RANGE: RangeInclusive<usize> = (1..=255);
     /// The range that the hash size can take.
     // hardware limit: 48-bit pointers
     pub const HASH_RANGE: RangeInclusive<usize> = (1..=2_usize.pow(48) / (1024 * 1024));
@@ -200,7 +204,7 @@ pub fn main_loop() -> Result<(), RecvError> {
                 find_magics::<{ PieceType::ROOK.0 }>();
             }
             Some("go") => {
-                go(tokens, &board, &mut workers);
+                go(tokens, &board, &mut workers, &state);
             }
             Some("isready") => {
                 println!("readyok");
@@ -252,8 +256,12 @@ pub fn main_loop() -> Result<(), RecvError> {
 }
 
 /// Interprets and executes the `go` command.
-pub fn go<'a, 'b, T>(mut given_limits: T, board: &Board, workers: &mut Vec<Worker<'a>>)
-where
+pub fn go<'a, 'b, T>(
+    mut given_limits: T,
+    board: &Board,
+    workers: &mut [Worker<'a>],
+    state: &SharedState,
+) where
     T: Iterator<Item = &'b str>,
 {
     let mut limits = Limits::default();
@@ -313,18 +321,32 @@ where
         }
     }
 
-    scope(|s| {
-        let mut threads = Vec::with_capacity(workers.len());
+    state.nodes.store(0, Ordering::Relaxed);
+    state
+        .status
+        .store(SearchStatus::Continue.into(), Ordering::Relaxed);
 
-        for worker in workers {
+    let best_move = scope(|s| {
+        let mut main_handle = None;
+
+        for (id, worker) in workers.iter_mut().enumerate() {
             worker.set_limits(limits);
-            threads.push(s.spawn(|| worker.start_search()));
+            let handle = s.spawn(move || worker.start_search());
+            if id == 0 {
+                main_handle = Some(handle);
+            }
         }
 
-        for thread in threads {
-            thread.join().expect("a thread panicked during the search");
-        }
+        main_handle
+            .expect("no workers were started")
+            .join()
+            .expect("a thread panicked during the search")
     });
+    println!("bestmove {best_move}");
+
+    if SearchStatus::from(state.status.load(Ordering::Relaxed)) == SearchStatus::Quit {
+        exit(0);
+    }
 }
 
 /// Sets the board to a position specified by the `position` command.
@@ -483,16 +505,14 @@ fn create_workers<'a>(
     threads: usize,
     move_overhead: Duration,
 ) -> Vec<Worker<'a>> {
-    iter::from_fn(|| {
-        Some(
-            Worker::new(state)
+    (0..)
+        .map(|id| {
+            Worker::new(state, id)
                 .with_board(board_history, board)
-                .with_printing(true)
-                .with_move_overhead(move_overhead),
-        )
-    })
-    .take(threads)
-    .collect()
+                .with_move_overhead(move_overhead)
+        })
+        .take(threads)
+        .collect()
 }
 
 /// Parses an `Option<&str>` into an `Option<T>`.
