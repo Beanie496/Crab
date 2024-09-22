@@ -22,7 +22,7 @@
 //! Crab, a UCI-compatible chess engine written in Rust.
 //!
 //! Accepted commands:
-//! - `bench [TT size] [limit] [limit type]`: run a benchmark. The default
+//! - `bench [limit] [limit type] [TT size]`: run a benchmark. The default
 //!   options are [`TT_SIZE`](crate::bench::TT_SIZE),
 //!   [`LIMIT`](crate::bench::LIMIT) and
 //!   [`LIMIT_TYPE`](crate::bench::LIMIT_TYPE) respectively.

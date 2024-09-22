@@ -31,7 +31,7 @@ use crate::{
 static BENCH_POSITIONS: &str = include_str!("../bench_positions.epd");
 
 /// The default limit of each benched position.
-pub const LIMIT: u64 = 12;
+pub const LIMIT: u64 = 13;
 /// The default limit type.
 pub const LIMIT_TYPE: &str = "depth";
 /// The default hash size of each benched position.
@@ -42,15 +42,15 @@ pub fn bench<'a, T>(mut options: T)
 where
     T: Iterator<Item = &'a str>,
 {
-    let tt_size = options
-        .next()
-        .and_then(|t| t.parse::<usize>().ok())
-        .unwrap_or(TT_SIZE);
     let limit = options
         .next()
         .and_then(|l| l.parse::<u64>().ok())
         .unwrap_or(LIMIT);
     let limit_type = options.next().unwrap_or(LIMIT_TYPE);
+    let tt_size = options
+        .next()
+        .and_then(|t| t.parse::<usize>().ok())
+        .unwrap_or(TT_SIZE);
 
     let limits = match limit_type {
         "depth" => {
