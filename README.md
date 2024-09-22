@@ -20,6 +20,7 @@ Features:
   - Butterfly history
   - Continuation history
   - Correction history
+- Late move pruning
 - Futility pruning
 - Extensions:
   - Check extensions

@@ -156,6 +156,7 @@ impl Worker<'_> {
         let killers = self.histories.current_killers(height);
         let last_history_item = self.histories.board_history.last();
         let counter_move = last_history_item.and_then(|item| self.histories.counter_move(*item));
+        let late_move_threshold = late_move_threshold(depth);
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
@@ -176,17 +177,19 @@ impl Worker<'_> {
             let reduction = late_move_reduction::<NodeType>(depth, total_moves);
             let mut new_depth = depth - 1;
 
-            if !NodeType::IS_PV && !is_in_check {
+            if !NodeType::IS_PV && !is_in_check && is_quiet && !best_score.is_mate() {
                 let lmr_depth = new_depth - reduction;
+
+                // Late move pruning (LMP): moves later in the movepicker are
+                // unlikely to be best, so we can skip them.
+                if lmr_depth <= 8 && total_moves >= late_move_threshold {
+                    movepicker.skip_quiets();
+                }
 
                 // Futility pruning: if the static evaluation is too bad, it's
                 // not worth it to search quiet moves, whether or not the score
                 // exceeds/can exceed alpha
-                if is_quiet
-                    && !best_score.is_mate()
-                    && lmr_depth <= 5
-                    && static_eval + futility_margin(lmr_depth) <= alpha
-                {
+                if lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
                     movepicker.skip_quiets();
                 }
             }
@@ -419,6 +422,12 @@ impl Worker<'_> {
 /// Calculates the reduction for a move.
 fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) -> Depth {
     Depth::from(((static_eval - beta) / 200).min(Evaluation(6))) + depth / 3 + 3
+}
+
+/// Calculates how many moves need to have been made before late move pruning
+/// applies.
+fn late_move_threshold(depth: Depth) -> u8 {
+    3 + (depth * depth / 2).0 as u8
 }
 
 /// Calculates the margin for futility pruning.
