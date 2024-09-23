@@ -39,6 +39,8 @@ pub enum Bound {
     Exact,
     /// An upper bound: `best_score <= alpha`.
     Upper,
+    /// No bound: when the score is invalid.
+    None,
 }
 
 /// A single entry in a transposition table.

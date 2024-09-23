@@ -84,6 +84,8 @@ impl Evaluation {
     pub const MATE_BOUND: Self = Self(Self::MATE.0 - Depth::MAX.0 as i32);
     /// The evaluation of a draw.
     pub const DRAW: Self = Self(0);
+    /// An invalid score.
+    pub const NO_SCORE: Self = Self(i16::MIN as i32);
 }
 
 impl Display for Evaluation {

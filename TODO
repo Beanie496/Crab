@@ -1,6 +1,5 @@
 to try, in rough chronological order
 - history pruning
-- storing static eval in tt if no tt hit
 - improving
 - cutnode
 - r += !improving + !cutnode

@@ -87,8 +87,27 @@ impl Worker<'_> {
         let (original_static_eval, static_eval) = if is_in_check {
             let eval = -Evaluation::INFINITY;
             (eval, eval)
+        } else if let Some(tt_hit) = tt_hit {
+            let eval = tt_hit.static_eval();
+            (eval, eval + self.histories.correction_history_delta(board))
         } else {
-            let eval = tt_hit.map_or_else(|| evaluate(board), TranspositionHit::static_eval);
+            let eval = evaluate(board);
+
+            let tt_entry = TranspositionEntry::new(
+                board.key(),
+                eval,
+                Evaluation::NO_SCORE,
+                None,
+                Depth(0),
+                Bound::None,
+                Height(0),
+            );
+            // either there was nothing already in the TT or the entry in the
+            // TT was old, so it's probably fine to overwrite it now with just
+            // the static eval before we write the full TT entry at the end of
+            // this function
+            self.state.tt.store(tt_entry);
+
             (eval, eval + self.histories.correction_history_delta(board))
         };
 
