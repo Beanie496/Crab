@@ -22,6 +22,7 @@ Features:
   - Continuation history
   - Correction history
 - Late move pruning
+- History pruning
 - Futility pruning
 - Extensions:
   - Check extensions

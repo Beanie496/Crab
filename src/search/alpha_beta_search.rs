@@ -179,12 +179,28 @@ impl Worker<'_> {
 
             if !NodeType::IS_PV && !is_in_check && is_quiet && !best_score.is_mate() {
                 let lmr_depth = new_depth - reduction;
+                let start = mv.start();
+                let end = mv.end();
+                let piece = board.piece_on(start);
+                let us = board.side_to_move();
+                let history_score = self.histories.butterfly_score(us, start, end)
+                    + self.histories.continuation_history_score(piece, end);
 
                 // Late move pruning: if we've already searched a lot of
                 // moves, we're unlikely to raise alpha with the remaining
                 // moves, so we can skip them.
                 if lmr_depth <= 8 && total_moves >= late_move_threshold {
                     movepicker.skip_quiets();
+                }
+
+                // History pruning: if a move's score is really low, assume
+                // it's bad and skip it.
+                if history_score <= Evaluation::from(depth) * -4096 {
+                    // The rest of the quiets can be skipped as well, since the
+                    // history scores are only going to get worse thanks to
+                    // move ordering.
+                    movepicker.skip_quiets();
+                    continue;
                 }
 
                 // Futility pruning: if the static evaluation is very low,
