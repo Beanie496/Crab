@@ -195,7 +195,9 @@ impl Worker<'_> {
 
                 // History pruning: if a move's score is really low, assume
                 // it's bad and skip it.
-                if history_score <= Evaluation::from(depth) * -4096 {
+                if movepicker.is_at_remaining()
+                    && history_score <= Evaluation::from(depth) * -4096
+                {
                     // The rest of the quiets can be skipped as well, since the
                     // history scores are only going to get worse thanks to
                     // move ordering.

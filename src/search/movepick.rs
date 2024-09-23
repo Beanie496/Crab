@@ -82,6 +82,10 @@ impl<Type: MovesType> MovePicker<Type> {
         self.do_quiets = false;
     }
 
+    pub(super) fn is_at_remaining(&self) -> bool {
+        self.stage == Stage::Remaining
+    }
+
     /// Return the next best [`Move`] in the list of legal moves.
     #[allow(clippy::cognitive_complexity)]
     pub(super) fn next(&mut self, board: &Board, histories: &Histories) -> Option<Move> {
