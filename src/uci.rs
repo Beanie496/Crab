@@ -430,9 +430,10 @@ where
         let counter_move_info = PieceDest::new(piece, dest);
         board_history.push(HistoryItem::new(board.key(), Some(counter_move_info)));
 
-        if !board.make_move(mv) {
+        if !board.is_legal(mv) {
             return;
         }
+        board.make_move(mv);
 
         // we can safely discard all moves before an irreversible move
         if board.halfmoves() == 0 {

@@ -163,11 +163,11 @@ impl Worker<'_> {
         let mut quiet_moves = Moves::new();
         while let Some(mv) = movepicker.next(board, &self.histories) {
             let is_quiet = board.is_quiet(mv);
+
             let mut copy = *board;
-            if !self.make_move(&mut copy, mv) {
+            if !copy.is_legal(mv) {
                 continue;
             }
-            self.state.tt.prefetch(copy.key());
             total_moves += 1;
 
             if NodeType::IS_ROOT && self.should_print() {
@@ -194,6 +194,9 @@ impl Worker<'_> {
                     movepicker.skip_quiets();
                 }
             }
+
+            self.make_move(&mut copy, mv);
+            self.state.tt.prefetch(copy.key());
 
             if is_quiet {
                 quiet_moves.push(mv);
@@ -399,9 +402,10 @@ impl Worker<'_> {
 
         while let Some(mv) = movepicker.next(board, &self.histories) {
             let mut copy = *board;
-            if !copy.make_move(mv) {
+            if !copy.is_legal(mv) {
                 continue;
             }
+            copy.make_move(mv);
 
             let score = -self.quiescence_search(&copy, -beta, -alpha, height + 1);
 

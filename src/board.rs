@@ -410,10 +410,9 @@ impl Board {
         *self = Self::default();
     }
 
-    /// Makes the given move on the internal board. `mv` is assumed to be a
-    /// valid move. Returns `true` if the given move is legal and `false`
-    /// otherwise.
-    pub fn make_move(&mut self, mv: Move) -> bool {
+    /// Makes the given move on the internal board. `mv` is assumed to be
+    /// legal.
+    pub fn make_move(&mut self, mv: Move) {
         let start = mv.start();
         let end = mv.end();
         let is_promotion = mv.is_promotion();
@@ -470,21 +469,8 @@ impl Board {
         }
 
         if is_castling {
-            // if the king is castling out of check
-            if self.is_square_attacked(start) {
-                return false;
-            }
-            // if the king is castling into check
-            if self.is_square_attacked(end) {
-                return false;
-            }
-
             let rook_start = Square(end.0.wrapping_add_signed(mv.rook_offset()));
             let rook_end = Square((start.0 + end.0) >> 1);
-            // if the king is castling through check
-            if self.is_square_attacked(rook_end) {
-                return false;
-            }
 
             self.move_piece(
                 rook_start,
@@ -520,10 +506,6 @@ impl Board {
             self.add_accumulated_piece(end, promotion_piece);
         }
 
-        if self.is_in_check() {
-            return false;
-        }
-
         if piece_type == PieceType::ROOK {
             match start {
                 Square::A1 => {
@@ -552,8 +534,6 @@ impl Board {
 
         self.toggle_castling_rights_key(self.castling_rights());
         self.flip_side();
-
-        true
     }
 
     /// Makes a null move.
@@ -906,6 +886,58 @@ impl Board {
 
         // return whether or not we're not the loser
         self.side_to_move() != us
+    }
+
+    /// Checks if the given pseudo-legal move is fully legal.
+    pub fn is_legal(&mut self, mv: Move) -> bool {
+        let start = mv.start();
+        let end = mv.end();
+        let is_castling = mv.is_castling();
+        let is_en_passant = mv.is_en_passant();
+
+        let piece = self.piece_on(start);
+        let piece_type = PieceType::from(piece);
+        let captured = self.piece_on(end);
+        let captured_type = PieceType::from(captured);
+        let us = Side::from(piece);
+        let them = us.flip();
+        let start_bb = Bitboard::from(start);
+        let end_bb = Bitboard::from(end);
+
+        self.update_piece_bb(start_bb | end_bb, piece_type, us);
+        if captured_type != PieceType::NONE {
+            self.update_piece_bb(end_bb, captured_type, them);
+        }
+
+        let is_legal = if is_castling {
+            let rook_end = Square((start.0 + end.0) >> 1);
+
+            // if the king is castling out of check, if the king is castling
+            // into check or if the king is castling through check
+            !(self.is_square_attacked(start)
+                || self.is_square_attacked(end)
+                || self.is_square_attacked(rook_end))
+        } else if is_en_passant {
+            let dest = Square(if us == Side::WHITE {
+                end.0 - 8
+            } else {
+                end.0 + 8
+            });
+            let dest_bb = Bitboard::from(dest);
+            self.update_piece_bb(dest_bb, PieceType::PAWN, them);
+            let is_legal = !self.is_in_check();
+            self.update_piece_bb(dest_bb, PieceType::PAWN, them);
+            is_legal
+        } else {
+            !self.is_in_check()
+        };
+
+        self.update_piece_bb(start_bb | end_bb, piece_type, us);
+        if captured_type != PieceType::NONE {
+            self.update_piece_bb(end_bb, captured_type, them);
+        }
+
+        is_legal
     }
 
     /// Checks if `mv` is a pseudolegal move on `self`.

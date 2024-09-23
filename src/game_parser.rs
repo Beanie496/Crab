@@ -257,13 +257,8 @@ impl GameSampler {
                 Move::new(start, end)
             };
 
-            if copy.make_move(mv) {
-                self.board = copy;
-                return;
-            }
+            self.board.make_move(mv);
         }
-
-        panic!("illegal move: {role:?} to {end}");
     }
 
     /// Makes a castling move for the given side.
@@ -280,7 +275,7 @@ impl GameSampler {
             }
         };
 
-        assert!(self.board.make_move(mv), "illegal move: \"{mv}\"");
+        self.board.make_move(mv);
     }
 
     /// For three random positions, it runs a deep-ish search, applies the

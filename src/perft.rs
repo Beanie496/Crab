@@ -57,9 +57,10 @@ pub fn perft<const SHOULD_PRINT: bool, const IS_TIMED: bool>(board: &Board, dept
     let mut total = 0;
     for mv in moves.iter().map(|scored_move| scored_move.mv) {
         let mut copy = *board;
-        if !copy.make_move(mv) {
+        if !copy.is_legal(mv) {
             continue;
         }
+        copy.make_move(mv);
 
         let moves = perft::<false, false>(&copy, depth - 1);
         total += moves;

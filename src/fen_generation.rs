@@ -202,9 +202,10 @@ fn generate_openings_for_board(
 
     while let Some(mv) = all_moves.pop_random(rng).map(|scored_move| scored_move.mv) {
         let mut copy = *board;
-        if !worker.make_move(&mut copy, mv) {
+        if !copy.is_legal(mv) {
             continue;
         }
+        worker.make_move(&mut copy, mv);
 
         let score =
             -worker.search::<RootNode>(pv, &copy, -beta, -alpha, SEARCH_DEPTH, Height::default());

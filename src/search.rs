@@ -457,19 +457,15 @@ impl<'a> Worker<'a> {
         self.start.elapsed()
     }
 
-    /// Makes `mv` on `board` and returns whether or not the move was legal.
-    pub fn make_move(&mut self, board: &mut Board, mv: Move) -> bool {
+    /// Makes `mv` on `board`, assuming it's fully legal.
+    pub fn make_move(&mut self, board: &mut Board, mv: Move) {
         let old_key = board.key();
-
-        if !board.make_move(mv) {
-            return false;
-        }
+        board.make_move(mv);
 
         let dest = mv.end();
         let piece = board.piece_on(dest);
         let counter_move_info = PieceDest::new(piece, dest);
         self.push_board_history(HistoryItem::new(old_key, Some(counter_move_info)));
-        true
     }
 
     /// Makes a null move on `board`.
