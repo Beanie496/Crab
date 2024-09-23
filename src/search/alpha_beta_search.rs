@@ -180,7 +180,7 @@ impl Worker<'_> {
             let mut reduction = base_reductions(depth, total_moves);
             let mut new_depth = depth - 1;
 
-            if !NodeType::IS_PV && !is_in_check && !best_score.is_mate() {
+            if !NodeType::IS_PV && !is_in_check && is_quiet && !best_score.is_mate() {
                 let lmr_depth = new_depth - reduction;
 
                 // Late move pruning: if we've already searched a lot of
@@ -188,12 +188,14 @@ impl Worker<'_> {
                 // moves, so we can skip them.
                 if lmr_depth <= 8 && total_moves >= late_move_threshold {
                     movepicker.skip_quiets();
+                    self.unmake_move();
+                    continue;
                 }
 
                 // Futility pruning: if the static evaluation is very low,
                 // we're unlikely to raise alpha with a quiet move, so we can
                 // skip them.
-                if is_quiet && lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
+                if lmr_depth <= 5 && static_eval + futility_margin(lmr_depth) <= alpha {
                     movepicker.skip_quiets();
                 }
             }
