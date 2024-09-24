@@ -1,5 +1,4 @@
 to try, in rough chronological order
-- storing static eval in tt if no tt hit
 - improving
 - cutnode
 - r += !improving + !cutnode
@@ -20,6 +19,7 @@ to try, in rough chronological order
 
 failed, but might retry:
 - history pruning
+- storing static eval in tt if no tt hit
 - qs tt lookup and/or qs tt storing
 - qs corrhist
 - capture history
