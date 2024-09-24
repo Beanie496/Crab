@@ -174,7 +174,7 @@ impl Worker<'_> {
                 println!("info currmovenumber {total_moves} currmove {mv}");
             }
 
-            let reduction = late_move_reduction::<NodeType>(depth, total_moves);
+            let mut reduction = base_reductions(depth, total_moves);
             let mut new_depth = depth - 1;
 
             if !NodeType::IS_PV && !is_in_check && !best_score.is_mate() {
@@ -215,6 +215,13 @@ impl Worker<'_> {
             // we've found a better move.)
             let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
+                if depth >= 3 && total_moves >= 3 {
+                    reduction += Depth::from(!NodeType::IS_PV);
+                    reduction = reduction.min(depth - 1);
+                } else {
+                    reduction = Depth::default();
+                }
+
                 score = -self.search::<NonPvNode>(
                     &mut new_pv,
                     &copy,
@@ -444,13 +451,4 @@ fn extension(is_in_check: bool) -> Depth {
         extension += 1;
     }
     extension
-}
-
-/// Calculates how much to reduce the search by during late move reductions.
-fn late_move_reduction<NodeType: Node>(depth: Depth, total_moves: u8) -> Depth {
-    if depth >= 3 && total_moves >= 3 {
-        base_reductions(depth, total_moves) + Depth::from(!NodeType::IS_PV)
-    } else {
-        Depth::default()
-    }
 }
