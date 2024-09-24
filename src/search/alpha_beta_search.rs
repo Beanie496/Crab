@@ -34,7 +34,7 @@ impl Worker<'_> {
     /// Returns the evaluation of after searching to the given depth. If
     /// `NodeType` is `Root`, `pv` will always have at least one legal move in
     /// it after the search.
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
     pub fn search<NodeType: Node>(
         &mut self,
         pv: &mut Pv,
@@ -43,6 +43,7 @@ impl Worker<'_> {
         mut beta: Evaluation,
         depth: Depth,
         height: Height,
+        is_cut_node: bool,
     ) -> Evaluation {
         if depth <= 0 {
             return self.quiescence_search(board, alpha, beta, height);
@@ -119,6 +120,7 @@ impl Worker<'_> {
                     -alpha,
                     depth - reduction,
                     height + 1,
+                    !is_cut_node,
                 );
 
                 self.unmake_null_move(board);
@@ -139,6 +141,7 @@ impl Worker<'_> {
                         beta,
                         depth - reduction,
                         height,
+                        is_cut_node,
                     );
 
                     self.nmp_rights.add_right(board.side_to_move());
@@ -216,7 +219,10 @@ impl Worker<'_> {
             let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
                 if depth >= 3 && total_moves >= 3 {
+                    // non-pv nodes are probably not important
                     reduction += Depth::from(!NodeType::IS_PV);
+                    // if we're not in a cut node, we expect a fail low
+                    reduction += Depth::from(!is_cut_node);
                     reduction = reduction.min(depth - 1);
                 } else {
                     reduction = Depth::default();
@@ -229,6 +235,7 @@ impl Worker<'_> {
                     -alpha,
                     new_depth - reduction,
                     height + 1,
+                    true,
                 );
 
                 if score > alpha && reduction > 0 {
@@ -239,6 +246,7 @@ impl Worker<'_> {
                         -alpha,
                         new_depth,
                         height + 1,
+                        !is_cut_node,
                     );
                 }
             };
@@ -251,6 +259,7 @@ impl Worker<'_> {
                     -alpha,
                     new_depth,
                     height + 1,
+                    false,
                 );
             }
 

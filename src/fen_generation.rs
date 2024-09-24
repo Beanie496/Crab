@@ -206,8 +206,15 @@ fn generate_openings_for_board(
             continue;
         }
 
-        let score =
-            -worker.search::<RootNode>(pv, &copy, -beta, -alpha, SEARCH_DEPTH, Height::default());
+        let score = -worker.search::<RootNode>(
+            pv,
+            &copy,
+            -beta,
+            -alpha,
+            SEARCH_DEPTH,
+            Height::default(),
+            false,
+        );
 
         worker.unmake_move();
 
