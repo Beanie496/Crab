@@ -225,7 +225,7 @@ impl Worker<'_> {
                     // node, so `is_cut_node` should be false. If it's true,
                     // it's probably wrong, so we reduce (for some reason)
                     reduction += Depth::from(is_cut_node);
-                    reduction = reduction.min(depth - 1);
+                    reduction = reduction.min(new_depth - 1);
                 } else {
                     reduction = Depth::default();
                 }
