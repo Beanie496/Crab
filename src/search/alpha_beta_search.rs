@@ -221,8 +221,10 @@ impl Worker<'_> {
                 if depth >= 3 && total_moves >= 3 {
                     // non-pv nodes are probably not important
                     reduction += Depth::from(!NodeType::IS_PV);
-                    // if we're not in a cut node, we expect a fail low
-                    reduction += Depth::from(!is_cut_node);
+                    // if we're reducing, it means we expect this to be an all
+                    // node, so `is_cut_node` should be false. If it's true,
+                    // it's probably wrong, so we reduce (for some reason)
+                    reduction += Depth::from(is_cut_node);
                     reduction = reduction.min(depth - 1);
                 } else {
                     reduction = Depth::default();
