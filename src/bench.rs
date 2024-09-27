@@ -31,7 +31,7 @@ use crate::{
 static BENCH_POSITIONS: &str = include_str!("../bench_positions.epd");
 
 /// The default limit of each benched position.
-pub const LIMIT: u64 = 13;
+pub const LIMIT: u64 = 14;
 /// The default limit type.
 pub const LIMIT_TYPE: &str = "depth";
 /// The default hash size of each benched position.
