@@ -34,7 +34,7 @@ impl Worker<'_> {
     /// Returns the evaluation of after searching to the given depth. If
     /// `NodeType` is `Root`, `pv` will always have at least one legal move in
     /// it after the search.
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
     pub fn search<NodeType: Node>(
         &mut self,
         pv: &mut Pv,
@@ -43,6 +43,7 @@ impl Worker<'_> {
         mut beta: Evaluation,
         depth: Depth,
         height: Height,
+        is_cut_node: bool,
     ) -> Evaluation {
         if depth <= 0 {
             return self.quiescence_search(board, alpha, beta, height);
@@ -119,6 +120,7 @@ impl Worker<'_> {
                     -alpha,
                     depth - reduction,
                     height + 1,
+                    !is_cut_node,
                 );
 
                 self.unmake_null_move(board);
@@ -139,6 +141,7 @@ impl Worker<'_> {
                         beta,
                         depth - reduction,
                         height,
+                        is_cut_node,
                     );
 
                     self.nmp_rights.add_right(board.side_to_move());
@@ -174,7 +177,7 @@ impl Worker<'_> {
                 println!("info currmovenumber {total_moves} currmove {mv}");
             }
 
-            let reduction = late_move_reduction::<NodeType>(depth, total_moves);
+            let mut reduction = base_reductions(depth, total_moves);
             let mut new_depth = depth - 1;
 
             if !NodeType::IS_PV && !is_in_check && !best_score.is_mate() {
@@ -215,6 +218,18 @@ impl Worker<'_> {
             // we've found a better move.)
             let mut score = Evaluation::default();
             if !NodeType::IS_PV || total_moves > 1 {
+                if depth >= 3 && total_moves >= 3 {
+                    // non-pv nodes are probably not important
+                    reduction += Depth::from(!NodeType::IS_PV);
+                    // if we're reducing, it means we expect this to be an all
+                    // node, so `is_cut_node` should be false. If it's true,
+                    // it's probably wrong, so we reduce (for some reason)
+                    reduction += Depth::from(is_cut_node);
+                    reduction = reduction.min(new_depth - 1);
+                } else {
+                    reduction = Depth::default();
+                }
+
                 score = -self.search::<NonPvNode>(
                     &mut new_pv,
                     &copy,
@@ -222,6 +237,7 @@ impl Worker<'_> {
                     -alpha,
                     new_depth - reduction,
                     height + 1,
+                    true,
                 );
 
                 if score > alpha && reduction > 0 {
@@ -232,6 +248,7 @@ impl Worker<'_> {
                         -alpha,
                         new_depth,
                         height + 1,
+                        !is_cut_node,
                     );
                 }
             };
@@ -244,6 +261,7 @@ impl Worker<'_> {
                     -alpha,
                     new_depth,
                     height + 1,
+                    false,
                 );
             }
 
@@ -444,13 +462,4 @@ fn extension(is_in_check: bool) -> Depth {
         extension += 1;
     }
     extension
-}
-
-/// Calculates how much to reduce the search by during late move reductions.
-fn late_move_reduction<NodeType: Node>(depth: Depth, total_moves: u8) -> Depth {
-    if depth >= 3 && total_moves >= 3 {
-        base_reductions(depth, total_moves) + Depth::from(!NodeType::IS_PV)
-    } else {
-        Depth::default()
-    }
 }

@@ -121,6 +121,7 @@ impl Worker<'_> {
                 asp_window.beta(),
                 depth,
                 Height::default(),
+                false,
             );
 
             if self.can_print {
