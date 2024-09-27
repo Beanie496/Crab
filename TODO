@@ -1,7 +1,6 @@
 to try, in rough chronological order
 - improving
 - r += !improving
-- custom uci commands
 - `go mate`
 - `go searchmoves`
 - nnue

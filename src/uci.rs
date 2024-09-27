@@ -33,9 +33,9 @@ use std::{
 use crate::{
     bench::bench,
     board::Board,
-    defs::{PieceType, Side, Square},
+    defs::{File, PieceType, Side},
     lookups::magic::find_magics,
-    movegen::{generate_moves, AllMoves, Moves},
+    movegen::Move,
     perft::perft,
     search::{
         BoardHistory, CompressedDepth, HistoryItem, Limits, PieceDest, SearchStatus, SharedState,
@@ -206,6 +206,30 @@ pub fn main_loop() -> Result<(), RecvError> {
             Some("go") => {
                 go(tokens, &board, &mut workers, &state);
             }
+            Some("ispseudolegal") => {
+                let is_pseudolegal = tokens
+                    .next()
+                    .and_then(|mv| parse_move(mv, &board))
+                    .filter(|&mv| board.is_pseudolegal(mv))
+                    .is_some();
+                println!("{is_pseudolegal}");
+            }
+            Some("ispseudolegalkiller") => {
+                let is_pseudolegal_killer = tokens
+                    .next()
+                    .and_then(|mv| parse_move(mv, &board))
+                    .filter(|&mv| board.is_pseudolegal_killer(mv))
+                    .is_some();
+                println!("{is_pseudolegal_killer}");
+            }
+            Some("isquiet") => {
+                let is_quiet = tokens
+                    .next()
+                    .and_then(|mv| parse_move(mv, &board))
+                    .filter(|&mv| board.is_quiet(mv))
+                    .is_some();
+                println!("{is_quiet}");
+            }
             Some("isready") => {
                 println!("readyok");
             }
@@ -217,6 +241,14 @@ pub fn main_loop() -> Result<(), RecvError> {
                 for worker in &mut workers {
                     worker.set_board(&board_history, &board);
                 }
+            }
+            Some("see") => {
+                let is_winning_exchange = tokens
+                    .next()
+                    .and_then(|mv| parse_move(mv, &board))
+                    .filter(|&mv| board.is_quiet(mv))
+                    .is_some();
+                println!("{is_winning_exchange}");
             }
             Some("setoption") => {
                 set_option(tokens, &mut options, &mut state);
@@ -357,7 +389,6 @@ pub fn set_position<'b, T>(mut tokens: T, old_history: &mut BoardHistory, old_bo
 where
     T: Iterator<Item = &'b str>,
 {
-    let mut moves = Moves::new();
     let mut board = Board::new();
     let mut board_history = BoardHistory::new();
 
@@ -394,34 +425,7 @@ where
 
     // if there are no moves to begin with, this loop will just be skipped
     for mv in tokens {
-        generate_moves::<AllMoves>(&board, &mut moves);
-
-        let Some(start) = mv.get(0..=1) else {
-            return;
-        };
-        let Ok(start) = Square::from_str(start) else {
-            return;
-        };
-        let Some(end) = mv.get(2..=3) else {
-            return;
-        };
-        let Ok(end) = Square::from_str(end) else {
-            return;
-        };
-
-        // Each move should be exactly 4 characters; if it's a promotion,
-        // the last char will be the promotion char.
-        let Some(mv) = (if mv.len() == 5 {
-            // SAFETY: `mv` has a non-zero length so `chars()` must return
-            // something
-            let promotion_char = unsafe { mv.chars().next_back().unwrap_unchecked() };
-            let Ok(piece_type) = PieceType::try_from(promotion_char) else {
-                return;
-            };
-            moves.move_with_promo(start, end, piece_type)
-        } else {
-            moves.move_with(start, end)
-        }) else {
+        let Some(mv) = parse_move(mv, &board).filter(|&mv| board.is_pseudolegal(mv)) else {
             return;
         };
 
@@ -438,8 +442,6 @@ where
         if board.halfmoves() == 0 {
             board_history.clear();
         }
-
-        moves.clear();
     }
 
     *old_board = board;
@@ -513,6 +515,39 @@ fn create_workers<'a>(
         })
         .take(threads)
         .collect()
+}
+
+/// Parses a move in long algebraic notation into a [`Move`].
+///
+/// Returns [`None`] if the move cannot be parsed.
+fn parse_move(string: &str, board: &Board) -> Option<Move> {
+    let start = string.get(0..=1)?.parse().ok()?;
+    let end = string.get(2..=3)?.parse().ok()?;
+    let piece = board.piece_on(start);
+
+    // if the move is fully legal, these will always be correct
+    let is_promotion = string.len() == 5;
+    let is_castling = PieceType::from(piece) == PieceType::KING
+        && File::from(start).0.abs_diff(File::from(end).0) == 2;
+    let is_en_passant = PieceType::from(piece) == PieceType::PAWN && end == board.ep_square();
+
+    if is_castling {
+        let is_white = board.side_to_move() == Side::WHITE;
+        let is_kingside = File::from(end) >= File::FILE5;
+
+        Some(Move::new_castle_any(is_white, is_kingside))
+    } else if is_promotion {
+        // SAFETY: `mv` has a non-zero length so `chars()` must return
+        // something
+        let promotion_char = unsafe { string.chars().next_back().unwrap_unchecked() };
+        let piece_type = PieceType::try_from(promotion_char).ok()?;
+
+        Some(Move::new_promo_any(start, end, piece_type))
+    } else if is_en_passant {
+        Some(Move::new_en_passant(start, end))
+    } else {
+        Some(Move::new(start, end))
+    }
 }
 
 /// Parses an `Option<&str>` into an `Option<T>`.

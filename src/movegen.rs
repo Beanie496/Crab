@@ -207,6 +207,25 @@ impl Move {
 
     /// Creates a castling [`Move`] from `start` to `end`, given if the side is
     /// White and if the side of the board is kingside.
+    pub fn new_castle_any(is_white: bool, is_kingside: bool) -> Self {
+        #[allow(clippy::collapsible_else_if)]
+        if is_white {
+            if is_kingside {
+                Self::new_castle::<true, true>()
+            } else {
+                Self::new_castle::<true, false>()
+            }
+        } else {
+            if is_kingside {
+                Self::new_castle::<false, true>()
+            } else {
+                Self::new_castle::<false, false>()
+            }
+        }
+    }
+
+    /// Creates a castling [`Move`] from `start` to `end`, given if the side is
+    /// White and if the side of the board is kingside.
     pub fn new_castle<const IS_WHITE: bool, const IS_KINGSIDE: bool>() -> Self {
         #[allow(clippy::collapsible_else_if)]
         if IS_WHITE {
@@ -344,33 +363,6 @@ impl Moves {
         debug_assert!(self.len() < self.capacity(), "stack overflow");
         // SAFETY: we just checked that we are able to push
         unsafe { self.push_unchecked(scored_move) };
-    }
-
-    /// Finds and returns, if it exists, the [`Move`] that has start square
-    /// `start` and end square `end`.
-    ///
-    /// Returns `Some(mv)` if a [`Move`] does match the start and end square;
-    /// returns `None` otherwise.
-    pub fn move_with(&self, start: Square, end: Square) -> Option<Move> {
-        self.iter()
-            .find(|&scored_move| scored_move.mv.is_moving_from_to(start, end))
-            .map(|&scored_move| scored_move.mv)
-    }
-
-    /// Finds and returns, if it exists, the [`Move`] that has start square
-    /// `start`, end square `end` and promotion piece `piece_type`.
-    ///
-    /// Returns `Some(mv)` if a [`Move`] does match the criteria; returns `None`
-    /// otherwise.
-    pub fn move_with_promo(
-        &self,
-        start: Square,
-        end: Square,
-        piece_type: PieceType,
-    ) -> Option<Move> {
-        self.iter()
-            .find(|&scored_move| scored_move.mv == Move::new_promo_any(start, end, piece_type))
-            .map(|&scored_move| scored_move.mv)
     }
 
     /// Picks a random item, swaps it with the first item, then pops the

@@ -31,9 +31,15 @@
 //!   `depth`, `nodes`, `movetime` and `infinite`. There's also a special
 //!   option `perft <depth>`, which overrides the regular search to run perft
 //!   to `<depth>`.
+//! - `ispseudolegal <move`: prints if `move` is pseudolegal
+//! - `ispseudolegalkiller <move>`: prints if `move` would be pseudolegal if it
+//!   were a killer
+//! - `isquiet <move>`: prints if `move` is seen as quiet
 //! - `isready`
 //! - `p`: pretty-print the current board
 //! - `position`
+//! - `see <move>`: prints the output of running static exchange evaluation on
+//!   `move`
 //! - `setoption`: see output of `uci` command for more detail
 //! - `stop`
 //! - `uci`

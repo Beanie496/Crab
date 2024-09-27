@@ -90,9 +90,9 @@ impl Display for Evaluation {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         #[allow(clippy::unwrap_used)]
         if self.is_mate() {
-            write!(f, "score mate {}", self.moves_to_mate())
+            write!(f, "mate {}", self.moves_to_mate())
         } else {
-            write!(f, "score cp {}", self.0)
+            write!(f, "cp {}", self.0)
         }
     }
 }

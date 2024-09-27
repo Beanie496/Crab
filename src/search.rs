@@ -645,7 +645,7 @@ impl<'a> Worker<'a> {
         let nps = 1_000_000 * nodes / time.as_micros().max(1) as u64;
 
         println!(
-            "info depth {depth} seldepth {} {score} hashfull {} nodes {nodes} time {} nps {nps} pv {pv}",
+            "info depth {depth} seldepth {} score {score} hashfull {} nodes {nodes} time {} nps {nps} pv {pv}",
             self.seldepth.0,
             self.state.tt.estimate_hashfull(),
             time.as_millis(),

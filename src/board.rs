@@ -27,7 +27,7 @@ use crate::{
     bitboard::Bitboard,
     defs::{Direction, File, Piece, PieceType, Rank, Side, Square},
     error::ParseError,
-    evaluation::{Phase, Score},
+    evaluation::{evaluate, Phase, Score},
     lookups::{ray_between, ATTACK_LOOKUPS},
     movegen::Move,
     util::{get_unchecked, insert_unchecked, is_double_pawn_push},
@@ -349,6 +349,8 @@ impl Board {
         println!();
         println!("FEN: {self}");
         println!("Zobrist key: {}", self.key());
+        println!("Pawn zobrist key: {}", self.pawn_key());
+        println!("Static evaluation: {}", evaluate(self));
     }
 
     /// Returns the piece bitboard given by `PIECE`.
