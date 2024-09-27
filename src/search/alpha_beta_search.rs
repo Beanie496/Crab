@@ -93,7 +93,20 @@ impl Worker<'_> {
             (eval, eval + self.histories.correction_history_delta(board))
         };
 
+        self.add_to_stack(height, is_in_check, static_eval);
         self.histories.clear_next_killers(height);
+
+        // This flag is if our current static evaluation is better than our
+        // static evaluation a full move ago (unless we're in check, in which
+        // case it's always false). If it is true, we expect a fail high, so we
+        // can be more aggressive with beta-related margins and similar, but we
+        // should be more conservative with alpha-related margins and similar.
+        // If it's false, it's the reverse.
+        let is_improving = height >= Height(2)
+            && self
+                .search_stack
+                .get(height.to_index() - 2)
+                .is_some_and(|&prev_static_eval| static_eval > prev_static_eval);
 
         if !NodeType::IS_PV && !is_in_check {
             // Null move pruning: if we can give the opponent a free move (by
@@ -159,7 +172,7 @@ impl Worker<'_> {
         let killers = self.histories.current_killers(height);
         let last_history_item = self.histories.board_history.last();
         let counter_move = last_history_item.and_then(|item| self.histories.counter_move(*item));
-        let late_move_threshold = late_move_threshold(depth);
+        let late_move_threshold = late_move_threshold(depth, is_improving);
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
@@ -221,6 +234,8 @@ impl Worker<'_> {
                 if depth >= 3 && total_moves >= 3 {
                     // non-pv nodes are probably not important
                     reduction += Depth::from(!NodeType::IS_PV);
+                    // if we're not improving, we expect a fail low
+                    reduction += Depth::from(!is_improving);
                     // if we're reducing, it means we expect this to be an all
                     // node, so `is_cut_node` should be false. If it's true,
                     // it's probably wrong, so we reduce (for some reason)
@@ -445,8 +460,9 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 
 /// Calculates how many moves need to have been made before late move pruning
 /// applies.
-fn late_move_threshold(depth: Depth) -> u8 {
-    3 + (depth * depth / 2).0 as u8
+fn late_move_threshold(depth: Depth, is_improving: bool) -> u8 {
+    let divisor = 2 - i16::from(is_improving);
+    ((depth * depth + 4).0 / divisor) as u8
 }
 
 /// Calculates the margin for futility pruning.
