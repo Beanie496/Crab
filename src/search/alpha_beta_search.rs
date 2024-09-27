@@ -172,7 +172,7 @@ impl Worker<'_> {
         let killers = self.histories.current_killers(height);
         let last_history_item = self.histories.board_history.last();
         let counter_move = last_history_item.and_then(|item| self.histories.counter_move(*item));
-        let late_move_threshold = late_move_threshold(depth);
+        let late_move_threshold = late_move_threshold(depth, is_improving);
         let mut movepicker = AllMovesPicker::new(tt_move, killers, counter_move);
 
         let mut total_moves: u8 = 0;
@@ -460,8 +460,9 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 
 /// Calculates how many moves need to have been made before late move pruning
 /// applies.
-fn late_move_threshold(depth: Depth) -> u8 {
-    3 + (depth * depth / 2).0 as u8
+fn late_move_threshold(depth: Depth, is_improving: bool) -> u8 {
+    let divisor = 2 - i16::from(is_improving);
+    ((depth * depth + 4).0 / divisor) as u8
 }
 
 /// Calculates the margin for futility pruning.
