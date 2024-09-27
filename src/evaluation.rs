@@ -76,6 +76,8 @@ static PIECE_SQUARE_TABLES: [[Score; Square::TOTAL]; Piece::TOTAL + 1] =
 static PHASE_WEIGHTS: [u8; Piece::TOTAL + 1] = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0, 0];
 
 impl Evaluation {
+    /// An invalid evaluation.
+    pub const NONE: Self = Self(Self::INFINITY.0 + 1);
     /// The highest possible (positive) evaluation.
     pub const INFINITY: Self = Self(i16::MAX as i32);
     /// The evaluation of a mate.

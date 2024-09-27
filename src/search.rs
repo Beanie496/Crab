@@ -184,6 +184,11 @@ pub struct Worker<'a> {
     state: &'a SharedState,
     /// The ID of the current thread, starting from 0 for the main thread.
     thread_id: usize,
+    /// A stack of information that different search calls might need to know
+    /// of each other.
+    ///
+    /// Currently just static evaluation.
+    search_stack: [Evaluation; Depth::MAX.to_index() + 1],
 }
 
 impl NmpRights {
@@ -381,6 +386,7 @@ impl<'a> Worker<'a> {
             board: Board::new(),
             state,
             thread_id,
+            search_stack: [Evaluation(0); Depth::MAX.to_index() + 1],
         }
     }
 
@@ -436,6 +442,7 @@ impl<'a> Worker<'a> {
         self.nodes.clear();
         self.nmp_rights = NmpRights::new();
         self.histories.age_all();
+        self.search_stack.fill(Evaluation(0));
         self.calculate_time_window();
 
         self.iterative_deepening()
@@ -503,6 +510,19 @@ impl<'a> Worker<'a> {
     /// Pops a history item off the stack.
     fn pop_board_history(&mut self) -> Option<HistoryItem> {
         self.histories.board_history.pop()
+    }
+
+    /// Adds a static evaluation to the search stack at the current height.
+    fn add_to_stack(&mut self, height: Height, is_in_check: bool, mut static_eval: Evaluation) {
+        // don't trust the static eval if we're in check: use the previous one
+        if is_in_check {
+            static_eval = if height >= Height(2) {
+                self.search_stack[height.to_index() - 2]
+            } else {
+                Evaluation::NONE
+            };
+        }
+        self.search_stack[height.to_index()] = static_eval;
     }
 
     /// Check the status of the search.
