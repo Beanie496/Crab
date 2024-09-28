@@ -116,7 +116,7 @@ impl Worker<'_> {
             // in zugzwang, which usually happens in king + pawn endgames.
             if self.nmp_rights.can_make_null_move(board.side_to_move())
                 && depth >= 3
-                && static_eval >= beta
+                && static_eval - null_move_margin(depth) >= beta
                 && beta > -Evaluation::MATE_BOUND
                 && board.has_non_pawn_pieces()
             {
@@ -451,6 +451,12 @@ impl Worker<'_> {
 
         best_score
     }
+}
+
+/// Calculates how far above beta the static eval should be to trigger null
+/// move pruning.
+fn null_move_margin(depth: Depth) -> Evaluation {
+    -Evaluation::from(depth) * 15 + 300
 }
 
 /// Calculates the reduction for a move.
