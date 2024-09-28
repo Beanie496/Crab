@@ -116,7 +116,11 @@ impl Worker<'_> {
             // in zugzwang, which usually happens in king + pawn endgames.
             if self.nmp_rights.can_make_null_move(board.side_to_move())
                 && depth >= 3
-                && static_eval >= beta
+                // We're in a non-PV node so beta now is the same as beta a
+                // full move ago. If we're not improving and our static eval is
+                // above beta, it means NMP was tried a full move ago but
+                // failed, so we should be a little wary about trying it now.
+                && static_eval - Evaluation(30) * Evaluation::from(!is_improving && height >= Height(2)) >= beta
                 && beta > -Evaluation::MATE_BOUND
                 && board.has_non_pawn_pieces()
             {

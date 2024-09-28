@@ -222,6 +222,12 @@ impl Div<i16> for Evaluation {
     }
 }
 
+impl From<bool> for Evaluation {
+    fn from(b: bool) -> Self {
+        Self(b.into())
+    }
+}
+
 impl From<CompressedEvaluation> for Evaluation {
     fn from(eval: CompressedEvaluation) -> Self {
         Self(eval.0.into())
