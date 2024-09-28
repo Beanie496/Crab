@@ -455,7 +455,9 @@ impl Worker<'_> {
 
 /// Calculates the reduction for a move.
 fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) -> Depth {
-    Depth::from(((static_eval - beta) / 200).min(Evaluation(6))) + depth / 3 + 3
+    let base = Depth::from(((static_eval - beta) / 200).min(Evaluation(6))) + depth / 3 + 3;
+    // make sure we do at least a depth 1 search
+    base.min(depth - 1)
 }
 
 /// Calculates how many moves need to have been made before late move pruning
