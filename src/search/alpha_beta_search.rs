@@ -120,7 +120,7 @@ impl Worker<'_> {
                 // full move ago. If we're not improving and our static eval is
                 // above beta, it means NMP was tried a full move ago but
                 // failed, so we should be a little wary about trying it now.
-                && static_eval - Evaluation(30) * Evaluation::from(!is_improving && height >= Height(2)) >= beta
+                && static_eval - null_move_margin(depth, height, is_improving) >= beta
                 && beta > -Evaluation::MATE_BOUND
                 && board.has_non_pawn_pieces()
             {
@@ -454,6 +454,17 @@ impl Worker<'_> {
         }
 
         best_score
+    }
+}
+
+/// Calculates how far above beta the static eval should be to trigger null
+/// move pruning.
+fn null_move_margin(depth: Depth, height: Height, is_improving: bool) -> Evaluation {
+    let margin = -Evaluation::from(depth) * 15 + 300;
+    if is_improving || height < Height(2) {
+        margin.min(Evaluation(0))
+    } else {
+        margin
     }
 }
 
