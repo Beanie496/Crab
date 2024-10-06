@@ -16,6 +16,8 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::sync::atomic::Ordering;
+
 use super::{
     AllMovesPicker, Depth, Height, Node, NonPvNode, Pv, PvNode, QuiescenceMovePicker, SearchStatus,
     Worker,
@@ -54,6 +56,10 @@ impl Worker<'_> {
         self.nodes.increment();
 
         if !NodeType::IS_ROOT {
+            if self.check_status() != SearchStatus::Continue {
+                return Evaluation::default();
+            }
+
             // Mate distance pruning: if the score of mating in the next move
             // (`mate_after(height + 1)`) is still unable to exceed alpha, we
             // can prune. Likewise, if we're getting mated right now
@@ -283,7 +289,9 @@ impl Worker<'_> {
             self.unmake_move();
 
             // if the search was stopped early, we can't trust its results
-            if self.check_status() != SearchStatus::Continue {
+            if SearchStatus::from(self.state.status.load(Ordering::Relaxed))
+                != SearchStatus::Continue
+            {
                 // in the (admittedly never observed before) scenario where the
                 // search was terminated during depth 1 and the PV was never
                 // updated, just add whatever move the search is currently on

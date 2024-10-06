@@ -76,7 +76,7 @@ impl UciOptions {
 impl Default for UciOptions {
     fn default() -> Self {
         Self {
-            move_overhead: Duration::from_millis(2),
+            move_overhead: Duration::from_millis(16),
             threads: 1,
             hash: 32,
         }
