@@ -145,7 +145,7 @@ impl Worker<'_> {
                 self.unmake_null_move(board);
 
                 if score >= beta && score < Evaluation::MATE_BOUND {
-                    if depth <= 8 {
+                    if depth <= 16 {
                         return score;
                     }
 
