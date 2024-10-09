@@ -44,8 +44,8 @@ impl Worker<'_> {
             let total_overhead = self.start.elapsed() + self.move_overhead;
             let total_time = *time;
             // if an iterative deepening loop takes way longer than expected,
-            // make sure we don't run out of time
-            *time = total_time.saturating_sub(total_overhead);
+            // make sure we don't burn too much time
+            *time = total_time.saturating_sub(total_overhead) / 2;
 
             self.allocated = (total_time / moves_to_go.0.into() + inc)
                 // don't allocate more time than we actually have

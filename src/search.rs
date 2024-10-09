@@ -577,8 +577,7 @@ impl<'a> Worker<'a> {
                 }
             }
             Limits::Timed { time, .. } => {
-                // if we've used all of our time and are eating into move
-                // overhead, stop the search
+                // stop the search if we've gone over our maximum allowed time
                 if self.start.elapsed() >= time {
                     self.state
                         .status
