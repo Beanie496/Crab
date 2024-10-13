@@ -37,7 +37,7 @@ checksum = "b0fc239e0f6cb375d2402d48afb92f76f5404fd1df208a41930ec81eda078bea"
 
 [[package]]
 name = "crab"
-version = "4.5.0"
+version = "4.6.0"
 dependencies = [
  "arrayvec",
  "oorandom",

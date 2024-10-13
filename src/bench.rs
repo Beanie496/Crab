@@ -46,11 +46,11 @@ where
         .next()
         .and_then(|l| l.parse::<u64>().ok())
         .unwrap_or(LIMIT);
-    let limit_type = options.next().unwrap_or(LIMIT_TYPE);
     let tt_size = options
         .next()
         .and_then(|t| t.parse::<usize>().ok())
         .unwrap_or(TT_SIZE);
+    let limit_type = options.next().unwrap_or(LIMIT_TYPE);
 
     let limits = match limit_type {
         "depth" => {

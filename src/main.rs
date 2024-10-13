@@ -22,9 +22,9 @@
 //! Crab, a UCI-compatible chess engine written in Rust.
 //!
 //! Accepted commands:
-//! - `bench [limit] [limit type] [TT size]`: run a benchmark. The default
-//!   options are [`TT_SIZE`](crate::bench::TT_SIZE),
-//!   [`LIMIT`](crate::bench::LIMIT) and
+//! - `bench [limit] [TT size] [limit type]`: run a benchmark. The default
+//!   options are [`LIMIT`](crate::bench::LIMIT),
+//!   [`TT_SIZE`](crate::bench::TT_SIZE) and
 //!   [`LIMIT_TYPE`](crate::bench::LIMIT_TYPE) respectively.
 //! - `f`: find magics for the bishop and rook
 //! - `go` with the options `wtime`, `btime`, `winc`, `binc`, `movestogo`,
