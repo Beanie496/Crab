@@ -538,7 +538,8 @@ impl<'a> Worker<'a> {
         }
 
         #[allow(clippy::unwrap_used)]
-        if let Ok(token) = self.state.uci_rx.lock().unwrap().try_recv() {
+        let next_token = self.state.uci_rx.lock().unwrap().try_recv();
+        if let Ok(token) = next_token {
             let token = token.trim();
             if token == "stop" {
                 self.state
@@ -604,11 +605,6 @@ impl<'a> Worker<'a> {
         match self.limits {
             Limits::Depth(d) => {
                 if depth >= Depth::from(d) {
-                    if self.is_main_thread() {
-                        self.state
-                            .status
-                            .store(SearchStatus::Stop.into(), Ordering::Relaxed);
-                    }
                     return true;
                 }
             }
@@ -616,9 +612,6 @@ impl<'a> Worker<'a> {
                 // if we do not have a realistic chance of finishing the next
                 // loop, assume we won't, and stop early.
                 if self.is_main_thread() && self.start.elapsed() > self.allocated.mul_f32(0.4) {
-                    self.state
-                        .status
-                        .store(SearchStatus::Stop.into(), Ordering::Relaxed);
                     return true;
                 }
             }

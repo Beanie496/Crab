@@ -16,8 +16,10 @@
  * Crab. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::sync::atomic::Ordering;
+
 use super::{AspirationWindow, Depth, Height, Pv, Worker};
-use crate::movegen::Move;
+use crate::{movegen::Move, search::SearchStatus};
 
 impl Worker<'_> {
     /// Performs iterative deepening on the given board.
@@ -28,7 +30,7 @@ impl Worker<'_> {
         let mut pv = Pv::new();
 
         // `Step` is unstable
-        for depth in 1..Depth::MAX.0 {
+        for depth in 1..=Depth::MAX.0 {
             let depth = Depth(depth);
 
             self.seldepth = Height::default();
@@ -40,6 +42,12 @@ impl Worker<'_> {
             }
 
             asp_window.adjust_around(score, depth);
+        }
+
+        if self.is_main_thread() {
+            self.state
+                .status
+                .store(SearchStatus::Stop.into(), Ordering::Relaxed);
         }
 
         self.root_pv.clear();

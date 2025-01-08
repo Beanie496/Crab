@@ -199,14 +199,14 @@ impl GameSampler {
                     let end_bb = Bitboard::from(end);
                     if us == Side::WHITE {
                         let start_bb = end_bb.south();
-                        if (start_bb & pawns).0.count_ones() == 1 {
+                        if (start_bb & pawns).0.is_power_of_two() {
                             start_bb
                         } else {
                             start_bb.south()
                         }
                     } else {
                         let start_bb = end_bb.north();
-                        if (start_bb & pawns).0.count_ones() == 1 {
+                        if (start_bb & pawns).0.is_power_of_two() {
                             start_bb
                         } else {
                             start_bb.north()

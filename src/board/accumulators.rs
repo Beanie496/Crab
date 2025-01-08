@@ -177,8 +177,8 @@ impl ZobristKeys {
         let right_k = CastlingRights::k.0 as usize;
         let right_q = CastlingRights::q.0 as usize;
         cfor!(let mut i = 1; i < castling_rights.len(); i += 1; {
-           // if it's a base castling right
-           if i.count_ones() == 1 {
+           // if it's a base castling right: only 1 bit set
+           if i.is_power_of_two() {
                castling_rights[i] = rand!(seed);
                i += 1;
                continue;
