@@ -471,7 +471,7 @@ fn null_move_reduction(static_eval: Evaluation, beta: Evaluation, depth: Depth) 
 /// Calculates how many moves need to have been made before late move pruning
 /// applies.
 fn late_move_threshold(depth: Depth, is_improving: bool) -> u8 {
-    let divisor = 2 - i16::from(is_improving);
+    let divisor = 2 - i32::from(is_improving);
     ((depth * depth + 4).0 / divisor) as u8
 }
 

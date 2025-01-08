@@ -120,7 +120,7 @@ where
                 this_iteration_openings,
                 // make the function play more and more random moves into the
                 // future as the openings required increases
-                Depth(2 + f32::ln(this_iteration_openings as f32).ceil() as i16),
+                Depth(2 + f32::ln(this_iteration_openings as f32).ceil() as i32),
                 alpha,
                 beta,
                 &mut rng,

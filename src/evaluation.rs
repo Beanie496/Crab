@@ -83,7 +83,7 @@ impl Evaluation {
     /// The evaluation of a mate.
     pub const MATE: Self = Self::INFINITY;
     /// The lowest score a mate can have.
-    pub const MATE_BOUND: Self = Self(Self::MATE.0 - Depth::MAX.0 as i32);
+    pub const MATE_BOUND: Self = Self(Self::MATE.0 - Depth::MAX.0);
     /// The evaluation of a draw.
     pub const DRAW: Self = Self(0);
 }
@@ -230,7 +230,7 @@ impl From<CompressedEvaluation> for Evaluation {
 
 impl From<Depth> for Evaluation {
     fn from(eval: Depth) -> Self {
-        Self(eval.0.into())
+        Self(eval.0)
     }
 }
 
@@ -248,11 +248,11 @@ impl Mul for Evaluation {
     }
 }
 
-impl Mul<i16> for Evaluation {
+impl Mul<i32> for Evaluation {
     type Output = Self;
 
-    fn mul(self, other: i16) -> Self::Output {
-        self * Self(other.into())
+    fn mul(self, other: i32) -> Self::Output {
+        self * Self(other)
     }
 }
 

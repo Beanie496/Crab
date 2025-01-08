@@ -189,7 +189,7 @@ impl Histories {
     ///
     /// It will always be in the range `0..=`[`Self::MAX_HISTORY_VAL`].
     fn bonus(depth: Depth) -> Evaluation {
-        Evaluation::from(CompressedEvaluation(depth.0.min(8) * 100))
+        Evaluation(depth.0.min(8) * 100)
     }
 
     /// Updates a particular item of a history table.

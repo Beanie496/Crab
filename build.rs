@@ -25,7 +25,7 @@ use std::{
 };
 
 /// The difference between the leaf node and the current node.
-type Depth = i16;
+type Depth = i32;
 /// A table of base late move reductions.
 ///
 /// Indexed by the depth then number of legal moves.

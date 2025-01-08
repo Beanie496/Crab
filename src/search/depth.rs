@@ -22,7 +22,7 @@ use std::{
     ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
 };
 
-use crate::evaluation::{CompressedEvaluation, Evaluation};
+use crate::evaluation::Evaluation;
 
 /// A [`Depth`] with half the size.
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
@@ -30,7 +30,7 @@ pub struct CompressedDepth(pub u8);
 
 /// The difference between leaf node and the current node.
 #[derive(Clone, Copy, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Depth(pub i16);
+pub struct Depth(pub i32);
 
 /// The difference between the root node and the current node.
 #[derive(Clone, Copy, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -110,7 +110,7 @@ impl From<CompressedDepth> for Depth {
 
 impl From<Evaluation> for Depth {
     fn from(eval: Evaluation) -> Self {
-        Self(CompressedEvaluation::from(eval).0)
+        Self(eval.0)
     }
 }
 
@@ -180,7 +180,7 @@ impl Add<u8> for Height {
 
 impl Depth {
     /// The maximum depth permissible.
-    pub const MAX: Self = Self(u8::MAX as i16);
+    pub const MAX: Self = Self(u8::MAX as i32);
 }
 
 impl Depth {
