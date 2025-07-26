@@ -272,7 +272,7 @@ impl Worker<'_> {
                         !is_cut_node,
                     );
                 }
-            };
+            }
 
             if NodeType::IS_PV && (score > alpha || total_moves == 1) {
                 score = -self.search::<PvNode>(

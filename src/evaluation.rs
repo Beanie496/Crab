@@ -43,7 +43,7 @@ pub struct CompressedEvaluation(pub i16);
 ///
 /// When converting to a [`CompressedEvaluation`] or compared against mate scores,
 /// this should always be in the range
-/// `-`[`Self::INFINITY`]`..=`[`Self::INFINITY`].
+/// <code>-[Self::INFINITY]..=[Self::INFINITY]</code>.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Evaluation(pub i32);
 

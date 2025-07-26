@@ -187,7 +187,8 @@ impl Histories {
 
     /// The bonus of a good move.
     ///
-    /// It will always be in the range `0..=`[`Self::MAX_HISTORY_VAL`].
+    /// It will always be in the range
+    /// <code>0..=[Self::MAX_HISTORY_VAL]</code>.
     fn bonus(depth: Depth) -> Evaluation {
         Evaluation(depth.0.min(8) * 100)
     }
@@ -361,12 +362,12 @@ impl Histories {
     }
 
     /// Clear the killers of the next height.
-    pub fn clear_next_killers(&mut self, height: Height) {
+    pub const fn clear_next_killers(&mut self, height: Height) {
         self.killers[height.to_index() + 1] = [None; 2];
     }
 
     /// Inserts `mv` into the table as given by `history_item`.
-    pub fn insert_into_counter_moves(&mut self, history_item: HistoryItem, mv: Move) {
+    pub const fn insert_into_counter_moves(&mut self, history_item: HistoryItem, mv: Move) {
         if let Some(piece_dest) = history_item.piece_dest {
             let piece = piece_dest.piece.to_index();
             let square = piece_dest.dest.to_index();

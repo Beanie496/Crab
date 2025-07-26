@@ -273,7 +273,7 @@ impl TranspositionTable {
     }
 
     /// Returns a mutable reference to the internal vector of entries.
-    fn tt_mut(&mut self) -> &mut Vec<[AtomicU64; 2]> {
+    const fn tt_mut(&mut self) -> &mut Vec<[AtomicU64; 2]> {
         &mut self.tt
     }
 }

@@ -220,6 +220,7 @@ impl Magic {
 ///
 /// Panics if the value given for the generic parameter does not match the
 /// inner value of a [`PieceType::BISHOP`] or a [`PieceType::ROOK`].
+#[allow(clippy::large_stack_arrays)]
 pub fn find_magics<const PIECE: u8>() {
     let piece = PieceType(PIECE);
     let piece_str = if piece == PieceType::BISHOP {

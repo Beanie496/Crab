@@ -707,27 +707,27 @@ impl Board {
     }
 
     /// Increments the halfmove counter.
-    fn increment_halfmoves(&mut self) {
+    const fn increment_halfmoves(&mut self) {
         self.halfmoves += 1;
     }
 
     /// Sets halfmoves.
-    fn set_halfmoves(&mut self, count: u8) {
+    const fn set_halfmoves(&mut self, count: u8) {
         self.halfmoves = count;
     }
 
     /// Zeroes the halfmove counter.
-    fn reset_halfmoves(&mut self) {
+    const fn reset_halfmoves(&mut self) {
         self.halfmoves = 0;
     }
 
     /// Increments the fullmove counter.
-    fn increment_fullmoves(&mut self) {
+    const fn increment_fullmoves(&mut self) {
         self.fullmoves += 1;
     }
 
     /// Sets fullmoves.
-    fn set_fullmoves(&mut self, count: u16) {
+    const fn set_fullmoves(&mut self, count: u16) {
         self.fullmoves = count;
     }
 

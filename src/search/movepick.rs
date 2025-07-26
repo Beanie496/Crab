@@ -78,7 +78,7 @@ pub(super) struct MovePicker<Type: MovesType> {
 
 impl<Type: MovesType> MovePicker<Type> {
     /// Skip any future quiets.
-    pub(super) fn skip_quiets(&mut self) {
+    pub(super) const fn skip_quiets(&mut self) {
         self.do_quiets = false;
     }
 

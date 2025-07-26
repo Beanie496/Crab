@@ -149,7 +149,7 @@ pub const fn sliding_attacks<const PIECE: u8>(square: Square, blockers: Bitboard
         ray >>= 1;
     } else {
         panic!("Sliding piece type not a bishop or rook");
-    };
+    }
     attacks |= ray & not_h_file;
 
     Bitboard(attacks)

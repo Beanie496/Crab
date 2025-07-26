@@ -414,7 +414,7 @@ where
             }
         }
         _ => return,
-    };
+    }
 
     // check if we have any moves to parse
     if let Some(token) = tokens.next() {

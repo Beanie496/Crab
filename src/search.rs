@@ -238,7 +238,7 @@ impl Limits {
     ///
     /// If `self` is not [`Timed`](Self::Timed), it will be set to
     /// [`Infinite`](Self::Infinite).
-    pub fn set_inc(&mut self, increment: Duration) {
+    pub const fn set_inc(&mut self, increment: Duration) {
         if let &mut Self::Timed { ref mut inc, .. } = self {
             *inc = increment;
         } else {
@@ -250,7 +250,7 @@ impl Limits {
     ///
     /// If `self` is not [`Timed`](Self::Timed), it will be set to
     /// [`Infinite`](Self::Infinite).
-    pub fn set_moves_to_go(&mut self, mtg: CompressedDepth) {
+    pub const fn set_moves_to_go(&mut self, mtg: CompressedDepth) {
         if let &mut Self::Timed {
             ref mut moves_to_go,
             ..
@@ -403,7 +403,7 @@ impl<'a> Worker<'a> {
     }
 
     /// Calls [`Self::set_limits()`] on `self`.
-    pub fn with_limits(mut self, limits: Limits) -> Self {
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
         self.set_limits(limits);
         self
     }
@@ -415,7 +415,7 @@ impl<'a> Worker<'a> {
     }
 
     /// Sets the limits of the worker.
-    pub fn set_limits(&mut self, limits: Limits) {
+    pub const fn set_limits(&mut self, limits: Limits) {
         self.limits = limits;
     }
 
@@ -588,7 +588,7 @@ impl<'a> Worker<'a> {
                 }
             }
             _ => (),
-        };
+        }
 
         SearchStatus::Continue
     }

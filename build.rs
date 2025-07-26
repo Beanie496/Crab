@@ -48,7 +48,11 @@ fn main() -> io::Result<()> {
 /// Creates the file `binaries/base_reductions.bin`.
 ///
 /// The file has structure [`BaseReductions`].
-#[allow(clippy::missing_docs_in_private_items, clippy::items_after_statements)]
+#[allow(
+    clippy::large_stack_arrays,
+    clippy::missing_docs_in_private_items,
+    clippy::items_after_statements
+)]
 fn create_base_reductions() -> io::Result<()> {
     let mut base_reductions: BaseReductions = [[0; 128]; 64];
     const SIZE: usize = size_of::<BaseReductions>();
@@ -70,7 +74,11 @@ fn create_base_reductions() -> io::Result<()> {
 ///
 /// If the squares are not orthogonal or diagonal to each other, the bitboard
 /// will be empty.
-#[allow(clippy::missing_docs_in_private_items, clippy::items_after_statements)]
+#[allow(
+    clippy::large_stack_arrays,
+    clippy::missing_docs_in_private_items,
+    clippy::items_after_statements
+)]
 fn create_rays_between() -> io::Result<()> {
     let mut rays_between: RaysBetween = [[0; 64]; 64];
     const SIZE: usize = size_of::<RaysBetween>();
