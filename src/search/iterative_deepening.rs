@@ -44,7 +44,10 @@ impl Worker<'_> {
             asp_window.adjust_around(score, depth);
         }
 
-        if self.is_main_thread() {
+        if self.is_main_thread()
+            && SearchStatus::from(self.state.status.load(Ordering::Relaxed))
+                == SearchStatus::Continue
+        {
             self.state
                 .status
                 .store(SearchStatus::Stop.into(), Ordering::Relaxed);
