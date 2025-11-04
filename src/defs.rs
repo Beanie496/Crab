@@ -234,6 +234,7 @@ impl Square {
 
 impl From<File> for char {
     /// Converts a rank into a character: 'a' to 'h'.
+    #[inline]
     fn from(file: File) -> Self {
         (b'a' + file.0) as Self
     }
@@ -242,6 +243,7 @@ impl From<File> for char {
 impl From<Piece> for char {
     /// Converts a piece into a character: 'P' for White pawn, 'k' for Black
     /// king, etc.
+    #[inline]
     fn from(piece: Piece) -> Self {
         PIECE_CHARS[piece.to_index()]
     }
@@ -249,6 +251,7 @@ impl From<Piece> for char {
 
 impl From<PieceType> for char {
     /// Converts a piece type into a character: 'p' for pawn to 'k' for king.
+    #[inline]
     fn from(piece_type: PieceType) -> Self {
         let piece = Piece::from_piecetype(piece_type, Side::BLACK);
         Self::from(piece)
@@ -257,6 +260,7 @@ impl From<PieceType> for char {
 
 impl From<Rank> for char {
     /// Converts a rank into a character: '1' to '8'.
+    #[inline]
     fn from(rank: Rank) -> Self {
         (b'1' + rank.0) as Self
     }
@@ -266,6 +270,7 @@ impl From<Side> for char {
     /// Converts a side into a char, assuming the side is White or Black.
     ///
     /// 'w' if White, 'b' if Black and '-' otherwise.
+    #[inline]
     fn from(side: Side) -> Self {
         match side {
             Side::WHITE => 'w',

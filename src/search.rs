@@ -87,7 +87,7 @@ impl Node for RootNode {
 }
 
 /// The type of a search and its limits.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub enum Limits {
     /// Go under timed conditions.
     Timed {
@@ -107,6 +107,7 @@ pub enum Limits {
     /// Go for an exact amount of time.
     Movetime(Duration),
     /// Go until told to stop.
+    #[default]
     Infinite,
 }
 
@@ -200,12 +201,6 @@ impl NmpRights {
     const BOTH: u8 = Self::BLACK | Self::WHITE;
 }
 
-impl Default for Limits {
-    fn default() -> Self {
-        Self::Infinite
-    }
-}
-
 impl Display for Pv {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut ret_str = String::with_capacity(self.len());
@@ -228,6 +223,7 @@ impl From<u8> for SearchStatus {
 }
 
 impl From<SearchStatus> for u8 {
+    #[inline]
     fn from(val: SearchStatus) -> Self {
         val as Self
     }

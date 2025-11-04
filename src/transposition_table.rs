@@ -93,6 +93,7 @@ impl From<[u64; 2]> for TranspositionEntry {
 }
 
 impl From<TranspositionEntry> for [u64; 2] {
+    #[inline]
     fn from(entry: TranspositionEntry) -> Self {
         // SAFETY: all fields are integral types
         unsafe { transmute::<TranspositionEntry, Self>(entry) }

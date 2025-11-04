@@ -319,7 +319,9 @@ pub fn tune(positions: &str, mut learning_rate: f64) {
 /// The vector will be shrunk to fit.
 fn initialise_tuner_entries(positions: &str) -> TuneEntries {
     let mut tune_entries = TuneEntries::new();
-    let positions = BufReader::new(fs::File::open(positions).expect("could not open {positions}"));
+    let positions = BufReader::new(
+        fs::File::open(positions).unwrap_or_else(|_| panic!("could not open {positions}")),
+    );
 
     for line in positions
         .lines()

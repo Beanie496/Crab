@@ -104,7 +104,7 @@ fn create_rays_between() -> io::Result<()> {
 /// `None`.
 const fn direction_of_dest(square: u8, dest: u8) -> Option<u8> {
     // north: difference is divisible by 8
-    if (dest - square) % 8 == 0 {
+    if (dest - square).is_multiple_of(8) {
         return Some(8);
     }
 

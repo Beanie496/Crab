@@ -152,7 +152,7 @@ impl PartialEq for ScoredMove {
 
 impl PartialOrd for ScoredMove {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.score.cmp(&other.score))
+        Some(self.cmp(other))
     }
 }
 
@@ -558,6 +558,10 @@ fn generate_pawn_moves<Type: MovesType, const IS_WHITE: bool>(
 /// Calculates all legal knight and king moves (excluding castling) for `board`
 /// and puts them in `moves`.
 #[allow(clippy::assertions_on_constants)]
+// we're counting the number of bits - in this case this happens to do
+// the same as `is_power_of_two()`, but that's masking what we're
+// trying to do
+#[allow(clippy::manual_is_power_of_two)]
 fn generate_non_sliding_moves<Type: MovesType, const IS_WHITE: bool>(
     board: &Board,
     moves: &mut Moves,
