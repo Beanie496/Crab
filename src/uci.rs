@@ -1,6 +1,6 @@
 /*
  * Crab, a UCI-compatible chess engine
- * Copyright (C) 2024 Jasper Shovelton
+ * Copyright (C) 2024 June Shovelton
  *
  * Crab is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -56,7 +56,7 @@ pub struct UciOptions {
 }
 
 /// The name of the author of this engine.
-const ID_AUTHOR: &str = "Jasper Shovelton";
+const ID_AUTHOR: &str = "June Shovelton";
 /// The name of this engine.
 const ID_NAME: &str = "Crab";
 /// The version of this engine.
